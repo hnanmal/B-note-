@@ -1,0 +1,210 @@
+로컬 디스크 볼륨에 대한 폴더 경로의 목록입니다.
+볼륨 일련 번호는 9ABB-0E50입니다.
+D:.
+│  .gitattributes
+│  B-note.spec
+│  count_codeline.py
+│  main.py
+│  packaging.txt
+│  project_structure.txt
+│  
+├─.vscode
+│      launch.json
+│      
+├─build
+│  └─B-note
+│      │  Analysis-00.toc
+│      │  B-note.pkg
+│      │  base_library.zip
+│      │  EXE-00.toc
+│      │  PKG-00.toc
+│      │  PYZ-00.pyz
+│      │  PYZ-00.toc
+│      │  Tree-00.toc
+│      │  Tree-01.toc
+│      │  Tree-02.toc
+│      │  warn-B-note.txt
+│      │  xref-B-note.html
+│      │  
+│      └─localpycs
+│              pyimod01_archive.pyc
+│              pyimod02_importers.pyc
+│              pyimod03_ctypes.pyc
+│              pyimod04_pywin32.pyc
+│              struct.pyc
+│              
+├─dist
+│  │  B-note.exe
+│  │  
+│  └─resource
+│          app_logo.ico
+│          app_logo.png
+│          app_logo_.png
+│          app_logo_maintab.png
+│          app_logo_maintab_.png
+│          A_04_Work_Master_AR.xlsx
+│          A_06_Work_Master_SS.xlsx
+│          A_07_Work_Master_FP.xlsx
+│          common_info_pic1.png
+│          frame_close.png
+│          frame_open.png
+│          pjt_input_main.png
+│          pjt_std_main.png
+│          PlantArch_BIM Standard.bnote
+│          recent_files.json
+│          recent_files_.json
+│          RIDIBatang.otf
+│          version.json
+│          WorkMaster_DB.xlsx
+│          
+├─installer
+│  │  H_BimNote Installer.iss
+│  │  
+│  └─installer
+│      │  H_BimNote_Setup_1.2.9.exe
+│      │  
+│      └─_old
+│              H_BimNote_Setup_1.2.3.exe
+│              H_BimNote_Setup_1.2.5.exe
+│              H_BimNote_Setup_1.2.6.exe
+│              H_BimNote_Setup_1.2.7.exe
+│              H_BimNote_Setup_1.2.8.exe
+│              
+├─resource
+│      app_logo.ico
+│      app_logo.png
+│      app_logo_.png
+│      app_logo_maintab.png
+│      app_logo_maintab_.png
+│      A_04_Work_Master_AR.xlsx
+│      A_06_Work_Master_SS.xlsx
+│      A_07_Work_Master_FP.xlsx
+│      common_info_pic1.png
+│      frame_close.png
+│      frame_open.png
+│      pjt_input_main.png
+│      pjt_std_main.png
+│      PlantArch_BIM Standard.bnote
+│      recent_files.json
+│      recent_files_.json
+│      RIDIBatang.otf
+│      version.json
+│      WorkMaster_DB.xlsx
+│      
+└─src
+    ├─controllers
+    │  │  tree_data_navigator.py
+    │  │  
+    │  ├─widget
+    │  │  │  widgets.py
+    │  │  │  
+    │  │  └─__pycache__
+    │  │          widgets.cpython-39.pyc
+    │  │          
+    │  └─__pycache__
+    │          tree_data_navigator.cpython-39.pyc
+    │          
+    ├─core
+    │  │  app_update.py
+    │  │  file_utils.py
+    │  │  fp_utils.py
+    │  │  recent_file_widget.py
+    │  │  web.py
+    │  │  
+    │  └─__pycache__
+    │          app_update.cpython-39.pyc
+    │          file_utils.cpython-39.pyc
+    │          fp_utils.cpython-39.pyc
+    │          recent_file_widget.cpython-39.pyc
+    │          web.cpython-39.pyc
+    │          
+    ├─models
+    │  │  app_state.py
+    │  │  observer_manager.py
+    │  │  sheet_utils.py
+    │  │  
+    │  └─__pycache__
+    │          app_state.cpython-39.pyc
+    │          observer_manager.cpython-39.pyc
+    │          sheet_utils.cpython-39.pyc
+    │          
+    └─views
+        │  app_ui_setup.py
+        │  btn_utils.py
+        │  logging_utils.py
+        │  upper_tab.py
+        │  
+        ├─lower_tabs
+        │  │  common_input_tab.py
+        │  │  group_WM_tabs.py
+        │  │  pjt_apply_main_tab.py
+        │  │  pjt_family_assign_tab.py
+        │  │  pjt_family_list_tabs.py
+        │  │  pjt_group_WM_tabs.py
+        │  │  pjt_int_matrix_tab.py
+        │  │  pjt_report_group_tab.py
+        │  │  pjt_report_member_tab.py
+        │  │  pjt_report_TotalBD_tab.py
+        │  │  pjt_report_WM_tab.py
+        │  │  pjt_std_main_tab.py
+        │  │  std_family_list_tabs.py
+        │  │  std_main_tab.py
+        │  │  
+        │  └─__pycache__
+        │          common_input_tab.cpython-39.pyc
+        │          group_WM_tabs.cpython-39.pyc
+        │          pjt_apply_main_tab.cpython-39.pyc
+        │          pjt_family_assign_tab.cpython-39.pyc
+        │          pjt_family_list_tabs.cpython-39.pyc
+        │          pjt_group_WM_tabs.cpython-39.pyc
+        │          pjt_int_matrix_tab.cpython-39.pyc
+        │          pjt_report_group_tab.cpython-39.pyc
+        │          pjt_report_member_tab.cpython-39.pyc
+        │          pjt_report_TotalBD_tab.cpython-39.pyc
+        │          pjt_std_main_tab.cpython-39.pyc
+        │          std_family_list_tabs.cpython-39.pyc
+        │          std_main_tab.cpython-39.pyc
+        │          
+        ├─widget
+        │  │  assign_widget.py
+        │  │  calc_sheet_widget.py
+        │  │  collapsing_frame.py
+        │  │  dnd_utils.py
+        │  │  easter_egg.py
+        │  │  html_viewer.py
+        │  │  listbox_utils.py
+        │  │  multiline_input.py
+        │  │  new_window.py
+        │  │  pjt_familylist_widget.py
+        │  │  pjt_int_matrix.py
+        │  │  pjt_main_widget.py
+        │  │  sheet_utils.py
+        │  │  treesheet_editor.py
+        │  │  treeview_editor.py
+        │  │  treeview_utils.py
+        │  │  update_log.py
+        │  │  widget.py
+        │  │  
+        │  └─__pycache__
+        │          assign_widget.cpython-39.pyc
+        │          calc_sheet_widget.cpython-39.pyc
+        │          collapsing_frame.cpython-39.pyc
+        │          easter_egg.cpython-39.pyc
+        │          html_viewer.cpython-39.pyc
+        │          multiline_input.cpython-39.pyc
+        │          new_window.cpython-39.pyc
+        │          pjt_familylist_widget.cpython-39.pyc
+        │          pjt_int_matrix.cpython-39.pyc
+        │          pjt_main_widget.cpython-39.pyc
+        │          sheet_utils.cpython-39.pyc
+        │          treesheet_editor.cpython-39.pyc
+        │          treeview_editor.cpython-39.pyc
+        │          treeview_utils.cpython-39.pyc
+        │          update_log.cpython-39.pyc
+        │          widget.cpython-39.pyc
+        │          
+        └─__pycache__
+                app_ui_setup.cpython-39.pyc
+                logging_utils.cpython-39.pyc
+                upper_tab.cpython-39.pyc
+                

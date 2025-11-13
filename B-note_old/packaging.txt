@@ -1,0 +1,15 @@
+pyinstaller --onefile --icon=resource/app_logo_maintab.ico  --windowed main.py
+
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.1 main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.2 main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.3 main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.4 main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.5 main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.6 main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.7 main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.8 main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.8_fix main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note_0.0.9 main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --name B-note main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo_maintab.ico --windowed --clean --name B-note main.py
+pyinstaller --onefile --add-data "resource:resource"  --icon=resource/app_logo.ico --windowed --clean --name B-note main.py

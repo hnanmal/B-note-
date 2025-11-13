@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary # PostgreSQL 드라이버
+pydantic[email]
+python-jose[cryptography] # JWT 토큰 생성 및 검증
+passlib[bcrypt] # 비밀번호 해싱
+pandas
+openpyxl
