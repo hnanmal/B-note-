@@ -4,16 +4,18 @@ const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
 
 function WorkMasterManager() {
     const [workMasters, setWorkMasters] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
     const [file, setFile] = useState(null);
     const [message, setMessage] = useState('');
 
-    const fetchWorkMasters = async () => {
+    const fetchWorkMasters = async (query = '') => {
         try {
-            const response = await fetch(`${API_BASE_URL}/work-masters/`);
+            const url = query ? `${API_BASE_URL}/work-masters/?search=${query}` : `${API_BASE_URL}/work-masters/`;
+            const response = await fetch(url);
             if (!response.ok) throw new Error('Network response was not ok');
             const data = await response.json();
             setWorkMasters(data);
-            setMessage('WorkMaster 목록을 성공적으로 불러왔습니다.');
+            setMessage(query ? `'${query}'에 대한 검색 결과를 포함하여 목록을 업데이트했습니다.` : 'WorkMaster 목록을 성공적으로 불러왔습니다.');
         } catch (error) {
             setMessage(`목록 조회 실패: ${error.message}`);
         }
@@ -54,6 +56,16 @@ function WorkMasterManager() {
         }
     };
 
+    const handleSearch = (e) => {
+        e.preventDefault();
+        fetchWorkMasters(searchTerm);
+    };
+
+    const handleRefresh = () => {
+        setSearchTerm('');
+        fetchWorkMasters();
+    };
+
     return (
         <div>
             <h2>WorkMaster 관리</h2>
@@ -66,8 +78,19 @@ function WorkMasterManager() {
 
             {message && <p><strong>상태:</strong> {message}</p>}
 
-            <h3>WorkMaster 목록 (상위 100개)</h3>
-            <button onClick={fetchWorkMasters}>새로고침</button>
+            <h3>WorkMaster 목록</h3>
+            <div style={{ marginBottom: '10px' }}>
+                <form onSubmit={handleSearch}>
+                    <input
+                        type="text"
+                        placeholder="전체 컬럼에서 검색..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{ marginRight: '10px', padding: '5px' }}/>
+                    <button type="submit">검색</button>
+                </form>
+            </div>
+            <button onClick={handleRefresh}>새로고침</button>
             <div style={{ maxHeight: '500px', overflow: 'auto', border: '1px solid #ccc', marginTop: '10px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f2f2f2' }}>
@@ -78,6 +101,12 @@ function WorkMasterManager() {
                             <th style={tableHeaderStyle}>Mid Category</th>
                             <th style={tableHeaderStyle}>Small Category</th>
                             <th style={tableHeaderStyle}>Unit</th>
+                            <th style={tableHeaderStyle}>Attr1 Spec</th>
+                            <th style={tableHeaderStyle}>Attr2 Spec</th>
+                            <th style={tableHeaderStyle}>Attr3 Spec</th>
+                            <th style={tableHeaderStyle}>Attr4 Spec</th>
+                            <th style={tableHeaderStyle}>Attr5 Spec</th>
+                            <th style={tableHeaderStyle}>Attr6 Spec</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -89,6 +118,12 @@ function WorkMasterManager() {
                                 <td style={tableCellStyle}>{wm.cat_mid_desc}</td>
                                 <td style={tableCellStyle}>{wm.cat_small_desc}</td>
                                 <td style={tableCellStyle}>{wm.uom1}</td>
+                                <td style={tableCellStyle}>{wm.attr1_spec}</td>
+                                <td style={tableCellStyle}>{wm.attr2_spec}</td>
+                                <td style={tableCellStyle}>{wm.attr3_spec}</td>
+                                <td style={tableCellStyle}>{wm.attr4_spec}</td>
+                                <td style={tableCellStyle}>{wm.attr5_spec}</td>
+                                <td style={tableCellStyle}>{wm.attr6_spec}</td>
                             </tr>
                         ))}
                     </tbody>

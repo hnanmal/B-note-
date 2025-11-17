@@ -1,6 +1,17 @@
-from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Integer,
+    String,
+    DateTime,
+    ForeignKey,
+    Text,
+    Table,
+    Enum,
+)
 from sqlalchemy.orm import relationship
 import datetime
+import enum
 
 from database import Base
 
@@ -25,14 +36,16 @@ class Project(Base):
     project_code = Column(String, unique=True, index=True)
     description = Column(Text, nullable=True)
     creation_date = Column(DateTime, default=datetime.datetime.utcnow)
-    
+
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="projects")
 
     # 예시: 빌딩과의 관계. 추후 Building 모델 생성 시 활성화
     # buildings = relationship("Building", back_populates="project", cascade="all, delete-orphan")
 
+
 # 여기에 Building 등 다른 모델들을 계속해서 추가해나갈 예정입니다.
+
 
 class WorkMaster(Base):
     __tablename__ = "work_masters"
@@ -57,8 +70,43 @@ class WorkMaster(Base):
     attr5_spec = Column(String)
     attr6_code = Column(String)
     attr6_spec = Column(String)
-    uom1 = Column("UoM1", String) # 'UoM1'
-    uom2 = Column("UoM2", String) # 'UoM2'
+    uom1 = Column("UoM1", String)  # 'UoM1'
+    uom2 = Column("UoM2", String)  # 'UoM2'
     work_group_code = Column(String)
     work_master_code = Column(String, unique=True, index=True)
     new_old_code = Column(String)
+
+
+# Association Table for StandardItem and WorkMaster
+standard_item_work_master_association = Table(
+    "standard_item_work_master_association",
+    Base.metadata,
+    Column("standard_item_id", Integer, ForeignKey("standard_items.id")),
+    Column("work_master_id", Integer, ForeignKey("work_masters.id")),
+)
+
+
+class StandardItemType(str, enum.Enum):
+    GWM = "GWM"
+    SWM = "SWM"
+
+
+class StandardItem(Base):
+    __tablename__ = "standard_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    type = Column(Enum(StandardItemType), nullable=False)
+
+    parent_id = Column(Integer, ForeignKey("standard_items.id"))
+    parent = relationship("StandardItem", remote_side=[id], back_populates="children")
+    children = relationship(
+        "StandardItem", back_populates="parent", cascade="all, delete-orphan"
+    )
+
+    # Many-to-Many relationship with WorkMaster
+    work_masters = relationship(
+        "WorkMaster",
+        secondary=standard_item_work_master_association,
+        backref="standard_items",
+    )
