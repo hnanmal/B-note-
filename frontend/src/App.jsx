@@ -9,7 +9,8 @@ function App() {
   const [activePage, setActivePage] = useState('matching'); // 'matching' | 'workmaster'
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const containerRef = useRef(null);
-  const SIDEBAR_WIDTH = 200;
+  const SIDEBAR_OPEN_WIDTH = 180;
+  const SIDEBAR_COLLAPSED_WIDTH = 16;
   const PANEL_LEFT_WIDTH = 560;
 
   return (
@@ -23,16 +24,16 @@ function App() {
         <div
           className={`sidebar-nav${sidebarOpen ? '' : ' collapsed'}`}
           style={{
-            width: sidebarOpen ? SIDEBAR_WIDTH : 48,
-            minWidth: sidebarOpen ? SIDEBAR_WIDTH : 48,
-            maxWidth: sidebarOpen ? SIDEBAR_WIDTH : 48,
+            width: sidebarOpen ? SIDEBAR_OPEN_WIDTH : SIDEBAR_COLLAPSED_WIDTH,
+            minWidth: sidebarOpen ? SIDEBAR_OPEN_WIDTH : SIDEBAR_COLLAPSED_WIDTH,
+            maxWidth: sidebarOpen ? SIDEBAR_OPEN_WIDTH : SIDEBAR_COLLAPSED_WIDTH,
             transition: 'width 0.2s',
             background: '#f8f8f8',
             borderRight: '1px solid #eee',
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'left',
-            position: 'sticky',
+            alignItems: 'center',
+            position: 'relative',
             height: '100%',
             zIndex: 10,
           }}
@@ -42,7 +43,7 @@ function App() {
             style={{
               position: 'absolute',
               top: 12,
-              right: 8,
+              right: -18,
               zIndex: 11,
               width: 32,
               height: 32,

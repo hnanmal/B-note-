@@ -5,7 +5,10 @@
   gap: 4px;
   background: #fafbfc;
   border-right: 1px solid #eee;
-  min-width: 180px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0 4px;
 }
 .nav-btn {
   transition: background 0.15s;
@@ -35,6 +38,30 @@
   letter-spacing: 0.5px;
   color: #222;
 }
+.App-header-fixed {
+  margin-bottom: 0;
+}
+
+#root {
+  margin: 0 auto;
+  padding: 0.5rem 1rem 1rem;
+  text-align: center;
+}
+
+.panel > * {
+  margin-top: 0;
+}
+
+.panel h1,
+.panel h2,
+.panel h3,
+.panel h4,
+.panel h5,
+.panel h6 {
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -74,16 +101,16 @@
 /* Two-column layout for main area */
 .App-main {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
   align-items: flex-start;
-  margin-top: 1.5rem;
+  margin-top: 0.15rem;
   text-align: left;
 }
 
 .panel {
   background: #fff;
   border: 1px solid #e0e0e0;
-  padding: 1rem;
+  padding: 0.35rem 0.75rem 0.65rem;
   box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
@@ -132,6 +159,8 @@
   flex: 1 1 60%;
   min-height: 200px;
   overflow: auto;
+  padding-top: 0;
+  margin-top: 0;
 }
 .panel.right .right-bottom {
   flex: 0 1 40%;
@@ -155,4 +184,4 @@
     min-height: auto;
     margin-top: 0.75rem;
   }
-} */
+}

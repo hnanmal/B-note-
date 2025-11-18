@@ -156,6 +156,7 @@ export default function StandardTreeManager({ onNodeSelect }) {
     };
 
     const smallBtn = { padding: '4px 6px', fontSize: 12 };
+    const headerButtonStyle = { padding: '4px 10px', fontSize: 12 };
 
     const renderNode = (node, level = 0) => (
         <div key={node.id} style={{ marginLeft: level * 12, padding: '6px 0' }}>
@@ -197,55 +198,57 @@ export default function StandardTreeManager({ onNodeSelect }) {
             <h2>Standard Tree</h2>
             {message && <div style={{ color: 'red' }}>{message}</div>}
             <div>
-                <div style={{ maxHeight: '680px', overflow: 'auto', overflowX: 'auto', border: '1px solid #e6e6e6', padding: 8, maxWidth: '100%' }}>
-                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div>
-                            <button onClick={() => handleAdd(null)}>루트 항목 추가</button>
-                            <button style={{ marginLeft: 8 }} onClick={refresh}>새로고침</button>
+                <div style={{ maxHeight: '680px', overflow: 'auto', overflowX: 'auto', border: '1px solid #e6e6e6', padding: 8, maxWidth: '100%', position: 'relative' }}>
+                    <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 2, paddingBottom: 8, borderBottom: '1px solid #e6e6e6' }}>
+                        <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div>
+                                <button style={headerButtonStyle} onClick={() => handleAdd(null)}>루트 항목 추가</button>
+                                <button style={{ ...headerButtonStyle, marginLeft: 8 }} onClick={refresh}>새로고침</button>
+                            </div>
+                            <div style={{ marginLeft: 'auto' }}>
+                                <span style={{ marginRight: 8, color: '#555' }}>필터:</span>
+                                <button onClick={() => setFilterType('ALL')} style={{ ...headerButtonStyle, fontWeight: filterType === 'ALL' ? '700' : '400' }}>All</button>
+                                <button onClick={() => setFilterType('GWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontWeight: filterType === 'GWM' ? '700' : '400' }}>GWM</button>
+                                <button onClick={() => setFilterType('SWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontWeight: filterType === 'SWM' ? '700' : '400' }}>SWM</button>
+                            </div>
                         </div>
-                        <div style={{ marginLeft: 'auto' }}>
-                            <span style={{ marginRight: 8, color: '#555' }}>필터:</span>
-                            <button onClick={() => setFilterType('ALL')} style={{ fontWeight: filterType === 'ALL' ? '700' : '400' }}>All</button>
-                            <button onClick={() => setFilterType('GWM')} style={{ marginLeft: 6, fontWeight: filterType === 'GWM' ? '700' : '400' }}>GWM</button>
-                            <button onClick={() => setFilterType('SWM')} style={{ marginLeft: 6, fontWeight: filterType === 'SWM' ? '700' : '400' }}>SWM</button>
-                        </div>
+                        {addingForParent !== undefined && (
+                            <div style={{ marginBottom: 8, padding: 8, border: '1px dashed #ccc' }}>
+                                <div style={{ marginBottom: 6 }}>
+                                    <input
+                                        ref={inputRef}
+                                        placeholder="항목 이름"
+                                        value={newName}
+                                        onChange={(e) => setNewName(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                submitCreate();
+                                            } else if (e.key === 'Escape') {
+                                                cancelAdd();
+                                            }
+                                        }}
+                                        style={{ padding: 6, width: 240 }}
+                                    />
+                                </div>
+                                {addingForParent === null ? (
+                                    <div style={{ marginBottom: 6 }}>
+                                        <button onClick={() => setNewType('GWM')} style={{ ...headerButtonStyle, fontWeight: newType === 'GWM' ? '700' : '400' }}>GWM</button>
+                                        <button onClick={() => setNewType('SWM')} style={{ ...headerButtonStyle, marginLeft: 8, fontWeight: newType === 'SWM' ? '700' : '400' }}>SWM</button>
+                                    </div>
+                                ) : (
+                                    <div style={{ marginBottom: 6, color: '#444' }}>부모 타입을 자동 상속: {newType}</div>
+                                )}
+                                <div>
+                                    <button style={headerButtonStyle} onClick={submitCreate}>생성</button>
+                                    <button onClick={cancelAdd} style={{ ...headerButtonStyle, marginLeft: 8 }}>취소</button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Inline add form */}
-                    {addingForParent !== undefined && (
-                        <div style={{ marginBottom: 8, padding: 8, border: '1px dashed #ccc' }}>
-                            <div style={{ marginBottom: 6 }}>
-                                <input
-                                    ref={inputRef}
-                                    placeholder="항목 이름"
-                                    value={newName}
-                                    onChange={(e) => setNewName(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            submitCreate();
-                                        } else if (e.key === 'Escape') {
-                                            cancelAdd();
-                                        }
-                                    }}
-                                    style={{ padding: 6, width: 240 }}
-                                />
-                            </div>
-                            {addingForParent === null ? (
-                                <div style={{ marginBottom: 6 }}>
-                                    <button onClick={() => setNewType('GWM')} style={{ fontWeight: newType === 'GWM' ? '700' : '400' }}>GWM</button>
-                                    <button onClick={() => setNewType('SWM')} style={{ marginLeft: 8, fontWeight: newType === 'SWM' ? '700' : '400' }}>SWM</button>
-                                </div>
-                            ) : (
-                                <div style={{ marginBottom: 6, color: '#444' }}>부모 타입을 자동 상속: {newType}</div>
-                            )}
-                            <div>
-                                <button onClick={submitCreate}>생성</button>
-                                <button onClick={cancelAdd} style={{ marginLeft: 8 }}>취소</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {tree.map(n => renderNode(n))}
+                    <div style={{ marginTop: 8 }}>
+                        {tree.map(n => renderNode(n))}
+                    </div>
                 </div>
             </div>
         </div>
