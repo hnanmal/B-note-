@@ -1,10 +1,40 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* Side navigation styles */
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #fafbfc;
+  border-right: 1px solid #eee;
+  min-width: 180px;
+}
+.nav-btn {
+  transition: background 0.15s;
+}
+.nav-btn.active {
+  background: #f0f0f0;
+  color: #222;
+}
+/* Fixed header styles */
+.App-header-fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 64px;
+  background: #f7f7f7;
+  border-bottom: 1px solid #e0e0e0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+.app-title {
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #222;
+}
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -40,3 +70,89 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Two-column layout for main area */
+.App-main {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin-top: 1.5rem;
+  text-align: left;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.panel.left {
+  /* width is controlled inline by App via style when splitter is active */
+  min-width: 240px;
+}
+
+.panel.right {
+  flex: 1 1 40%;
+  min-width: 300px;
+}
+
+/* Splitter between left and right panels */
+.splitter {
+  width: 8px;
+  cursor: col-resize;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,0.06), transparent);
+  border-radius: 2px;
+  margin: 0 4px;
+}
+.splitter:hover {
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,0.12), transparent);
+}
+
+@media (max-width: 900px) {
+  /* disable splitter on small screens: hide and stack panels */
+  .splitter { display: none; }
+}
+
+@media (max-width: 900px) {
+  .App-main {
+    flex-direction: column;
+  }
+  .panel.left, .panel.right {
+    min-width: auto;
+  }
+}
+
+/* Right panel vertical split */
+.panel.right {
+  display: flex;
+  flex-direction: column;
+}
+.panel.right .right-top {
+  flex: 1 1 60%;
+  min-height: 200px;
+  overflow: auto;
+}
+.panel.right .right-bottom {
+  flex: 0 1 40%;
+  min-height: 140px;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-top: 1px solid #eee;
+  background: #fbfbfb;
+}
+.matching-info {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 900px) {
+  /* When stacked vertically, keep right subpanels stacked */
+  .panel.right {
+    flex-direction: column;
+  }
+  .panel.right .right-top, .panel.right .right-bottom {
+    min-height: auto;
+    margin-top: 0.75rem;
+  }
+} */

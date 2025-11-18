@@ -13,7 +13,7 @@ from sqlalchemy.orm import relationship
 import datetime
 import enum
 
-from database import Base
+from .database import Base
 
 
 class User(Base):
@@ -70,11 +70,18 @@ class WorkMaster(Base):
     attr5_spec = Column(String)
     attr6_code = Column(String)
     attr6_spec = Column(String)
-    uom1 = Column("UoM1", String)  # 'UoM1'
-    uom2 = Column("UoM2", String)  # 'UoM2'
+    uom1 = Column(String)
+    uom2 = Column(String)
     work_group_code = Column(String)
     work_master_code = Column(String, unique=True, index=True)
     new_old_code = Column(String)
+
+    # Many-to-Many relationship with StandardItem
+    standard_items = relationship(
+        "StandardItem",
+        secondary="standard_item_work_master_association",
+        back_populates="work_masters",
+    )
 
 
 # Association Table for StandardItem and WorkMaster
@@ -108,5 +115,5 @@ class StandardItem(Base):
     work_masters = relationship(
         "WorkMaster",
         secondary=standard_item_work_master_association,
-        backref="standard_items",
+        back_populates="standard_items",
     )

@@ -4,8 +4,9 @@ from typing import List, Optional
 import pandas as pd
 import io
 
-import crud, schemas, models
-from database import SessionLocal
+from . import crud, schemas, models
+from .database import SessionLocal
+from . import database
 
 
 # 데이터베이스 세션을 가져오는 의존성
@@ -18,6 +19,20 @@ def get_db():
 
 
 router = APIRouter()
+
+
+@router.get("/debug/ping", tags=["Debug"])
+def debug_ping():
+    return {"ok": True}
+
+
+@router.get("/debug/db", tags=["Debug"])
+def debug_db(db: Session = Depends(get_db)):
+    try:
+        cnt = db.query(models.StandardItem).count()
+        return {"db_url": database.SQLALCHEMY_DATABASE_URL, "standard_items": cnt}
+    except Exception as e:
+        return {"db_url": database.SQLALCHEMY_DATABASE_URL, "error": str(e)}
 
 
 # TODO: 실제 사용자 인증 로직으로 교체해야 합니다.
@@ -134,3 +149,108 @@ async def upload_work_masters(
         raise HTTPException(
             status_code=500, detail=f"An error occurred while processing the file: {e}"
         )
+
+
+# ===================
+#   StandardItem
+# ===================
+@router.get(
+    "/standard-items/",
+    response_model=List[schemas.StandardItem],
+    tags=["Standard Items"],
+)
+def read_standard_items(
+    skip: int = 0,
+    limit: int = None,
+    search: Optional[str] = None,
+    parent_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    return crud.get_standard_items(
+        db=db, skip=skip, limit=limit, search=search, parent_id=parent_id
+    )
+
+
+@router.post(
+    "/standard-items/{standard_item_id}/assign",
+    tags=["Standard Items"],
+)
+def assign_work_master(
+    standard_item_id: int,
+    payload: schemas.AssignWorkMaster,
+    db: Session = Depends(get_db),
+):
+    std = crud.assign_work_master_to_standard_item(
+        db, standard_item_id=standard_item_id, work_master_id=payload.work_master_id
+    )
+    if not std:
+        raise HTTPException(
+            status_code=404, detail="StandardItem or WorkMaster not found"
+        )
+    return {"message": "assigned", "standard_item_id": std.id}
+
+
+@router.post(
+    "/standard-items/{standard_item_id}/remove",
+    tags=["Standard Items"],
+)
+def remove_work_master(
+    standard_item_id: int,
+    payload: schemas.AssignWorkMaster,
+    db: Session = Depends(get_db),
+):
+    std = crud.remove_work_master_from_standard_item(
+        db, standard_item_id=standard_item_id, work_master_id=payload.work_master_id
+    )
+    if not std:
+        raise HTTPException(
+            status_code=404, detail="StandardItem or WorkMaster not found"
+        )
+    return {"message": "removed", "standard_item_id": std.id}
+
+
+# Create standard item
+@router.post(
+    "/standard-items/", response_model=schemas.StandardItem, tags=["Standard Items"]
+)
+def create_standard_item(
+    item: schemas.StandardItemCreate, db: Session = Depends(get_db)
+):
+    return crud.create_standard_item(db=db, standard_item=item)
+
+
+# Get single standard item
+@router.get(
+    "/standard-items/{standard_item_id}",
+    response_model=schemas.StandardItem,
+    tags=["Standard Items"],
+)
+def get_standard_item(standard_item_id: int, db: Session = Depends(get_db)):
+    std = crud.get_standard_item(db, standard_item_id=standard_item_id)
+    if not std:
+        raise HTTPException(status_code=404, detail="StandardItem not found")
+    return std
+
+
+# Delete standard item
+@router.delete("/standard-items/{standard_item_id}", tags=["Standard Items"])
+def delete_standard_item(standard_item_id: int, db: Session = Depends(get_db)):
+    std = crud.delete_standard_item(db, standard_item_id=standard_item_id)
+    if not std:
+        raise HTTPException(status_code=404, detail="StandardItem not found")
+    return {"message": "deleted", "standard_item_id": standard_item_id}
+
+
+# Rename standard item (only name)
+@router.post("/standard-items/{standard_item_id}/rename", tags=["Standard Items"])
+def rename_standard_item(
+    standard_item_id: int,
+    payload: schemas.StandardItemRename,
+    db: Session = Depends(get_db),
+):
+    std = crud.update_standard_item_name(
+        db, standard_item_id=standard_item_id, new_name=payload.name
+    )
+    if not std:
+        raise HTTPException(status_code=404, detail="StandardItem not found")
+    return {"message": "renamed", "standard_item_id": std.id}

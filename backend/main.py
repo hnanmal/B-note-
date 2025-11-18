@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api import router
-from database import engine, Base
+from .api import router
+from .database import engine, Base
 
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
@@ -15,13 +15,16 @@ app = FastAPI(
 # CORS 미들웨어 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 개발 중에는 모든 출처를 허용. 배포 시에는 프론트엔드 주소만 명시.
+    allow_origins=[
+        "*"
+    ],  # 개발 중에는 모든 출처를 허용. 배포 시에는 프론트엔드 주소만 명시.
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 HTTP 헤더 허용
 )
 
 app.include_router(router, prefix="/api/v1")
+
 
 @app.get("/")
 def read_root():

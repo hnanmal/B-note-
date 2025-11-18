@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-import models, schemas
-import security
+from . import models, schemas
+from . import security
 
 
 def get_project(db: Session, project_id: int):
@@ -109,3 +109,118 @@ def get_work_masters(db: Session, skip: int = 0, limit: int = None, search: str 
         query = query.limit(limit)
 
     return query.all()
+
+
+# ===================
+#   StandardItem
+# ===================
+def get_standard_items(
+    db: Session,
+    skip: int = 0,
+    limit: int = None,
+    search: str = None,
+    parent_id: int = None,
+):
+    query = db.query(models.StandardItem)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                models.StandardItem.name.ilike(search_term),
+            )
+        )
+
+    # filter by parent_id when provided (return only direct children)
+    if parent_id is not None:
+        query = query.filter(models.StandardItem.parent_id == parent_id)
+
+    if skip is not None:
+        query = query.offset(skip)
+    if limit is not None:
+        query = query.limit(limit)
+
+    return query.all()
+
+
+def create_standard_item(db: Session, standard_item: schemas.StandardItemCreate):
+    db_item = models.StandardItem(**standard_item.dict())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+def delete_standard_item(db: Session, standard_item_id: int):
+    item = get_standard_item(db, standard_item_id)
+    if not item:
+        return None
+    db.delete(item)
+    db.commit()
+    return item
+
+
+def get_standard_item(db: Session, standard_item_id: int):
+    return (
+        db.query(models.StandardItem)
+        .filter(models.StandardItem.id == standard_item_id)
+        .first()
+    )
+
+
+def assign_work_master_to_standard_item(
+    db: Session, standard_item_id: int, work_master_id: int
+):
+    std = get_standard_item(db, standard_item_id)
+    if not std:
+        return None
+    wm = (
+        db.query(models.WorkMaster)
+        .filter(models.WorkMaster.id == work_master_id)
+        .first()
+    )
+    if not wm:
+        return None
+
+    # Avoid duplicate
+    if wm not in std.work_masters:
+        std.work_masters.append(wm)
+        db.add(std)
+        db.commit()
+        db.refresh(std)
+
+    return std
+
+
+def remove_work_master_from_standard_item(
+    db: Session, standard_item_id: int, work_master_id: int
+):
+    std = get_standard_item(db, standard_item_id)
+    if not std:
+        return None
+    wm = (
+        db.query(models.WorkMaster)
+        .filter(models.WorkMaster.id == work_master_id)
+        .first()
+    )
+    if not wm:
+        return None
+
+    if wm in std.work_masters:
+        std.work_masters.remove(wm)
+        db.add(std)
+        db.commit()
+        db.refresh(std)
+
+    return std
+
+
+def update_standard_item_name(db: Session, standard_item_id: int, new_name: str):
+    item = get_standard_item(db, standard_item_id)
+    if not item:
+        return None
+    item.name = new_name
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item

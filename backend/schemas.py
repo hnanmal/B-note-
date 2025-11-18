@@ -1,49 +1,32 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 import datetime
 
-# ===================
-#      Project
-# ===================
-class ProjectBase(BaseModel):
+from .models import StandardItemType
+
+
+# Forward declarations for circular references
+class _StandardItemWithoutRelations(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    type: StandardItemType
+    parent_id: Optional[int] = None
+
+
+class _ProjectWithoutOwner(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
     project_name: str
     project_code: str
     description: Optional[str] = None
-
-class ProjectCreate(ProjectBase):
-    pass
-
-class Project(ProjectBase):
-    id: int
-    owner_id: int
     creation_date: datetime.datetime
-
-    class Config:
-        orm_mode = True
-
-# ===================
-#        User
-# ===================
-class UserBase(BaseModel):
-    email: EmailStr
-    username: str
-
-class UserCreate(UserBase):
-    password: str
-
-class User(UserBase):
-    id: int
-    is_active: bool
-    projects: List[Project] = []
-
-    class Config:
-        orm_mode = True
+    owner_id: int
 
 
-
-# ===================
-#     WorkMaster
-# ===================
+# WorkMaster Schemas
 class WorkMasterBase(BaseModel):
     discipline: Optional[str] = None
     cat_large_code: Optional[str] = None
@@ -70,11 +53,91 @@ class WorkMasterBase(BaseModel):
     work_master_code: str
     new_old_code: Optional[str] = None
 
+
 class WorkMasterCreate(WorkMasterBase):
     pass
 
+
 class WorkMaster(WorkMasterBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    standard_items: List[_StandardItemWithoutRelations] = []
+
+
+# StandardItem Schemas
+class StandardItemBase(BaseModel):
+    name: str
+    type: StandardItemType
+    parent_id: Optional[int] = None
+
+
+class StandardItemCreate(StandardItemBase):
+    pass
+
+
+class AssignWorkMaster(BaseModel):
+    work_master_id: int
+
+
+class StandardItemRename(BaseModel):
+    name: str
+
+
+class StandardItem(StandardItemBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    # avoid recursive nesting by using the lightweight _StandardItemWithoutRelations
+    parent: Optional[_StandardItemWithoutRelations] = None
+    children: List[_StandardItemWithoutRelations] = []
+    work_masters: List[WorkMaster] = []
+
+
+# Project Schemas
+class ProjectBase(BaseModel):
+    project_name: str
+    project_code: str
+    description: Optional[str] = None
+
+
+class ProjectCreate(ProjectBase):
+    pass
+
+
+class Project(ProjectBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    creation_date: datetime.datetime
+    owner_id: int
+    owner: "UserWithoutProjects"
+
+
+# User Schemas
+class UserBase(BaseModel):
+    email: str
+    username: Optional[str] = None
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class User(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    is_active: bool
+    projects: List[_ProjectWithoutOwner] = []
+
+
+class UserWithoutProjects(UserBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
 
-    class Config:
-        orm_mode = True
+
+# Update forward references to resolve circular dependencies
+StandardItem.model_rebuild()
+Project.model_rebuild()
+User.model_rebuild()
