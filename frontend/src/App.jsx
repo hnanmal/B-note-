@@ -15,12 +15,12 @@ function App() {
   const PANEL_LEFT_WIDTH = 560;
 
   return (
-    <div className="App" style={{ height: '100vh', width: '100vw', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+    <div className="App" style={{ height: 'calc(100vh - 1.5rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
       <header className="App-header-fixed">
         <div className="app-title">B-note+</div>
       </header>
   <div style={{ height: 32 }} />
-      <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100vh - 64px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
+      <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100% - 64px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
         {/* Sidebar: Only navigation, toggleable, fixed to left */}
         <div
           className={`sidebar-nav${sidebarOpen ? '' : ' collapsed'}`}
