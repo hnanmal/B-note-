@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
 const buttonStyle = { fontSize: 12, padding: '4px 10px', borderRadius: 4, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' };
@@ -7,6 +7,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
     const [standardItems, setStandardItems] = useState([]);
     const [workMasters, setWorkMasters] = useState([]);
     const [assignedSet, setAssignedSet] = useState(new Set());
+    const [persistedAssignedSet, setPersistedAssignedSet] = useState(new Set());
     const [message, setMessage] = useState('');
     const [wmInput, setWmInput] = useState('');
     const [wmFilter, setWmFilter] = useState('');
@@ -24,7 +25,28 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
         return map;
     }, [standardItems]);
 
-    const fetchData = async () => {
+    const loadAssignments = useCallback(async () => {
+        const nodeId = selectedNode?.id;
+        const nodeDepth = selectedNode?.depth;
+        if (!nodeId || nodeDepth < 2) {
+            setAssignedSet(new Set());
+            return;
+        }
+        try {
+            const res = await fetch(`${API_BASE_URL}/standard-items/${nodeId}`);
+            if (!res.ok) throw new Error('선택 항목 상세를 불러오지 못했습니다');
+            const data = await res.json();
+            const loaded = new Set((data.work_masters || []).map(w => w.id));
+            setAssignedSet(new Set(loaded));
+            setPersistedAssignedSet(new Set(loaded));
+        } catch (error) {
+            console.error('Failed to load assigned WorkMasters', error);
+            setAssignedSet(new Set());
+            setPersistedAssignedSet(new Set());
+        }
+    }, [selectedNode?.id, selectedNode?.depth]);
+
+    const fetchData = useCallback(async () => {
         try {
             const [stdRes, wmRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/standard-items/`),
@@ -35,36 +57,19 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
             const [stdData, wmData] = await Promise.all([stdRes.json(), wmRes.json()]);
             setStandardItems(stdData);
             setWorkMasters(wmData);
+            await loadAssignments();
         } catch (e) {
             setMessage(e.message || '데이터 로드에 실패했습니다');
         }
-    };
+    }, [loadAssignments]);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fetchData]);
 
     useEffect(() => {
-        if (!selectedNode || !selectedNode.id || selectedNode.depth < 2) {
-            setAssignedSet(new Set());
-            return;
-        }
-        const existing = standardItems.find(item => item.id === selectedNode.id);
-        if (existing) {
-            setAssignedSet(new Set((existing.work_masters || []).map(w => w.id)));
-            return;
-        }
-        (async () => {
-            try {
-                const res = await fetch(`${API_BASE_URL}/standard-items/${selectedNode.id}`);
-                if (!res.ok) throw new Error('선택 항목 상세를 불러오지 못했습니다');
-                const data = await res.json();
-                setAssignedSet(new Set((data.work_masters || []).map(w => w.id)));
-            } catch (e) {
-                setAssignedSet(new Set());
-            }
-        })();
-    }, [selectedNode, standardItems]);
+        loadAssignments();
+    }, [loadAssignments]);
 
     const filteredWorkMasters = useMemo(() => {
         const candidates = workMasters.filter(w => (w.new_old_code || '').toLowerCase() !== 'old');
@@ -100,16 +105,18 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
         setLoadingSave(true);
         setMessage('저장 중...');
         try {
-            const current = new Set(filteredAssigned.map(w => w.id));
             const next = assignedSet;
+            const current = new Set(persistedAssignedSet);
             const toAdd = Array.from(next).filter(id => !current.has(id));
             const toRemove = Array.from(current).filter(id => !next.has(id));
+            console.log('save: toAdd', toAdd, 'toRemove', toRemove, 'node', selectedNode?.id);
             for (const id of toAdd) {
                 await fetch(`${API_BASE_URL}/standard-items/${selectedNode.id}/assign`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ work_master_id: Number(id) }),
                 });
+                console.log('save assign', id);
             }
             for (const id of toRemove) {
                 await fetch(`${API_BASE_URL}/standard-items/${selectedNode.id}/remove`, {
@@ -117,9 +124,12 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ work_master_id: Number(id) }),
                 });
+                console.log('save remove', id);
             }
             setMessage('저장 완료');
             await fetchData();
+            setAssignedSet(new Set(next));
+            setPersistedAssignedSet(new Set(next));
         } catch (e) {
             setMessage(e.message || '저장 중 오류가 발생했습니다');
         } finally {

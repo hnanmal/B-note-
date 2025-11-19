@@ -52,7 +52,9 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
         if (onNodeSelect) {
             try {
                 onNodeSelect({ id, depth, node });
-            } catch (e) {}
+            } catch (error) {
+                console.error('Error notifying node selection', error);
+            }
         }
     };
 
@@ -105,7 +107,11 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
         if (addingForParent !== undefined) {
             // wait for DOM update
             setTimeout(() => {
-                try { inputRef.current && inputRef.current.focus(); } catch (e) {}
+                try {
+                    inputRef.current && inputRef.current.focus();
+                } catch (error) {
+                    console.error('Failed to focus input', error);
+                }
             }, 0);
         }
     }, [addingForParent]);
