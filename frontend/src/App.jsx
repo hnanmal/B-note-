@@ -19,7 +19,7 @@ function App() {
       <header className="App-header-fixed">
         <div className="app-title">B-note+</div>
       </header>
-      <div style={{ height: 64 }} />
+  <div style={{ height: 32 }} />
       <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100vh - 64px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
         {/* Sidebar: Only navigation, toggleable, fixed to left */}
         <div
