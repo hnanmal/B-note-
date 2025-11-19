@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
 
-export default function StandardTreeManager({ onNodeSelect }) {
+export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
     const [items, setItems] = useState([]);
     const [tree, setTree] = useState([]);
     const [selected, setSelected] = useState(null);
@@ -26,7 +26,7 @@ export default function StandardTreeManager({ onNodeSelect }) {
         }
     };
 
-    useEffect(() => { fetchAll(); }, []);
+    useEffect(() => { fetchAll(); }, [refreshSignal]);
 
     useEffect(() => {
         // build tree from filtered items

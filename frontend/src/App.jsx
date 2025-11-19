@@ -8,6 +8,7 @@ function App() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [activePage, setActivePage] = useState('matching'); // 'matching' | 'workmaster'
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const containerRef = useRef(null);
   const SIDEBAR_OPEN_WIDTH = 180;
   const SIDEBAR_COLLAPSED_WIDTH = 16;
@@ -123,7 +124,7 @@ function App() {
         }}>
           <div style={{ flex: 1, overflow: 'auto', padding: '0 0 0 8px', minWidth: 0 }}>
             {activePage === 'matching' ? (
-              <StandardTreeManager onNodeSelect={setSelectedNode} />
+              <StandardTreeManager onNodeSelect={setSelectedNode} refreshSignal={treeRefreshKey} />
             ) : (
               <WorkMasterManager />
             )}
@@ -134,7 +135,7 @@ function App() {
         <div className="panel right" style={{ flex: '1 1 auto', height: '100%', position: 'relative', zIndex: 1, minWidth: 0, overflowX: 'hidden' }}>
           <div className="right-top" style={{ height: '100%', minWidth: 0 }}>
             {activePage === 'matching' ? (
-              <StandardGwmMatcher selectedNode={selectedNode} />
+              <StandardGwmMatcher selectedNode={selectedNode} onTreeRefresh={() => setTreeRefreshKey((prev) => prev + 1)} />
             ) : (
               <div style={{ padding: 32, color: '#888', fontSize: 18 }}>워크마스터 매니저 탭에서는 매칭 UI가 숨겨집니다.</div>
             )}
