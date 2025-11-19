@@ -35,7 +35,7 @@ function App() {
             flexDirection: 'column',
             alignItems: 'center',
             position: 'relative',
-            height: '100%',
+            height: 'calc(100% - 64px)',
             zIndex: 10,
           }}
         >
@@ -117,7 +117,7 @@ function App() {
           flex: '0 0 ' + PANEL_LEFT_WIDTH + 'px',
           display: 'flex',
           flexDirection: 'column',
-          height: '100%',
+          height: 'calc(100% - 64px)',
           position: 'relative',
           zIndex: 1,
           overflowX: 'hidden',
@@ -132,7 +132,7 @@ function App() {
         </div>
 
         {/* Right panel: Matching UI or info */}
-        <div className="panel right" style={{ flex: '1 1 auto', height: '100%', position: 'relative', zIndex: 1, minWidth: 0, overflowX: 'hidden' }}>
+        <div className="panel right" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflowX: 'hidden' }}>
           <div className="right-top" style={{ height: '100%', minWidth: 0 }}>
             {activePage === 'matching' ? (
               <StandardGwmMatcher selectedNode={selectedNode} onTreeRefresh={() => setTreeRefreshKey((prev) => prev + 1)} />
