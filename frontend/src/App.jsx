@@ -111,17 +111,30 @@ function App() {
         </div>
 
         {/* Left panel: StandardTreeManager or WorkMasterManager, always visible, next to sidebar */}
-        <div className="panel left" style={{
-          width: PANEL_LEFT_WIDTH,
-          minWidth: 0,
-          flex: '0 0 ' + PANEL_LEFT_WIDTH + 'px',
-          display: 'flex',
-          flexDirection: 'column',
-          height: 'calc(100% - 64px)',
-          position: 'relative',
-          zIndex: 1,
-          overflowX: 'hidden',
-        }}>
+          {/* Left panel: StandardTreeManager or WorkMasterManager */}
+          <div
+            className="panel left"
+            style={activePage === 'matching' ? {
+              width: PANEL_LEFT_WIDTH,
+              minWidth: 0,
+              flex: '0 0 ' + PANEL_LEFT_WIDTH + 'px',
+              display: 'flex',
+              flexDirection: 'column',
+              height: 'calc(100% - 64px)',
+              position: 'relative',
+              zIndex: 1,
+              overflowX: 'hidden',
+            } : {
+              flex: '1 1 auto',
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              height: 'calc(100% - 64px)',
+              position: 'relative',
+              zIndex: 1,
+              overflowX: 'hidden',
+            }}
+          >
           <div style={{ flex: 1, overflow: 'auto', padding: '0 0 0 8px', minWidth: 0 }}>
             {activePage === 'matching' ? (
               <StandardTreeManager onNodeSelect={setSelectedNode} refreshSignal={treeRefreshKey} />
@@ -132,15 +145,13 @@ function App() {
         </div>
 
         {/* Right panel: Matching UI or info */}
-        <div className="panel right" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflowX: 'hidden' }}>
-          <div className="right-top" style={{ height: '100%', minWidth: 0 }}>
-            {activePage === 'matching' ? (
-              <StandardGwmMatcher selectedNode={selectedNode} onTreeRefresh={() => setTreeRefreshKey((prev) => prev + 1)} />
-            ) : (
-              <div style={{ padding: 32, color: '#888', fontSize: 18 }}>워크마스터 매니저 탭에서는 매칭 UI가 숨겨집니다.</div>
-            )}
-          </div>
-        </div>
+          {activePage === 'matching' && (
+            <div className="panel right" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflowX: 'hidden' }}>
+              <div className="right-top" style={{ height: '100%', minWidth: 0 }}>
+                <StandardGwmMatcher selectedNode={selectedNode} onTreeRefresh={() => setTreeRefreshKey((prev) => prev + 1)} />
+              </div>
+            </div>
+          )}
       </main>
     </div>
   );

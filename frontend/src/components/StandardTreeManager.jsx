@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
 
@@ -14,6 +14,22 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
     const [message, setMessage] = useState('');
     const [editingId, setEditingId] = useState(null);
     const [editingName, setEditingName] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [matchIds, setMatchIds] = useState([]);
+    const [matchIndex, setMatchIndex] = useState(-1);
+    const treeContainerRef = useRef(null);
+    const nodeRefs = useRef(new Map());
+
+    const scrollMatchIntoView = (matchId) => {
+        const target = nodeRefs.current.get(matchId);
+        if (target && target.scrollIntoView) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+        }
+        if (treeContainerRef.current) {
+            treeContainerRef.current.scrollTop = 0;
+        }
+    };
 
     const fetchAll = async () => {
         try {
@@ -161,11 +177,79 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
         } catch (e) { setMessage(e.message); }
     };
 
+    const flattenNodes = useMemo(() => {
+        const list = [];
+        const traverse = (nodes, depth = 0) => {
+            nodes.forEach(node => {
+                list.push({ ...node, depth });
+                if (node.children && node.children.length) {
+                    traverse(node.children, depth + 1);
+                }
+            });
+        };
+        traverse(tree);
+        return list;
+    }, [tree]);
+
+    const nodeRegistry = useMemo(() => {
+        const map = new Map();
+        flattenNodes.forEach(({ id, depth, children, ...rest }) => {
+            map.set(id, { node: { id, ...rest, children }, depth });
+        });
+        return map;
+    }, [flattenNodes]);
+
+    const matchSet = useMemo(() => new Set(matchIds), [matchIds]);
+
+    const handleSearch = () => {
+        const term = (searchTerm || '').trim().toLowerCase();
+        if (!term) {
+            setMatchIds([]);
+            setMatchIndex(-1);
+            return;
+        }
+        const matches = flattenNodes
+            .filter(n => (n.name || '').toLowerCase().includes(term))
+            .map(n => n.id);
+        setMatchIds(matches);
+        if (!matches.length) {
+            setMatchIndex(-1);
+            return;
+        }
+        setMatchIndex(0);
+        const firstMatch = nodeRegistry.get(matches[0]);
+        if (firstMatch) {
+            selectNode(matches[0], firstMatch.depth, firstMatch.node);
+            scrollMatchIntoView(matches[0]);
+        }
+    };
+
+    const cycleMatch = () => {
+        if (!matchIds.length) return;
+        const nextIndex = matchIndex < 0 ? 0 : (matchIndex + 1) % matchIds.length;
+        setMatchIndex(nextIndex);
+        const matchId = matchIds[nextIndex];
+        const entry = nodeRegistry.get(matchId);
+        if (entry) {
+            selectNode(matchId, entry.depth, entry.node);
+            scrollMatchIntoView(matchId);
+        }
+    };
+
     const smallBtn = { padding: '4px 6px', fontSize: 12 };
     const headerButtonStyle = { padding: '4px 10px', fontSize: 12 };
 
-    const renderNode = (node, level = 0) => (
-        <div key={node.id} style={{ marginLeft: level * 12, padding: '6px 0' }}>
+    const renderNode = (node, level = 0) => {
+        const isMatch = matchSet.has(node.id);
+        return (
+            <div
+                key={node.id}
+                ref={(el) => {
+                    if (el) nodeRefs.current.set(node.id, el);
+                    else nodeRefs.current.delete(node.id);
+                }}
+                style={{ marginLeft: level * 12, padding: '6px 0', background: isMatch ? '#fff7c1' : 'transparent', borderRadius: 4 }}
+            >
             <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div style={{ flex: 1 }}>
                     {editingId === node.id ? (
@@ -197,14 +281,15 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                 </div>
             )}
         </div>
-    );
+        );
+    };
 
     return (
         <div>
             <h2>Standard Tree</h2>
             {message && <div style={{ color: 'red' }}>{message}</div>}
             <div>
-                <div style={{ maxHeight: '680px', overflow: 'auto', overflowX: 'auto', border: '1px solid #e6e6e6', padding: 8, maxWidth: '100%', position: 'relative' }}>
+                <div ref={treeContainerRef} style={{ maxHeight: '680px', overflow: 'auto', overflowX: 'auto', border: '1px solid #e6e6e6', padding: 8, maxWidth: '100%', position: 'relative' }}>
                     <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 2, paddingBottom: 8, borderBottom: '1px solid #e6e6e6' }}>
                         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div>
@@ -217,6 +302,18 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                                 <button onClick={() => setFilterType('GWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontWeight: filterType === 'GWM' ? '700' : '400' }}>GWM</button>
                                 <button onClick={() => setFilterType('SWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontWeight: filterType === 'SWM' ? '700' : '400' }}>SWM</button>
                             </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <input
+                                placeholder="Standard Tree 검색"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                                style={{ flex: 1, padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+                            />
+                            <button style={headerButtonStyle} onClick={handleSearch}>검색</button>
+                            <button style={headerButtonStyle} onClick={cycleMatch} disabled={!matchIds.length}>다음</button>
+                            <span style={{ fontSize: 13, color: '#666' }}>{matchIds.length ? `${matchIndex + 1}/${matchIds.length} 개 일치` : '검색 결과 없음'}</span>
                         </div>
                         {addingForParent !== undefined && (
                             <div style={{ marginBottom: 8, padding: 8, border: '1px dashed #ccc' }}>
