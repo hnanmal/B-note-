@@ -4,6 +4,11 @@ import WorkMasterManager from './components/WorkMasterManager';
 import StandardGwmMatcher from './components/StandardGwmMatcher';
 import StandardTreeManager from './components/StandardTreeManager';
 
+const NAV_ITEMS = [
+  { id: 'workmaster', label: '워크마스터 매니저', icon: '🧰' },
+  { id: 'matching', label: 'Team Standard Matching', icon: '🧩' },
+];
+
 function App() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [activePage, setActivePage] = useState('matching'); // 'matching' | 'workmaster'
@@ -11,7 +16,7 @@ function App() {
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const containerRef = useRef(null);
   const SIDEBAR_OPEN_WIDTH = 180;
-  const SIDEBAR_COLLAPSED_WIDTH = 16;
+  const SIDEBAR_COLLAPSED_WIDTH = 64;
   const PANEL_LEFT_WIDTH = 560;
 
   return (
@@ -44,11 +49,11 @@ function App() {
             style={{
               position: 'absolute',
               top: 12,
-              right: -18,
+              right: sidebarOpen ? -18 : (SIDEBAR_COLLAPSED_WIDTH - 36) / 2,
               zIndex: 11,
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
+              width: 36,
+              height: 36,
+              borderRadius: 8,
               border: '1px solid #ccc',
               background: '#fff',
               cursor: 'pointer',
@@ -56,57 +61,73 @@ function App() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              fontSize: 18,
+              lineHeight: 1,
+              padding: 0,
             }}
             onClick={() => setSidebarOpen((open) => !open)}
             aria-label={sidebarOpen ? '사이드바 닫기' : '사이드바 열기'}
           >
-            {sidebarOpen ? '<' : '>'}
+            <span style={{ lineHeight: 1 }}>☰</span>
           </button>
-          {sidebarOpen && (
-            <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <button
-                className={`nav-btn${activePage === 'workmaster' ? ' active' : ''}`}
-                onClick={() => setActivePage('workmaster')}
-                style={{
-                  width: '100%',
-                  minWidth: 0,
-                  maxWidth: '100%',
-                  boxSizing: 'border-box',
-                  padding: '6px 0',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  border: 'none',
-                  background: activePage === 'workmaster' ? '#e0e0e0' : 'transparent',
-                  cursor: 'pointer',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                워크마스터 매니저
-              </button>
-              <button
-                className={`nav-btn${activePage === 'matching' ? ' active' : ''}`}
-                onClick={() => setActivePage('matching')}
-                style={{
-                  width: '100%',
-                  minWidth: 0,
-                  maxWidth: '100%',
-                  boxSizing: 'border-box',
-                  padding: '6px 0',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  border: 'none',
-                  background: activePage === 'matching' ? '#e0e0e0' : 'transparent',
-                  cursor: 'pointer',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Team Standard Matching
-              </button>
+          {sidebarOpen ? (
+            <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+              {NAV_ITEMS.map(item => (
+                <button
+                  key={item.id}
+                  className={`nav-btn${activePage === item.id ? ' active' : ''}`}
+                  onClick={() => setActivePage(item.id)}
+                  style={{
+                    width: '100%',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    boxSizing: 'border-box',
+                    padding: '6px 0',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    border: 'none',
+                    background: activePage === item.id ? '#e0e0e0' : 'transparent',
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
             </nav>
+          ) : (
+            <div style={{ marginTop: 56, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+              {NAV_ITEMS.map(item => (
+                <button
+                  key={item.id}
+                  className={`nav-btn icon${activePage === item.id ? ' active' : ''}`}
+                  onClick={() => setActivePage(item.id)}
+                    style={{
+                      width: 36,
+                      height: 40,
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 18,
+                      fontWeight: 600,
+                      color: activePage === item.id ? '#222' : '#666',
+                      borderRadius: 6,
+                      transition: 'background 0.2s',
+                    }}
+                  aria-label={item.label}
+                >
+                  {item.icon}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 

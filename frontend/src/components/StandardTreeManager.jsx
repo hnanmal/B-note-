@@ -241,6 +241,7 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
 
     const renderNode = (node, level = 0) => {
         const isMatch = matchSet.has(node.id);
+        const indent = level * 12;
         return (
             <div
                 key={node.id}
@@ -248,9 +249,24 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                     if (el) nodeRefs.current.set(node.id, el);
                     else nodeRefs.current.delete(node.id);
                 }}
-                style={{ marginLeft: level * 12, padding: '6px 0', background: isMatch ? '#fff7c1' : 'transparent', borderRadius: 4 }}
+                style={{ marginLeft: indent, padding: '6px 0', background: isMatch ? '#fff7c1' : 'transparent', borderRadius: 4 }}
             >
             <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div style={{ position: 'relative', width: indent, height: '100%' }}>
+                    {level > 0 && (
+                        <span
+                            style={{
+                                position: 'absolute',
+                                left: Math.max(indent - 6, 0),
+                                top: 0,
+                                bottom: 0,
+                                width: 2,
+                                background: '#ccc',
+                                borderRadius: 1,
+                            }}
+                        />
+                    )}
+                </div>
                 <div style={{ flex: 1 }}>
                     {editingId === node.id ? (
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -330,7 +346,7 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                                                 cancelAdd();
                                             }
                                         }}
-                                        style={{ padding: 6, width: 240 }}
+                                        style={{ padding: 6, width: 240, background: '#fff8a3' }}
                                     />
                                 </div>
                                 {addingForParent === null ? (

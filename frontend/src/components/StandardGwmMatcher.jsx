@@ -14,6 +14,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
     const [loadingSave, setLoadingSave] = useState(false);
     const [copySnapshot, setCopySnapshot] = useState(null);
     const [pasteLoading, setPasteLoading] = useState(false);
+    const [copiedAssignments, setCopiedAssignments] = useState(null);
 
     const childrenMap = useMemo(() => {
         const map = new Map();
@@ -171,6 +172,38 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
         selectedNode.depth === copySnapshot.depth &&
         copySnapshot.nodes.length > 0
     );
+
+    const handleCopyAssignments = () => {
+        if (!selectedNode || selectedNode.depth < 2) {
+            setMessage('레벨2 항목을 선택한 후 복사하세요');
+            return;
+        }
+        const items = Array.from(assignedSet);
+        if (!items.length) {
+            setMessage('복사할 할당 항목이 없습니다');
+            return;
+        }
+        setCopiedAssignments({
+            nodeId: selectedNode.id,
+            depth: selectedNode.depth,
+            assignments: items,
+        });
+        setMessage('현재 할당 항목이 복사되었습니다. 다른 항목을 선택하면 붙여넣기 버튼이 활성화됩니다.');
+    };
+
+    const canPasteAssignments = Boolean(
+        copiedAssignments &&
+        selectedNode &&
+        selectedNode.depth >= 2 &&
+        selectedNode.id !== copiedAssignments.nodeId &&
+        copiedAssignments.assignments.length > 0
+    );
+
+    const handlePasteAssignments = () => {
+        if (!canPasteAssignments) return;
+        setAssignedSet(new Set(copiedAssignments.assignments));
+        setMessage('복사한 할당 항목을 붙여넣었습니다. 저장을 눌러 변경 내용을 반영하세요.');
+    };
 
     const duplicateNodes = async (nodes, parentId) => {
         for (const node of nodes) {
@@ -335,7 +368,24 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
                                     </div>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button type="button" style={buttonStyle} onClick={() => setAssignedSet(new Set())}>전체 제거</button>
-                                        <button type="button" style={buttonStyle} onClick={() => setMessage('현재 할당 항목이 복사되었습니다')}>복사</button>
+                                        <button
+                                            type="button"
+                                            style={buttonStyle}
+                                            onClick={handleCopyAssignments}
+                                            disabled={!assignedSet.size}
+                                        >
+                                            복사
+                                        </button>
+                                        {copiedAssignments && (
+                                            <button
+                                                type="button"
+                                                style={buttonStyle}
+                                                onClick={handlePasteAssignments}
+                                                disabled={!canPasteAssignments}
+                                            >
+                                                붙여넣기
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid #f0f0f0', maxHeight: 'calc(100vh - 360px)', background: '#fff' }}>
