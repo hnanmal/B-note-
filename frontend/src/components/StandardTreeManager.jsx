@@ -19,6 +19,8 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
     const [matchIndex, setMatchIndex] = useState(-1);
     const treeContainerRef = useRef(null);
     const nodeRefs = useRef(new Map());
+    const [collapsedNodes, setCollapsedNodes] = useState(new Set());
+    const [viewLevel, setViewLevel] = useState(3);
 
     const scrollMatchIntoView = (matchId) => {
         const target = nodeRefs.current.get(matchId);
@@ -199,6 +201,15 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
         return map;
     }, [flattenNodes]);
 
+    const toggleCollapse = (nodeId) => {
+        setCollapsedNodes(prev => {
+            const next = new Set(prev);
+            if (next.has(nodeId)) next.delete(nodeId);
+            else next.add(nodeId);
+            return next;
+        });
+    };
+
     const matchSet = useMemo(() => new Set(matchIds), [matchIds]);
 
     const handleSearch = () => {
@@ -238,10 +249,30 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
 
     const smallBtn = { padding: '4px 6px', fontSize: 12 };
     const headerButtonStyle = { padding: '4px 10px', fontSize: 12 };
+    const collapseButtonStyle = {
+        width: 24,
+        height: 24,
+        padding: 0,
+        marginRight: 4,
+        borderRadius: 4,
+        border: '1px solid #ccc',
+        background: '#fff',
+        cursor: 'pointer',
+        fontSize: 14,
+        fontWeight: 600,
+        lineHeight: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    };
 
     const renderNode = (node, level = 0) => {
         const isMatch = matchSet.has(node.id);
         const indent = level * 12;
+        const hasChildren = node.children && node.children.length > 0;
+        if (level >= viewLevel) return null;
+        const isCollapsed = collapsedNodes.has(node.id);
+        const shouldRenderChildren = hasChildren && level + 1 < viewLevel;
         return (
             <div
                 key={node.id}
@@ -267,21 +298,36 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                         />
                     )}
                 </div>
-                <div style={{ flex: 1 }}>
-                    {editingId === node.id ? (
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <input value={editingName} onChange={(e) => setEditingName(e.target.value)} style={{ padding: 6, width: 220 }} onKeyDown={(e) => { if (e.key==='Enter') saveEdit(node.id); if (e.key==='Escape') cancelEdit(); }} />
-                            <button style={{ ...smallBtn }} onClick={() => saveEdit(node.id)}>저장</button>
-                            <button style={{ ...smallBtn }} onClick={cancelEdit}>취소</button>
-                        </div>
-                    ) : (
-                        <span
-                            onClick={() => selectNode(node.id, level, node)}
-                            style={{ cursor: 'pointer', fontWeight: node.id === selected ? '600' : '400' }}
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {hasChildren && level + 1 < viewLevel && (
+                        <button
+                            type="button"
+                            aria-label={isCollapsed ? '펼치기' : '접기'}
+                            style={collapseButtonStyle}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleCollapse(node.id);
+                            }}
                         >
-                            {node.name} <small style={{ color: '#666' }}>({node.type})</small>
-                        </span>
+                            {isCollapsed ? '+' : '-'}
+                        </button>
                     )}
+                    <div style={{ flex: 1 }}>
+                        {editingId === node.id ? (
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <input value={editingName} onChange={(e) => setEditingName(e.target.value)} style={{ padding: 6, width: 220 }} onKeyDown={(e) => { if (e.key==='Enter') saveEdit(node.id); if (e.key==='Escape') cancelEdit(); }} />
+                                <button style={{ ...smallBtn }} onClick={() => saveEdit(node.id)}>저장</button>
+                                <button style={{ ...smallBtn }} onClick={cancelEdit}>취소</button>
+                            </div>
+                        ) : (
+                            <span
+                                onClick={() => selectNode(node.id, level, node)}
+                                style={{ cursor: 'pointer', fontWeight: node.id === selected ? '600' : '400' }}
+                            >
+                                {node.name} <small style={{ color: '#666' }}>({node.type})</small>
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <div>
                     {level < 2 && (
@@ -291,9 +337,9 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                     <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => handleDelete(node.id)}>삭제</button>
                 </div>
             </div>
-            {node.children && node.children.length > 0 && (
+            {!isCollapsed && shouldRenderChildren && (
                 <div>
-                    {node.children.map(c => renderNode(c, level + 1))}
+                    {node.children.map(c => renderNode(c, level + 1)).filter(Boolean)}
                 </div>
             )}
         </div>
@@ -312,12 +358,27 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                                 <button style={headerButtonStyle} onClick={() => handleAdd(null)}>루트 항목 추가</button>
                                 <button style={{ ...headerButtonStyle, marginLeft: 8 }} onClick={refresh}>새로고침</button>
                             </div>
-                            <div style={{ marginLeft: 'auto' }}>
+                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <label htmlFor="view-level" style={{ fontSize: 11, color: '#444' }}>레벨</label>
+                                    <select
+                                        id="view-level"
+                                        value={viewLevel}
+                                        onChange={(e) => setViewLevel(Number(e.target.value))}
+                                        style={{ padding: '2px 4px', fontSize: 11, borderRadius: 4, border: '1px solid #ccc', minWidth: 60 }}
+                                    >
+                                        <option value={1}>1</option>
+                                        <option value={2}>2</option>
+                                        <option value={3}>3</option>
+                                    </select>
+                                </div>
+                                <div>
                                 <span style={{ marginRight: 8, color: '#555' }}>필터:</span>
                                 <button onClick={() => setFilterType('ALL')} style={{ ...headerButtonStyle, fontWeight: filterType === 'ALL' ? '700' : '400' }}>All</button>
                                 <button onClick={() => setFilterType('GWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontWeight: filterType === 'GWM' ? '700' : '400' }}>GWM</button>
                                 <button onClick={() => setFilterType('SWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontWeight: filterType === 'SWM' ? '700' : '400' }}>SWM</button>
                             </div>
+                        </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                             <input
