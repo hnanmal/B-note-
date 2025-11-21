@@ -34,7 +34,7 @@ function App() {
             minWidth: sidebarOpen ? SIDEBAR_OPEN_WIDTH : SIDEBAR_COLLAPSED_WIDTH,
             maxWidth: sidebarOpen ? SIDEBAR_OPEN_WIDTH : SIDEBAR_COLLAPSED_WIDTH,
             transition: 'width 0.2s',
-            background: '#f8f8f8',
+            background: 'rgba(246, 217, 117, 0.25)',
             borderRight: '1px solid #eee',
             display: 'flex',
             flexDirection: 'column',
@@ -72,7 +72,7 @@ function App() {
           </button>
           {sidebarOpen ? (
             <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
-              {NAV_ITEMS.map(item => (
+                  {NAV_ITEMS.map(item => (
                 <button
                   key={item.id}
                   className={`nav-btn${activePage === item.id ? ' active' : ''}`}
@@ -85,8 +85,9 @@ function App() {
                     padding: '6px 0',
                     fontWeight: 600,
                     fontSize: 13,
-                    border: 'none',
-                    background: activePage === item.id ? '#e0e0e0' : 'transparent',
+                       border: 'none',
+                       background: activePage === item.id ? '#f7c748' : '#f1f1f1',
+                       color: activePage === item.id ? '#2c1b00' : '#555',
                     cursor: 'pointer',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',

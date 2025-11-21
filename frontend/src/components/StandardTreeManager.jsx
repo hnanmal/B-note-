@@ -347,11 +347,11 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
     };
 
     return (
-        <div>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <h2>Standard Tree</h2>
             {message && <div style={{ color: 'red' }}>{message}</div>}
-            <div>
-                <div ref={treeContainerRef} style={{ maxHeight: '680px', overflow: 'auto', overflowX: 'auto', border: '1px solid #e6e6e6', padding: 8, maxWidth: '100%', position: 'relative' }}>
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <div ref={treeContainerRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e6e6e6', padding: 8, maxWidth: '100%', position: 'relative' }}>
                     <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 2, paddingBottom: 8, borderBottom: '1px solid #e6e6e6' }}>
                         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div>
@@ -426,7 +426,7 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                         )}
                     </div>
 
-                    <div style={{ marginTop: 8 }}>
+                        <div style={{ marginTop: 8, flex: 1, minHeight: 0, overflowY: 'auto' }}>
                         {tree.map(n => renderNode(n))}
                     </div>
                 </div>

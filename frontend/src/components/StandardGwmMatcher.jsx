@@ -58,11 +58,10 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
             const [stdData, wmData] = await Promise.all([stdRes.json(), wmRes.json()]);
             setStandardItems(stdData);
             setWorkMasters(wmData);
-            await loadAssignments();
         } catch (e) {
             setMessage(e.message || '데이터 로드에 실패했습니다');
         }
-    }, [loadAssignments]);
+    }, []);
 
     useEffect(() => {
         fetchData();
@@ -388,7 +387,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
                                         )}
                                     </div>
                                 </div>
-                                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid #f0f0f0', maxHeight: 'calc(100vh - 360px)', background: '#fff' }}>
+                                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid #f0f0f0', maxHeight: 'calc(100vh - 360px)', background: 'rgba(246, 217, 117, 0.25)' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <tbody>
                                             {filteredAssigned.map(w => {
