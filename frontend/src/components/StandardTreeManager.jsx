@@ -322,9 +322,15 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                         ) : (
                             <span
                                 onClick={() => selectNode(node.id, level, node)}
-                                style={{ cursor: 'pointer', fontWeight: node.id === selected ? '600' : '400' }}
+                                style={{ cursor: 'pointer', fontWeight: node.id === selected ? '600' : '400', display: 'flex', alignItems: 'center', gap: 6 }}
                             >
-                                {node.name} <small style={{ color: '#666' }}>({node.type})</small>
+                                {level === 2 && (
+                                    // <span style={{ fontWeight: 600 }}>▶</span>
+                                    <span style={{ fontWeight: 600 }}>▸</span>
+                                )}
+                                <span>
+                                    {node.name} <small style={{ color: '#666' }}>({node.type})</small>
+                                </span>
                             </span>
                         )}
                     </div>

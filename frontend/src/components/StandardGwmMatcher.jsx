@@ -73,14 +73,19 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
 
     const filteredWorkMasters = useMemo(() => {
         const candidates = workMasters.filter(w => (w.new_old_code || '').toLowerCase() !== 'old');
+        const matchesConstraint = (w) => (w.work_master_code || '').startsWith('S') && (w.cat_mid_code || '') === 'AA';
+        const constrained = candidates.filter(matchesConstraint);
         const filterText = (wmFilter || '').trim().toLowerCase();
-        if (!filterText) return candidates;
+        if (!filterText) {
+            return constrained;
+        }
         const terms = filterText.split('|').map(term => term.trim()).filter(Boolean);
-        return candidates.filter(w => {
-            const haystack = [w.work_master_code, w.cat_large_desc, w.cat_mid_desc, w.cat_small_desc]
-                .filter(Boolean)
-                .map(text => text.toLowerCase());
-            return terms.every(term => haystack.some(entry => entry.includes(term)));
+        return constrained.filter(w => {
+            const haystack = Object.values(w)
+                .filter(value => typeof value === 'string' || typeof value === 'number')
+                .map(value => String(value).toLowerCase())
+                .join(' ');
+            return terms.every(term => haystack.includes(term));
         });
     }, [workMasters, wmFilter]);
 
@@ -394,14 +399,14 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
                                                 const attrs = [w.attr1_spec, w.attr2_spec, w.attr3_spec, w.attr4_spec, w.attr5_spec, w.attr6_spec].filter(Boolean).join(' | ');
                                                 return (
                                                     <tr key={w.id}>
-                                                        <td style={{ padding: 8, borderBottom: '1px solid #f6f6f6' }}>
+                                                        <td style={{ padding: 8, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
                                                             <div style={{ fontWeight: 700 }}>{w.cat_large_desc || w.cat_mid_desc || w.cat_small_desc || w.work_master_code}</div>
                                                             <div style={{ fontSize: 13, color: '#444', marginTop: 4 }}>{[w.cat_mid_desc, w.cat_small_desc].filter(Boolean).join(' / ')}</div>
                                                             {attrs && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{attrs}{w.uom1 ? ` | UoM: ${w.uom1}` : ''}</div>}
                                                             {!attrs && w.uom1 && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>UoM: {w.uom1}</div>}
                                                             <div style={{ fontSize: 11, color: '#c00', marginTop: 8 }}>{w.work_master_code}</div>
                                                         </td>
-                                                        <td style={{ padding: 8, borderBottom: '1px solid #f6f6f6', width: 80, textAlign: 'center' }}>
+                                                        <td style={{ padding: 8, borderBottom: '1px solid rgba(0,0,0,0.08)', width: 80, textAlign: 'center' }}>
                                                             <button style={buttonStyle} onClick={() => toggleAssignLocal(w.id)}>제거</button>
                                                         </td>
                                                     </tr>
