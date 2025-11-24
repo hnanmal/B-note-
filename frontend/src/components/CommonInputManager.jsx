@@ -386,12 +386,12 @@
                   >
                     {collapsed.has(classification) ? '＋' : '－'}
                   </button>
-                  <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <strong style={{ fontSize: 16 }}>{classification}</strong>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>{items.length}개</div>
+                    <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{items.length}개</span>
                   </div>
                 </div>
-                <span style={{ fontSize: 12, color: '#475467' }}>카드형 목록</span>
+                {/* <span style={{ fontSize: 12, color: '#475467' }}>카드형 목록</span> */}
               </div>
               {!collapsed.has(classification) && (
                 <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
