@@ -94,6 +94,42 @@ class StandardItem(StandardItemBase):
     work_masters: List[WorkMaster] = []
 
 
+class _FamilyListWithoutRelations(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    item_type: str
+    parent_id: Optional[int] = None
+
+
+class FamilyListBase(BaseModel):
+    name: str
+    item_type: str
+    parent_id: Optional[int] = None
+    sequence_number: Optional[str] = None
+
+
+class FamilyListCreate(FamilyListBase):
+    pass
+
+
+class FamilyListUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: Optional[str] = None
+    item_type: Optional[str] = None
+    parent_id: Optional[int] = None
+    sequence_number: Optional[str] = None
+
+
+class FamilyListItem(FamilyListBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    children: List[_FamilyListWithoutRelations] = []
+
+
 # Project Schemas
 class ProjectBase(BaseModel):
     project_name: str
@@ -197,3 +233,4 @@ class CommonInputItem(CommonInputBase):
 StandardItem.model_rebuild()
 Project.model_rebuild()
 User.model_rebuild()
+FamilyListItem.model_rebuild()

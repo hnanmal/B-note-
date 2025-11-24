@@ -160,6 +160,48 @@ def delete_standard_item(db: Session, standard_item_id: int):
     return item
 
 
+def list_family_items(db: Session):
+    return db.query(models.FamilyListItem).order_by(models.FamilyListItem.name).all()
+
+
+def get_family_item(db: Session, item_id: int):
+    return (
+        db.query(models.FamilyListItem)
+        .filter(models.FamilyListItem.id == item_id)
+        .first()
+    )
+
+
+def create_family_item(db: Session, family_item: schemas.FamilyListCreate):
+    db_item = models.FamilyListItem(**family_item.dict())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+def update_family_item(db: Session, item_id: int, updates: schemas.FamilyListUpdate):
+    db_item = get_family_item(db, item_id)
+    if not db_item:
+        return None
+    data = updates.dict(exclude_none=True)
+    for key, value in data.items():
+        setattr(db_item, key, value)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+def delete_family_item(db: Session, item_id: int):
+    item = get_family_item(db, item_id)
+    if not item:
+        return None
+    db.delete(item)
+    db.commit()
+    return item
+
+
 def get_standard_item(db: Session, standard_item_id: int):
     return (
         db.query(models.StandardItem)

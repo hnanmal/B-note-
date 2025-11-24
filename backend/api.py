@@ -257,6 +257,48 @@ def rename_standard_item(
 
 
 @router.get(
+    "/family-list/",
+    response_model=List[schemas.FamilyListItem],
+    tags=["Family List"],
+)
+def read_family_list(db: Session = Depends(get_db)):
+    return crud.list_family_items(db)
+
+
+@router.post(
+    "/family-list/",
+    response_model=schemas.FamilyListItem,
+    tags=["Family List"],
+)
+def create_family_list_item(
+    item: schemas.FamilyListCreate, db: Session = Depends(get_db)
+):
+    return crud.create_family_item(db, item)
+
+
+@router.put(
+    "/family-list/{item_id}",
+    response_model=schemas.FamilyListItem,
+    tags=["Family List"],
+)
+def update_family_list_item(
+    item_id: int, payload: schemas.FamilyListUpdate, db: Session = Depends(get_db)
+):
+    updated = crud.update_family_item(db, item_id, payload)
+    if not updated:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return updated
+
+
+@router.delete("/family-list/{item_id}", tags=["Family List"])
+def delete_family_list_item(item_id: int, db: Session = Depends(get_db)):
+    deleted = crud.delete_family_item(db, item_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return {"message": "deleted", "id": item_id}
+
+
+@router.get(
     "/project-db/",
     response_model=List[schemas.ProjectDbItem],
     tags=["Project DB"],

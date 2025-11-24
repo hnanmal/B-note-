@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api import router
-from .database import engine, Base
+from .database import engine, Base, ensure_family_list_sequence_column
 
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
+ensure_family_list_sequence_column(engine)
 
 app = FastAPI(
     title="B-note API",

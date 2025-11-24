@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-
-const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+import { API_BASE_URL } from '../apiConfig';
 
 export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
     const [items, setItems] = useState([]);
@@ -359,10 +358,10 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <div ref={treeContainerRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e6e6e6', padding: 8, maxWidth: '100%', position: 'relative' }}>
                     <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 2, paddingBottom: 8, borderBottom: '1px solid #e6e6e6' }}>
-                        <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                             <div>
                                 <button style={headerButtonStyle} onClick={() => handleAdd(null)}>루트 항목 추가</button>
-                                <button style={{ ...headerButtonStyle, marginLeft: 8 }} onClick={refresh}>새로고침</button>
+                                <button style={{ ...headerButtonStyle, marginLeft: 4 }} onClick={refresh}>새로고침</button>
                             </div>
                             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -379,10 +378,10 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                                     </select>
                                 </div>
                                 <div>
-                                <span style={{ marginRight: 8, color: '#555' }}>필터:</span>
-                                <button onClick={() => setFilterType('ALL')} style={{ ...headerButtonStyle, fontWeight: filterType === 'ALL' ? '700' : '400' }}>All</button>
-                                <button onClick={() => setFilterType('GWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontWeight: filterType === 'GWM' ? '700' : '400' }}>GWM</button>
-                                <button onClick={() => setFilterType('SWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontWeight: filterType === 'SWM' ? '700' : '400' }}>SWM</button>
+                                <span style={{ marginRight: 8, color: '#555', fontSize: 11 }}>필터:</span>
+                                <button onClick={() => setFilterType('ALL')} style={{ ...headerButtonStyle, fontSize: 11, fontWeight: filterType === 'ALL' ? '700' : '400' }}>All</button>
+                                <button onClick={() => setFilterType('GWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontSize: 11, fontWeight: filterType === 'GWM' ? '700' : '400' }}>GWM</button>
+                                <button onClick={() => setFilterType('SWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontSize: 11, fontWeight: filterType === 'SWM' ? '700' : '400' }}>SWM</button>
                             </div>
                         </div>
                         </div>

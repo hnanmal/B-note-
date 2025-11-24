@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+import { API_BASE_URL } from '../apiConfig';
 const ADMIN_KEY = 'HECBIM';
 
 const formatBytes = (bytes = 0) => {

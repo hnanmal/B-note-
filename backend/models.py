@@ -130,3 +130,19 @@ class CommonInput(Base):
     unit = Column(String, nullable=True)
     remark = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
+class FamilyListItem(Base):
+    __tablename__ = "family_list"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    item_type = Column(String, nullable=False, default="FAMILY")
+    parent_id = Column(Integer, ForeignKey("family_list.id"), nullable=True)
+    sequence_number = Column(String, nullable=True)
+
+    parent = relationship("FamilyListItem", remote_side=[id], back_populates="children")
+    children = relationship(
+        "FamilyListItem", back_populates="parent", cascade="all, delete-orphan"
+    )
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)

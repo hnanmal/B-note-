@@ -5,6 +5,7 @@ import StandardGwmMatcher from './components/StandardGwmMatcher';
 import StandardTreeManager from './components/StandardTreeManager';
 import ProjectPage from './components/ProjectPage';
 import CommonInputPage from './components/CommonInputPage';
+import TeamStandardFamilyList from './components/TeamStandardFamilyList';
 
 const NAV_ITEMS = [
   { id: 'workmaster', label: '워크마스터 매니저', icon: '🧰' },
@@ -85,9 +86,9 @@ function App() {
                     minWidth: 0,
                     maxWidth: '100%',
                     boxSizing: 'border-box',
-                    padding: '6px 0',
+                    padding: '4px 0',
                     fontWeight: 600,
-                    fontSize: 13,
+                    fontSize: 12,
                     border: 'none',
                     background: activePage === item.id ? '#f7c748' : '#f1f1f1',
                     color: activePage === item.id ? '#2c1b00' : '#1d4ed8',
@@ -102,7 +103,7 @@ function App() {
                   {item.label}
                 </button>
               ))}
-              <div style={{ marginTop: 4 }}>
+              <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <button
                   type="button"
                   onClick={() => setActivePage('common')}
@@ -121,6 +122,25 @@ function App() {
                   }}
                 >
                   Common Input Setting
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePage('family')}
+                  className={`nav-btn${activePage === 'family' ? ' active' : ''}`}
+                  style={{
+                    width: '100%',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    padding: '6px 0',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    border: 'none',
+                    background: activePage === 'family' ? '#f7c748' : '#f1f1f1',
+                    color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Team Standard Family List
                 </button>
               </div>
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -157,8 +177,8 @@ function App() {
                       className={`nav-btn icon${activePage === item.id ? ' active' : ''}`}
                       onClick={() => setActivePage(item.id)}
                       style={{
-                        width: 36,
-                        height: 40,
+                        width: 32,
+                        height: 32,
                         border: 'none',
                         background: 'transparent',
                         cursor: 'pointer',
@@ -166,7 +186,7 @@ function App() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: 600,
                         color: activePage === item.id ? '#222' : '#1d4ed8',
                         borderRadius: 6,
@@ -185,8 +205,8 @@ function App() {
                   type="button"
                   onClick={() => setActivePage('project')}
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 32,
+                    height: 32,
                     borderRadius: 8,
                     border: '1px solid #f7c748',
                     background: activePage === 'project' ? '#f7c748' : '#fff',
@@ -194,7 +214,7 @@ function App() {
                     cursor: 'pointer',
                     transition: 'background 0.2s',
                     textAlign: 'center',
-                    fontSize: 14,
+                    fontSize: 12,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -210,8 +230,8 @@ function App() {
                     type="button"
                     onClick={() => setActivePage('common')}
                     style={{
-                      width: 36,
-                      height: 36,
+                      width: 32,
+                      height: 32,
                       borderRadius: 8,
                       border: '1px solid #f7c748',
                       background: activePage === 'common' ? '#f7c748' : '#fff',
@@ -219,7 +239,7 @@ function App() {
                       cursor: 'pointer',
                       transition: 'background 0.2s',
                       textAlign: 'center',
-                      fontSize: 14,
+                      fontSize: 12,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -228,6 +248,32 @@ function App() {
                     aria-label="Common Input Setting"
                   >
                     C
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                  <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Family</div>
+                  <button
+                    type="button"
+                    onClick={() => setActivePage('family')}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      border: '1px solid #f7c748',
+                      background: activePage === 'family' ? '#f7c748' : '#fff',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'background 0.2s',
+                      textAlign: 'center',
+                      fontSize: 12,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
+                    }}
+                    aria-label="Team Standard Family List"
+                  >
+                    F
                   </button>
                 </div>
             </div>
@@ -241,6 +287,10 @@ function App() {
         ) : activePage === 'common' ? (
           <div className="panel pick" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
             <CommonInputPage />
+          </div>
+        ) : activePage === 'family' ? (
+          <div className="panel family" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+            <TeamStandardFamilyList />
           </div>
         ) : (
           <>
