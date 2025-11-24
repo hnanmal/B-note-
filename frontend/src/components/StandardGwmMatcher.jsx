@@ -73,14 +73,22 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
 
     const filteredWorkMasters = useMemo(() => {
         const candidates = workMasters.filter(w => (w.new_old_code || '').toLowerCase() !== 'old');
-        const matchesConstraint = (w) => (w.work_master_code || '').startsWith('S') && (w.cat_mid_code || '') === 'AA';
-        const constrained = candidates.filter(matchesConstraint);
+        const startsWith = (letter) => (w) => (w.work_master_code || '').startsWith(letter);
+        const startsWithS = startsWith('S');
+        const startsWithF = startsWith('F');
+        const hasCatMidAA = (w) => (w.cat_mid_code || '') === 'AA';
+        const hasCatLargeF01 = (w) => (w.cat_large_code || '') === 'F01';
+        const searchable = candidates.filter(w => {
+            if (startsWithS(w)) return hasCatMidAA(w);
+            if (startsWithF(w)) return hasCatLargeF01(w);
+            return true;
+        });
         const filterText = (wmFilter || '').trim().toLowerCase();
         if (!filterText) {
-            return constrained;
+            return searchable;
         }
         const terms = filterText.split('|').map(term => term.trim()).filter(Boolean);
-        return constrained.filter(w => {
+        return searchable.filter(w => {
             const haystack = Object.values(w)
                 .filter(value => typeof value === 'string' || typeof value === 'number')
                 .map(value => String(value).toLowerCase())

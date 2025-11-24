@@ -224,3 +224,47 @@ def update_standard_item_name(db: Session, standard_item_id: int, new_name: str)
     db.commit()
     db.refresh(item)
     return item
+
+
+def list_common_inputs(db: Session):
+    return (
+        db.query(models.CommonInput)
+        .order_by(models.CommonInput.classification, models.CommonInput.abbreviation)
+        .all()
+    )
+
+
+def get_common_input(db: Session, item_id: int):
+    return db.query(models.CommonInput).filter(models.CommonInput.id == item_id).first()
+
+
+def create_common_input(db: Session, item: schemas.CommonInputCreate):
+    if not item.classification.strip():
+        raise ValueError("분류를 입력해주세요.")
+    db_item = models.CommonInput(**item.dict())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+def update_common_input(db: Session, item_id: int, updates: schemas.CommonInputUpdate):
+    db_item = get_common_input(db, item_id)
+    if not db_item:
+        return None
+    data = updates.dict(exclude_none=True)
+    for key, value in data.items():
+        setattr(db_item, key, value)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+def delete_common_input(db: Session, item_id: int):
+    item = get_common_input(db, item_id)
+    if not item:
+        return None
+    db.delete(item)
+    db.commit()
+    return item

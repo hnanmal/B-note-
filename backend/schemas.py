@@ -137,6 +137,62 @@ class UserWithoutProjects(UserBase):
     id: int
 
 
+class ProjectDbBase(BaseModel):
+    display_name: str
+
+
+class ProjectDbCreate(ProjectDbBase):
+    pass
+
+
+class ProjectDbCopy(BaseModel):
+    display_name: Optional[str] = None
+
+
+class ProjectDbRename(BaseModel):
+    new_display_name: str
+
+
+class ProjectDbItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    file_name: str
+    display_name: str
+    created_at: str
+    size: int
+
+
+class CommonInputBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    classification: str
+    abbreviation: Optional[str] = None
+    description: Optional[str] = None
+    input_value: Optional[str] = None
+    unit: Optional[str] = None
+    remark: Optional[str] = None
+
+
+class CommonInputCreate(CommonInputBase):
+    pass
+
+
+class CommonInputUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    classification: Optional[str] = None
+    abbreviation: Optional[str] = None
+    description: Optional[str] = None
+    input_value: Optional[str] = None
+    unit: Optional[str] = None
+    remark: Optional[str] = None
+
+
+class CommonInputItem(CommonInputBase):
+    id: int
+    created_at: datetime.datetime
+
+
 # Update forward references to resolve circular dependencies
 StandardItem.model_rebuild()
 Project.model_rebuild()

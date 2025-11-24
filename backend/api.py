@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import pandas as pd
 import io
 
-from . import crud, schemas, models
+from . import crud, project_db, schemas, models
 from .database import SessionLocal
 from . import database
 
@@ -254,3 +254,115 @@ def rename_standard_item(
     if not std:
         raise HTTPException(status_code=404, detail="StandardItem not found")
     return {"message": "renamed", "standard_item_id": std.id}
+
+
+@router.get(
+    "/project-db/",
+    response_model=List[schemas.ProjectDbItem],
+    tags=["Project DB"],
+)
+def list_project_databases():
+    return project_db.list_project_dbs()
+
+
+@router.post(
+    "/project-db/",
+    response_model=schemas.ProjectDbItem,
+    tags=["Project DB"],
+)
+def create_project_database(payload: schemas.ProjectDbCreate):
+    try:
+        return project_db.create_project_db(payload.display_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post(
+    "/project-db/{file_name}/copy",
+    response_model=schemas.ProjectDbItem,
+    tags=["Project DB"],
+)
+def copy_project_database(file_name: str, payload: schemas.ProjectDbCopy):
+    try:
+        return project_db.copy_project_db(file_name, payload.display_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post(
+    "/project-db/{file_name}/rename",
+    response_model=schemas.ProjectDbItem,
+    tags=["Project DB"],
+)
+def rename_project_database(file_name: str, payload: schemas.ProjectDbRename):
+    try:
+        return project_db.rename_project_db(file_name, payload.new_display_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.delete("/project-db/{file_name}", tags=["Project DB"])
+def delete_project_database(file_name: str, admin_key: str):
+    if admin_key != project_db.ADMIN_KEY:
+        raise HTTPException(
+            status_code=403, detail="Admin key is required for deletion"
+        )
+    try:
+        project_db.delete_project_db(file_name)
+        return {"message": "deleted", "file_name": file_name}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get(
+    "/common-input/",
+    response_model=List[schemas.CommonInputItem],
+    tags=["Common Input"],
+)
+def list_common_input(db: Session = Depends(get_db)):
+    return crud.list_common_inputs(db)
+
+
+@router.post(
+    "/common-input/",
+    response_model=schemas.CommonInputItem,
+    tags=["Common Input"],
+)
+def create_common_input(
+    payload: schemas.CommonInputCreate, db: Session = Depends(get_db)
+):
+    try:
+        return crud.create_common_input(db, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.put(
+    "/common-input/{item_id}",
+    response_model=schemas.CommonInputItem,
+    tags=["Common Input"],
+)
+def update_common_input(
+    item_id: int, payload: schemas.CommonInputUpdate, db: Session = Depends(get_db)
+):
+    updated = crud.update_common_input(db, item_id, payload)
+    if not updated:
+        raise HTTPException(status_code=404, detail="CommonInput item not found")
+    return updated
+
+
+@router.delete("/common-input/{item_id}", tags=["Common Input"])
+def delete_common_input(item_id: int, db: Session = Depends(get_db)):
+    deleted = crud.delete_common_input(db, item_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="CommonInput item not found")
+    return {"message": "deleted", "id": item_id}
+
+
+@router.options("/{path:path}")
+def cors_options(path: str):
+    return Response(status_code=204)

@@ -3,6 +3,8 @@ import './App.css'
 import WorkMasterManager from './components/WorkMasterManager';
 import StandardGwmMatcher from './components/StandardGwmMatcher';
 import StandardTreeManager from './components/StandardTreeManager';
+import ProjectPage from './components/ProjectPage';
+import CommonInputPage from './components/CommonInputPage';
 
 const NAV_ITEMS = [
   { id: 'workmaster', label: '워크마스터 매니저', icon: '🧰' },
@@ -11,7 +13,7 @@ const NAV_ITEMS = [
 
 function App() {
   const [selectedNode, setSelectedNode] = useState(null);
-  const [activePage, setActivePage] = useState('matching'); // 'matching' | 'workmaster'
+  const [activePage, setActivePage] = useState('matching'); // 'matching' | 'workmaster' | 'project' | 'common'
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const containerRef = useRef(null);
@@ -26,7 +28,7 @@ function App() {
       </header>
   <div style={{ height: 32 }} />
       <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100% - 64px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
-        {/* Sidebar: Only navigation, toggleable, fixed to left */}
+  {/* Sidebar: Only navigation, toggleable, fixed to left */}
         <div
           className={`sidebar-nav${sidebarOpen ? '' : ' collapsed'}`}
           style={{
@@ -71,8 +73,9 @@ function App() {
             <span style={{ lineHeight: 1 }}>☰</span>
           </button>
           {sidebarOpen ? (
-            <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
-                  {NAV_ITEMS.map(item => (
+            <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#555', textAlign: 'center' }}>팀BIM Admin</div>
+              {NAV_ITEMS.map(item => (
                 <button
                   key={item.id}
                   className={`nav-btn${activePage === item.id ? ' active' : ''}`}
@@ -85,9 +88,9 @@ function App() {
                     padding: '6px 0',
                     fontWeight: 600,
                     fontSize: 13,
-                       border: 'none',
-                       background: activePage === item.id ? '#f7c748' : '#f1f1f1',
-                       color: activePage === item.id ? '#2c1b00' : '#555',
+                    border: 'none',
+                    background: activePage === item.id ? '#f7c748' : '#f1f1f1',
+                    color: activePage === item.id ? '#2c1b00' : '#1d4ed8',
                     cursor: 'pointer',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -99,81 +102,191 @@ function App() {
                   {item.label}
                 </button>
               ))}
+              <div style={{ marginTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setActivePage('common')}
+                  className={`nav-btn${activePage === 'common' ? ' active' : ''}`}
+                  style={{
+                    width: '100%',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    padding: '6px 0',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    border: 'none',
+                    background: activePage === 'common' ? '#f7c748' : '#f1f1f1',
+                    color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Common Input Setting
+                </button>
+              </div>
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>Project User</div>
+                <button
+                  type="button"
+                  onClick={() => setActivePage('project')}
+                  style={{
+                    width: '80%',
+                    padding: '6px 0',
+                    borderRadius: 8,
+                    border: '1px solid #f7c748',
+                    background: activePage === 'project' ? '#f7c748' : '#fff',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    textAlign: 'center',
+                    fontSize: 13,
+                    color: activePage === 'project' ? '#2c1b00' : '#1d4ed8',
+                  }}
+                >
+                  Project Main
+                </button>
+              </div>
             </nav>
           ) : (
-            <div style={{ marginTop: 56, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-              {NAV_ITEMS.map(item => (
+            <div style={{ marginTop: 56, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>BIM Admin</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {NAV_ITEMS.map(item => (
+                    <button
+                      key={item.id}
+                      className={`nav-btn icon${activePage === item.id ? ' active' : ''}`}
+                      onClick={() => setActivePage(item.id)}
+                      style={{
+                        width: 36,
+                        height: 40,
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 18,
+                        fontWeight: 600,
+                        color: activePage === item.id ? '#222' : '#1d4ed8',
+                        borderRadius: 6,
+                        transition: 'background 0.2s',
+                      }}
+                      aria-label={item.label}
+                    >
+                      {item.icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Project User</div>
                 <button
-                  key={item.id}
-                  className={`nav-btn icon${activePage === item.id ? ' active' : ''}`}
-                  onClick={() => setActivePage(item.id)}
+                  type="button"
+                  onClick={() => setActivePage('project')}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    border: '1px solid #f7c748',
+                    background: activePage === 'project' ? '#f7c748' : '#fff',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    textAlign: 'center',
+                    fontSize: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: activePage === 'project' ? '#2c1b00' : '#1d4ed8',
+                  }}
+                >
+                  P
+                </button>
+              </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                  <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Common</div>
+                  <button
+                    type="button"
+                    onClick={() => setActivePage('common')}
                     style={{
                       width: 36,
-                      height: 40,
-                      border: 'none',
-                      background: 'transparent',
+                      height: 36,
+                      borderRadius: 8,
+                      border: '1px solid #f7c748',
+                      background: activePage === 'common' ? '#f7c748' : '#fff',
+                      fontWeight: 600,
                       cursor: 'pointer',
-                      padding: 0,
+                      transition: 'background 0.2s',
+                      textAlign: 'center',
+                      fontSize: 14,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 18,
-                      fontWeight: 600,
-                      color: activePage === item.id ? '#222' : '#666',
-                      borderRadius: 6,
-                      transition: 'background 0.2s',
+                      color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
                     }}
-                  aria-label={item.label}
-                >
-                  {item.icon}
-                </button>
-              ))}
+                    aria-label="Common Input Setting"
+                  >
+                    C
+                  </button>
+                </div>
             </div>
           )}
         </div>
 
-        {/* Left panel: StandardTreeManager or WorkMasterManager, always visible, next to sidebar */}
-          {/* Left panel: StandardTreeManager or WorkMasterManager */}
-          <div
-            className="panel left"
-            style={activePage === 'matching' ? {
-              width: PANEL_LEFT_WIDTH,
-              minWidth: 0,
-              flex: '0 0 ' + PANEL_LEFT_WIDTH + 'px',
-              display: 'flex',
-              flexDirection: 'column',
-              height: 'calc(100% - 64px)',
-              position: 'relative',
-              zIndex: 1,
-              overflowX: 'hidden',
-            } : {
-              flex: '1 1 auto',
-              minWidth: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              height: 'calc(100% - 64px)',
-              position: 'relative',
-              zIndex: 1,
-              overflowX: 'hidden',
-            }}
-          >
-          <div style={{ flex: 1, overflow: 'auto', padding: '0 0 0 8px', minWidth: 0 }}>
-            {activePage === 'matching' ? (
-              <StandardTreeManager onNodeSelect={setSelectedNode} refreshSignal={treeRefreshKey} />
-            ) : (
-              <WorkMasterManager />
-            )}
+        {activePage === 'project' ? (
+          <div className="panel project" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+            <ProjectPage />
           </div>
-        </div>
-
-        {/* Right panel: Matching UI or info */}
-          {activePage === 'matching' && (
-            <div className="panel right" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflowX: 'hidden' }}>
-              <div className="right-top" style={{ height: '100%', minWidth: 0 }}>
-                <StandardGwmMatcher selectedNode={selectedNode} onTreeRefresh={() => setTreeRefreshKey((prev) => prev + 1)} />
+        ) : activePage === 'common' ? (
+          <div className="panel pick" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+            <CommonInputPage />
+          </div>
+        ) : (
+          <>
+            {/* Left panel: StandardTreeManager or WorkMasterManager */}
+            <div
+              className="panel left"
+              style={activePage === 'matching' ? {
+                width: PANEL_LEFT_WIDTH,
+                minWidth: 0,
+                flex: '0 0 ' + PANEL_LEFT_WIDTH + 'px',
+                display: 'flex',
+                flexDirection: 'column',
+                height: 'calc(100% - 64px)',
+                position: 'relative',
+                zIndex: 1,
+                overflowX: 'hidden',
+              } : {
+                flex: '1 1 auto',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                height: 'calc(100% - 64px)',
+                position: 'relative',
+                zIndex: 1,
+                overflowX: 'hidden',
+              }}
+            >
+              <div style={{ flex: 1, overflow: 'auto', padding: '0 0 0 8px', minWidth: 0 }}>
+                {activePage === 'matching' ? (
+                  <StandardTreeManager onNodeSelect={setSelectedNode} refreshSignal={treeRefreshKey} />
+                ) : (
+                  <WorkMasterManager />
+                )}
               </div>
             </div>
-          )}
+
+            {/* Right panel: Matching UI or info */}
+            {activePage === 'matching' && (
+              <div className="panel right" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflowX: 'hidden' }}>
+                <div className="right-top" style={{ height: '100%', minWidth: 0 }}>
+                  <StandardGwmMatcher selectedNode={selectedNode} onTreeRefresh={() => setTreeRefreshKey((prev) => prev + 1)} />
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </main>
     </div>
   );

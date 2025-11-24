@@ -117,3 +117,16 @@ class StandardItem(Base):
         secondary=standard_item_work_master_association,
         back_populates="standard_items",
     )
+
+
+class CommonInput(Base):
+    __tablename__ = "common_input"
+
+    id = Column(Integer, primary_key=True, index=True)
+    classification = Column(String, index=True, nullable=False)
+    abbreviation = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    input_value = Column(String, nullable=True)
+    unit = Column(String, nullable=True)
+    remark = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
