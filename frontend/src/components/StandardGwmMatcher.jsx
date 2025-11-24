@@ -2,6 +2,16 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
 const buttonStyle = { fontSize: 12, padding: '4px 10px', borderRadius: 4, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' };
+const highlightBackground = 'rgba(246, 217, 117, 0.25)';
+const highlightedLabelStyle = {
+    backgroundColor: highlightBackground,
+    padding: '2px 8px',
+    borderRadius: 4,
+    marginLeft: 8,
+    display: 'inline-block',
+    fontSize: 14,
+    lineHeight: 1.3,
+};
 
 export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
     const [standardItems, setStandardItems] = useState([]);
@@ -258,7 +268,26 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
     const hasTreeChildren = Boolean(selectedNode && (childrenMap.get(selectedNode.id) || []).length);
     const isCopyMode = selectedNode && selectedNode.depth <= 1;
     const isMatcherMode = selectedNode && selectedNode.depth >= 2;
-    const selectedLabel = selectedNode?.node?.name || selectedNode?.id || '항목을 선택해주세요';
+    const itemDictionary = useMemo(() => {
+        const dict = new Map();
+        standardItems.forEach(item => dict.set(item.id, item));
+        return dict;
+    }, [standardItems]);
+
+    const selectedPathLabel = useMemo(() => {
+        if (!selectedNode?.id) return null;
+        const parts = [];
+        let currentId = selectedNode.id;
+        while (currentId) {
+            const item = itemDictionary.get(currentId);
+            if (!item) break;
+            parts.push(item.name);
+            currentId = item.parent_id;
+        }
+        return parts.length ? parts.reverse().join(' > ') : null;
+    }, [selectedNode?.id, itemDictionary]);
+
+    const selectedLabel = selectedPathLabel || selectedNode?.node?.name || selectedNode?.id || '항목을 선택해주세요';
     const selectedType = selectedNode?.node?.type || '';
 
     return (
@@ -275,7 +304,9 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
                     <>
                         <div>
                             <div style={{ marginBottom: 6 }}>
-                                <strong>선택 항목:</strong> {selectedLabel} <small style={{ color: '#666' }}>({selectedType})</small>
+                                <strong>선택 항목:</strong>
+                                <span style={highlightedLabelStyle}>{selectedLabel}</span>
+                                <small style={{ color: '#666', marginLeft: 6 }}>({selectedType})</small>
                             </div>
                             <div style={{ fontSize: 13, color: '#444' }}>
                                 이 항목의 하위 트리를 복사 후 같은 레벨의 다른 항목 아래에 붙여넣을 수 있습니다.
@@ -310,7 +341,9 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
                 {isMatcherMode && selectedNode && (
                     <>
                         <div style={{ marginBottom: 8 }}>
-                            <strong>선택 항목:</strong> {selectedLabel} <small style={{ color: '#666' }}>({selectedType})</small>
+                            <strong>선택 항목:</strong>
+                            <span style={highlightedLabelStyle}>{selectedLabel}</span>
+                            <small style={{ color: '#666', marginLeft: 6 }}>({selectedType})</small>
                         </div>
                         <div style={{ display: 'flex', gap: 12, minWidth: 0, height: '100%' }}>
                             <div style={{ flex: 1, borderRight: '1px solid #eee', paddingRight: 12, maxWidth: 420, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%', overflow: 'hidden' }}>

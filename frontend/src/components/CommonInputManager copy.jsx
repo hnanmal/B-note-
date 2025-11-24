@@ -52,7 +52,6 @@
     const [editingValues, setEditingValues] = useState(emptyEntry);
     const [collapsed, setCollapsed] = useState(new Set());
     const [editModalOpen, setEditModalOpen] = useState(false);
-    const [createModalOpen, setCreateModalOpen] = useState(false);
 
     const INLINE_FIELD_HEIGHT = 40;
     const inlineFieldStyle = {
@@ -106,17 +105,6 @@
       });
     };
 
-    const openCreateModal = () => {
-      setForm(emptyEntry);
-      setStatus(null);
-      setCreateModalOpen(true);
-    };
-
-    const closeCreateModal = () => {
-      setCreateModalOpen(false);
-      setForm(emptyEntry);
-    };
-
     const startEdit = (entry) => {
       setEditingId(entry.id);
       setEditingValues({
@@ -152,7 +140,6 @@
         await handleResponse(response);
         setForm(emptyEntry);
         setStatus({ type: 'success', message: '공통 입력 항목이 등록되었습니다.' });
-        closeCreateModal();
         await fetchEntries();
       } catch (error) {
         setStatus({ type: 'error', message: error.message });
@@ -209,92 +196,21 @@
       [entries],
     );
 
-    const listRowStyle = {
-      width: '100%',
-      borderRadius: 5,
+    const cardGridStyle = {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(6, minmax(180px, 1fr))',
+      gap: 6,
+    };
+
+    const cardStyle = {
+      borderRadius: 14,
       background: '#fff',
-      padding: '4px 4px',
-      boxShadow: '0 3px 8px rgba(15,23,42,0.06)',
-      border: '1px solid #e5e7eb',
+      padding: 14,
+      minHeight: 80,
+      boxShadow: '0 6px 18px rgba(15,23,42,0.08)',
       display: 'flex',
-      alignItems: 'center',
-      gap: 4,
-    };
-
-    const listTextGroupStyle = {
-      display: 'flex',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 20,
-      minWidth: 260,
-      flex: '1 1 200px',
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-    };
-
-    const listMetaStyle = {
-      display: 'flex',
-      gap: 6,
-      flex: '1 1 320px',
-      fontSize: 12,
-      alignItems: 'center',
-    };
-
-    const listMetaLabelStyle = {
-      fontSize: 11,
-      color: '#94a3b8',
-      textTransform: 'uppercase',
-    };
-
-    const listMetaItemStyle = {
-      display: 'flex',
-      alignItems: 'center',
+      flexDirection: 'column',
       gap: 10,
-      minWidth: 100,
-    };
-
-    const listMetaValueStyle = {
-      fontSize: 13,
-      fontWeight: 600,
-      color: '#1d4ed8',
-    };
-
-    const actionButtonContainer = {
-      display: 'flex',
-      gap: 6,
-      alignItems: 'center',
-      flexWrap: 'nowrap',
-    };
-
-    const headerStyle = {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-    };
-
-    const titleStyle = {
-      margin: 0,
-      fontSize: 18,
-      fontWeight: 600,
-      color: '#0f172a',
-    };
-
-    const subtitleStyle = {
-      margin: 0,
-      fontSize: 12,
-      color: '#475467',
-    };
-
-    const createButtonStyle = {
-      padding: '8px 16px',
-      borderRadius: 8,
-      border: 'none',
-      background: '#2563eb',
-      color: '#fff',
-      fontWeight: 600,
-      cursor: 'pointer',
     };
 
     const modalOverlayStyle = {
@@ -309,12 +225,10 @@
     };
 
     const modalContentStyle = {
-      borderRadius: 14,
-      background: '#fff',
-      padding: 14,
-      minWidth: 720,
+      ...cardStyle,
+      minWidth: 480,
       maxWidth: 'calc(100% - 48px)',
-      width: 'min(1200px, 100%)',
+      width: 'min(900px, 100%)',
       boxShadow: '0 16px 40px rgba(15,23,42,0.25)',
     };
 
@@ -325,14 +239,84 @@
     };
 
     return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={headerStyle}>
-          <div>
-            <h1 style={titleStyle}>공통 입력 목록</h1>
-            <p style={subtitleStyle}>등록된 항목을 분류별로 확인하고, 필요시 수정이나 삭제를 진행하세요.</p>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={inlineRowStyle}>
+          <div style={{ flex: '0 0 160px', minWidth: 140 }}>
+            <label style={{ fontSize: 12, color: '#475467' }}>분류</label>
+            <input
+              list="classification-suggestions"
+              value={form.classification}
+              onChange={(e) => setForm((prev) => ({ ...prev, classification: e.target.value }))}
+              placeholder="예: 구조"
+              style={inlineFieldStyle}
+            />
+            <datalist id="classification-suggestions">
+              {classificationDatalist.map((category) => (
+                <option key={category} value={category} />
+              ))}
+            </datalist>
           </div>
-          <button type="button" onClick={openCreateModal} style={createButtonStyle}>
-            새로운 항목 등록
+          <div style={{ flex: '0 0 140px', minWidth: 130 }}>
+            <label style={{ fontSize: 12, color: '#475467' }}>Abbreviation</label>
+            <input
+              value={form.abbreviation}
+              onChange={(e) => setForm((prev) => ({ ...prev, abbreviation: e.target.value }))}
+              placeholder="예: STR"
+              style={inlineFieldStyle}
+            />
+          </div>
+          <div style={{ flex: '0 0 220px', minWidth: 180 }}>
+            <label style={{ fontSize: 12, color: '#475467' }}>Description</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+              placeholder="설명"
+              style={{ ...textareaFieldStyle, height: INLINE_FIELD_HEIGHT }}
+            />
+          </div>
+          <div style={{ flex: '0 0 150px', minWidth: 130 }}>
+            <label style={{ fontSize: 12, color: '#475467' }}>Input</label>
+            <input
+              value={form.input_value}
+              onChange={(e) => setForm((prev) => ({ ...prev, input_value: e.target.value }))}
+              placeholder="입력값"
+              style={inlineFieldStyle}
+            />
+          </div>
+          <div style={{ flex: '0 0 130px', minWidth: 110 }}>
+            <label style={{ fontSize: 12, color: '#475467' }}>Unit</label>
+            <input
+              value={form.unit}
+              onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))}
+              placeholder="차원"
+              style={inlineFieldStyle}
+            />
+          </div>
+          <div style={{ flex: '0 0 220px', minWidth: 180 }}>
+            <label style={{ fontSize: 12, color: '#475467' }}>Remark</label>
+            <textarea
+              value={form.remark}
+              onChange={(e) => setForm((prev) => ({ ...prev, remark: e.target.value }))}
+              placeholder="비고"
+              style={{ ...textareaFieldStyle, height: INLINE_FIELD_HEIGHT }}
+            />
+          </div>
+          <button
+            onClick={handleCreate}
+            disabled={operationPending}
+            style={{
+              padding: '0 20px',
+              height: INLINE_FIELD_HEIGHT,
+              borderRadius: 8,
+              border: 'none',
+              background: operationPending ? '#93c5fd' : '#2563eb',
+              color: '#fff',
+              fontWeight: 600,
+              cursor: operationPending ? 'not-allowed' : 'pointer',
+              alignSelf: 'flex-end',
+            }}
+          >
+            등록
           </button>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
@@ -354,7 +338,7 @@
         >
           {tree.length === 0 && <div style={{ color: '#6b7280' }}>등록된 항목이 없습니다.</div>}
           {tree.map(({ classification, items }) => (
-            <div key={classification} style={{ marginBottom: 4 }}>
+            <div key={classification} style={{ marginBottom: 16 }}>
               <div
                 style={{
                   padding: '10px 12px',
@@ -377,9 +361,6 @@
                       border: 'none',
                       background: collapsed.has(classification) ? '#e0e7ff' : '#eef2ff',
                       color: '#1d4ed8',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
                       fontWeight: 700,
                       cursor: 'pointer',
                     }}
@@ -394,187 +375,69 @@
                 <span style={{ fontSize: 12, color: '#475467' }}>카드형 목록</span>
               </div>
               {!collapsed.has(classification) && (
-                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {items.map((entry) => (
-                    <div key={entry.id} style={{ ...listRowStyle, marginLeft: 56, width: 'calc(100% - 200px)' }}>
-                      <div style={listTextGroupStyle}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', flex: '0 0 auto' }}>{entry.abbreviation || '무명'}</div>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: '#475467',
-                            flex: '1 1 auto',
-                            minWidth: 0,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {entry.description || '설명이 없습니다.'}
+                <div style={{ marginTop: 12 }}>
+                  <div style={cardGridStyle}>
+                    {items.map((entry) => (
+                      <div key={entry.id} style={cardStyle}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>{entry.abbreviation || '무명'}</div>
+                            <div style={{ fontSize: 12, color: '#475467' }}>{entry.description || '설명이 없습니다.'}</div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'nowrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => startEdit(entry)}
+                              style={{
+                                padding: '4px 12px',
+                                borderRadius: 6,
+                                border: '1px solid #cbd5f5',
+                                background: '#fff',
+                                fontSize: 12,
+                              }}
+                            >
+                              수정
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(entry.id)}
+                              disabled={operationPending}
+                              style={{
+                                padding: '4px 12px',
+                                borderRadius: 6,
+                                border: '1px solid #fecaca',
+                                background: '#fee2e2',
+                                color: '#991b1b',
+                                cursor: operationPending ? 'not-allowed' : 'pointer',
+                                fontSize: 12,
+                              }}
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#475467' }}>
+                          <div>
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>Input</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#1d4ed8' }}>{entry.input_value || '-'}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>Unit</div>
+                            <div>{entry.unit || '-'}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>Remark</div>
+                            <div>{entry.remark || '-'}</div>
+                          </div>
                         </div>
                       </div>
-                      <div style={listMetaStyle}>
-                        <div style={listMetaItemStyle}>
-                          <span style={listMetaLabelStyle}>Input</span>
-                          <span style={listMetaValueStyle}>{entry.input_value || '-'}</span>
-                        </div>
-                        <div style={listMetaItemStyle}>
-                          <span style={listMetaLabelStyle}>Unit</span>
-                          <span style={{ fontSize: 13 }}>{entry.unit || '-'}</span>
-                        </div>
-                        <div style={listMetaItemStyle}>
-                          <span style={listMetaLabelStyle}>Remark</span>
-                          <span style={{ fontSize: 13 }}>{entry.remark || '-'}</span>
-                        </div>
-                      </div>
-                      <div style={actionButtonContainer}>
-                        <button
-                          type="button"
-                          onClick={() => startEdit(entry)}
-                          style={{
-                            padding: '6px 14px',
-                            borderRadius: 6,
-                            border: '1px solid #cbd5f5',
-                            background: '#fff',
-                            fontSize: 12,
-                          }}
-                        >
-                          수정
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(entry.id)}
-                          disabled={operationPending}
-                          style={{
-                            padding: '6px 14px',
-                            borderRadius: 6,
-                            border: '1px solid #fecaca',
-                            background: '#fee2e2',
-                            color: '#991b1b',
-                            cursor: operationPending ? 'not-allowed' : 'pointer',
-                            fontSize: 12,
-                          }}
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           ))}
         </div>
-      {createModalOpen && (
-        <div style={modalOverlayStyle} onClick={(e) => void (e.target === e.currentTarget && closeCreateModal())}>
-          <div style={modalContentStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <strong style={{ fontSize: 18, color: '#0f172a' }}>항목 등록</strong>
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                style={{ border: 'none', background: 'transparent', fontSize: 16, cursor: 'pointer' }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={modalFieldRowStyle}>
-              <div style={{ flex: '0 0 160px', minWidth: 140 }}>
-                <label style={{ fontSize: 12, color: '#475467' }}>분류</label>
-                <input
-                  list="classification-suggestions"
-                  value={form.classification}
-                  onChange={(e) => setForm((prev) => ({ ...prev, classification: e.target.value }))}
-                  placeholder="예: 구조"
-                  style={inlineFieldStyle}
-                />
-                <datalist id="classification-suggestions">
-                  {classificationDatalist.map((category) => (
-                    <option key={category} value={category} />
-                  ))}
-                </datalist>
-              </div>
-              <div style={{ flex: '0 0 140px', minWidth: 130 }}>
-                <label style={{ fontSize: 12, color: '#475467' }}>Abbreviation</label>
-                <input
-                  value={form.abbreviation}
-                  onChange={(e) => setForm((prev) => ({ ...prev, abbreviation: e.target.value }))}
-                  placeholder="예: STR"
-                  style={inlineFieldStyle}
-                />
-              </div>
-              <div style={{ flex: '0 0 220px', minWidth: 180 }}>
-                <label style={{ fontSize: 12, color: '#475467' }}>Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="설명"
-                  style={{ ...textareaFieldStyle, height: INLINE_FIELD_HEIGHT }}
-                />
-              </div>
-              <div style={{ flex: '0 0 150px', minWidth: 130 }}>
-                <label style={{ fontSize: 12, color: '#475467' }}>Input</label>
-                <input
-                  value={form.input_value}
-                  onChange={(e) => setForm((prev) => ({ ...prev, input_value: e.target.value }))}
-                  placeholder="입력값"
-                  style={inlineFieldStyle}
-                />
-              </div>
-              <div style={{ flex: '0 0 130px', minWidth: 110 }}>
-                <label style={{ fontSize: 12, color: '#475467' }}>Unit</label>
-                <input
-                  value={form.unit}
-                  onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))}
-                  placeholder="차원"
-                  style={inlineFieldStyle}
-                />
-              </div>
-              <div style={{ flex: '0 0 220px', minWidth: 180 }}>
-                <label style={{ fontSize: 12, color: '#475467' }}>Remark</label>
-                <textarea
-                  value={form.remark}
-                  onChange={(e) => setForm((prev) => ({ ...prev, remark: e.target.value }))}
-                  placeholder="비고"
-                  style={{ ...textareaFieldStyle, height: INLINE_FIELD_HEIGHT }}
-                />
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={operationPending}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 6,
-                  border: 'none',
-                  background: '#2563eb',
-                  color: '#fff',
-                  cursor: operationPending ? 'not-allowed' : 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                저장
-              </button>
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 6,
-                  border: '1px solid #cbd5f5',
-                  background: '#fff',
-                  color: '#475467',
-                }}
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {editModalOpen && (
         <div style={modalOverlayStyle} onClick={(e) => void (e.target === e.currentTarget && cancelEdit())}>
           <div style={modalContentStyle}>
