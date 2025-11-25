@@ -325,10 +325,10 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                             >
                                 {level === 2 && (
                                     // <span style={{ fontWeight: 600 }}>▶</span>
-                                    <span style={{ fontWeight: 600 }}>▸</span>
+                                    <span style={{ fontWeight: 600, fontSize: 12 }}>▸</span>
                                 )}
-                                <span>
-                                    {node.name} <small style={{ color: '#666' }}>({node.type})</small>
+                                <span style={{ fontSize: 12 }}>
+                                    {node.name} <small style={{ color: '#666', fontSize: 10 }}>({node.type})</small>
                                 </span>
                             </span>
                         )}
@@ -353,7 +353,7 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
 
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <h2>Standard Tree</h2>
+            <h2 style={{ fontSize: 14, marginBottom: 8, paddingLeft: 8 }}>Standard GWM Tree</h2>
             {message && <div style={{ color: 'red' }}>{message}</div>}
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <div ref={treeContainerRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e6e6e6', padding: 8, maxWidth: '100%', position: 'relative' }}>
@@ -387,7 +387,7 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                             <input
-                                placeholder="Standard Tree 검색"
+                                placeholder="Standard GWM Tree 검색"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}

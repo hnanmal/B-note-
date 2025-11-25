@@ -140,9 +140,30 @@ class FamilyListItem(Base):
     item_type = Column(String, nullable=False, default="FAMILY")
     parent_id = Column(Integer, ForeignKey("family_list.id"), nullable=True)
     sequence_number = Column(String, nullable=True)
+    description = Column(String, nullable=True)
+    calc_dictionary_entries = relationship(
+        "CalcDictionaryEntry",
+        back_populates="family_list_item",
+        cascade="all, delete-orphan",
+    )
 
     parent = relationship("FamilyListItem", remote_side=[id], back_populates="children")
     children = relationship(
         "FamilyListItem", back_populates="parent", cascade="all, delete-orphan"
     )
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
+class CalcDictionaryEntry(Base):
+    __tablename__ = "calc_dictionary"
+
+    id = Column(Integer, primary_key=True, index=True)
+    family_list_id = Column(Integer, ForeignKey("family_list.id"), nullable=False)
+    calc_code = Column(String, nullable=True)
+    symbol_key = Column(String, nullable=False)
+    symbol_value = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    family_list_item = relationship(
+        "FamilyListItem", back_populates="calc_dictionary_entries"
+    )

@@ -108,6 +108,7 @@ class FamilyListBase(BaseModel):
     item_type: str
     parent_id: Optional[int] = None
     sequence_number: Optional[str] = None
+    description: Optional[str] = None
 
 
 class FamilyListCreate(FamilyListBase):
@@ -121,6 +122,7 @@ class FamilyListUpdate(BaseModel):
     item_type: Optional[str] = None
     parent_id: Optional[int] = None
     sequence_number: Optional[str] = None
+    description: Optional[str] = None
 
 
 class FamilyListItem(FamilyListBase):
@@ -128,6 +130,24 @@ class FamilyListItem(FamilyListBase):
 
     id: int
     children: List[_FamilyListWithoutRelations] = []
+
+
+class CalcDictionaryEntryBase(BaseModel):
+    calc_code: Optional[str] = None
+    symbol_key: str
+    symbol_value: str
+
+
+class CalcDictionaryEntryCreate(CalcDictionaryEntryBase):
+    pass
+
+
+class CalcDictionaryEntry(CalcDictionaryEntryBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    family_list_id: int
+    created_at: datetime.datetime
 
 
 # Project Schemas
@@ -234,3 +254,4 @@ StandardItem.model_rebuild()
 Project.model_rebuild()
 User.model_rebuild()
 FamilyListItem.model_rebuild()
+CalcDictionaryEntry.model_rebuild()

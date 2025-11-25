@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from typing import Optional
 from . import models, schemas
 from . import security
 
@@ -160,16 +161,26 @@ def delete_standard_item(db: Session, standard_item_id: int):
     return item
 
 
+def _normalize_family_sequence(item: Optional[models.FamilyListItem]):
+    if item is None:
+        return None
+    if item.sequence_number is not None:
+        item.sequence_number = str(item.sequence_number)
+    return item
+
+
 def list_family_items(db: Session):
-    return db.query(models.FamilyListItem).order_by(models.FamilyListItem.name).all()
+    items = db.query(models.FamilyListItem).order_by(models.FamilyListItem.name).all()
+    return [_normalize_family_sequence(item) for item in items]
 
 
 def get_family_item(db: Session, item_id: int):
-    return (
+    item = (
         db.query(models.FamilyListItem)
         .filter(models.FamilyListItem.id == item_id)
         .first()
     )
+    return _normalize_family_sequence(item)
 
 
 def create_family_item(db: Session, family_item: schemas.FamilyListCreate):
@@ -177,7 +188,7 @@ def create_family_item(db: Session, family_item: schemas.FamilyListCreate):
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
-    return db_item
+    return _normalize_family_sequence(db_item)
 
 
 def update_family_item(db: Session, item_id: int, updates: schemas.FamilyListUpdate):
@@ -190,7 +201,7 @@ def update_family_item(db: Session, item_id: int, updates: schemas.FamilyListUpd
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
-    return db_item
+    return _normalize_family_sequence(db_item)
 
 
 def delete_family_item(db: Session, item_id: int):
@@ -200,6 +211,30 @@ def delete_family_item(db: Session, item_id: int):
     db.delete(item)
     db.commit()
     return item
+
+
+def list_calc_dictionary_entries(db: Session, family_item_id: int):
+    return (
+        db.query(models.CalcDictionaryEntry)
+        .filter(models.CalcDictionaryEntry.family_list_id == family_item_id)
+        .order_by(models.CalcDictionaryEntry.symbol_key)
+        .all()
+    )
+
+
+def create_calc_dictionary_entry(
+    db: Session, family_item_id: int, entry_in: schemas.CalcDictionaryEntryCreate
+):
+    db_entry = models.CalcDictionaryEntry(
+        family_list_id=family_item_id,
+        calc_code=entry_in.calc_code,
+        symbol_key=entry_in.symbol_key,
+        symbol_value=entry_in.symbol_value,
+    )
+    db.add(db_entry)
+    db.commit()
+    db.refresh(db_entry)
+    return db_entry
 
 
 def get_standard_item(db: Session, standard_item_id: int):

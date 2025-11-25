@@ -299,6 +299,34 @@ def delete_family_list_item(item_id: int, db: Session = Depends(get_db)):
 
 
 @router.get(
+    "/family-list/{item_id}/calc-dictionary",
+    response_model=List[schemas.CalcDictionaryEntry],
+    tags=["Family List"],
+)
+def read_family_calc_dictionary(item_id: int, db: Session = Depends(get_db)):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.list_calc_dictionary_entries(db, family_item_id=item_id)
+
+
+@router.post(
+    "/family-list/{item_id}/calc-dictionary",
+    response_model=schemas.CalcDictionaryEntry,
+    tags=["Family List"],
+)
+def create_family_calc_dictionary_entry(
+    item_id: int,
+    entry: schemas.CalcDictionaryEntryCreate,
+    db: Session = Depends(get_db),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.create_calc_dictionary_entry(db, family_item_id=item_id, entry_in=entry)
+
+
+@router.get(
     "/project-db/",
     response_model=List[schemas.ProjectDbItem],
     tags=["Project DB"],

@@ -23,7 +23,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-def ensure_family_list_sequence_column(engine):
+def ensure_family_list_columns(engine):
     with engine.connect() as conn:
         try:
             columns = conn.execute(text("PRAGMA table_info('family_list')")).fetchall()
@@ -32,5 +32,20 @@ def ensure_family_list_sequence_column(engine):
         column_names = [col[1] for col in columns]
         if "sequence_number" not in column_names:
             conn.execute(
-                text("ALTER TABLE family_list ADD COLUMN sequence_number INTEGER")
+                text("ALTER TABLE family_list ADD COLUMN sequence_number TEXT")
             )
+        if "description" not in column_names:
+            conn.execute(text("ALTER TABLE family_list ADD COLUMN description TEXT"))
+
+
+def ensure_calc_dictionary_columns(engine):
+    with engine.connect() as conn:
+        try:
+            columns = conn.execute(
+                text("PRAGMA table_info('calc_dictionary')")
+            ).fetchall()
+        except OperationalError:
+            return
+        column_names = [col[1] for col in columns]
+        if "calc_code" not in column_names:
+            conn.execute(text("ALTER TABLE calc_dictionary ADD COLUMN calc_code TEXT"))

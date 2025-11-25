@@ -30,7 +30,18 @@ export default function TeamStandardFamilyList() {
   const [addingType, setAddingType] = useState('CATEGORY');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
+  const [editingSequence, setEditingSequence] = useState('');
+  const [editingItemType, setEditingItemType] = useState('CATEGORY');
+  const [editingDescription, setEditingDescription] = useState('');
   const [addingSequence, setAddingSequence] = useState('');
+  const [selectedFamilyNode, setSelectedFamilyNode] = useState(null);
+  const [calcDictionaryEntries, setCalcDictionaryEntries] = useState([]);
+  const [calcDictionaryLoading, setCalcDictionaryLoading] = useState(false);
+  const [calcDictionaryError, setCalcDictionaryError] = useState(null);
+  const [newCalcSymbolKey, setNewCalcSymbolKey] = useState('');
+  const [newCalcSymbolValue, setNewCalcSymbolValue] = useState('');
+  const [newCalcCodeInput, setNewCalcCodeInput] = useState('');
+  const [creatingCalcEntry, setCreatingCalcEntry] = useState(false);
 
   const refreshFamilyItems = useCallback(async () => {
     setLoading(true);
@@ -52,12 +63,120 @@ export default function TeamStandardFamilyList() {
     refreshFamilyItems();
   }, [refreshFamilyItems]);
 
+  useEffect(() => {
+    if (selectedFamilyNode?.item_type === 'FAMILY') {
+      setNewCalcCodeInput((selectedFamilyNode.sequence_number ?? '').trim());
+    } else {
+      setNewCalcCodeInput('');
+    }
+  }, [selectedFamilyNode]);
+
+  const loadCalcDictionary = useCallback(
+    async (signal) => {
+      if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
+      setCalcDictionaryLoading(true);
+      setCalcDictionaryError(null);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary`,
+          signal ? { signal } : undefined
+        );
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+          if (!response.ok) {
+            throw new Error('calc_dictionary 데이터를 불러오는 데 실패했습니다.');
+          }
+        }
+
+        if (!response.ok) {
+          const detailMessage =
+            payload?.detail || payload?.message || 'calc_dictionary 데이터를 불러오는 데 실패했습니다.';
+          throw new Error(detailMessage);
+        }
+
+        setCalcDictionaryEntries(Array.isArray(payload) ? payload : []);
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        setCalcDictionaryError(error.message);
+      } finally {
+        setCalcDictionaryLoading(false);
+      }
+    },
+    [selectedFamilyNode]
+  );
+
+  useEffect(() => {
+    if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') {
+      setCalcDictionaryEntries([]);
+      setCalcDictionaryLoading(false);
+      setCalcDictionaryError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    loadCalcDictionary(controller.signal);
+    return () => controller.abort();
+  }, [loadCalcDictionary, selectedFamilyNode]);
+
+  const handleCreateCalcEntry = async () => {
+    if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
+    const symbolKey = newCalcSymbolKey.trim();
+    const symbolValue = newCalcSymbolValue.trim();
+    if (!symbolKey || !symbolValue) {
+      setCalcDictionaryError('심벌 키와 값은 필수입니다.');
+      return;
+    }
+    setCalcDictionaryError(null);
+    setCreatingCalcEntry(true);
+    try {
+      const payload = {
+        symbol_key: symbolKey,
+        symbol_value: symbolValue,
+      };
+      const trimmedCalcCode = newCalcCodeInput.trim();
+      if (trimmedCalcCode) payload.calc_code = trimmedCalcCode;
+      const response = await fetch(
+        `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message =
+          body?.detail || body?.message || 'calc_dictionary 항목을 저장하지 못했습니다.';
+        throw new Error(message);
+      }
+      setNewCalcSymbolKey('');
+      setNewCalcSymbolValue('');
+      setNewCalcCodeInput((selectedFamilyNode.sequence_number ?? '').trim());
+      await loadCalcDictionary();
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        setCalcDictionaryError(error.message);
+      }
+    } finally {
+      setCreatingCalcEntry(false);
+    }
+  };
+
   const filteredItems = useMemo(() => {
     if (filterType === 'ALL') return familyItems;
     return familyItems.filter((item) => item.item_type === filterType);
   }, [familyItems, filterType]);
 
   const familyTree = useMemo(() => buildFamilyTree(filteredItems), [filteredItems]);
+  const cleanedCalcCode = selectedFamilyNode?.sequence_number?.trim();
+  const matchingCalcDictionaryEntries = useMemo(() => {
+    if (!cleanedCalcCode) return [];
+    return calcDictionaryEntries.filter((entry) => (entry.calc_code || '').trim() === cleanedCalcCode);
+  }, [calcDictionaryEntries, cleanedCalcCode]);
+  const isFamilySelected = selectedFamilyNode?.item_type === 'FAMILY';
 
   const cancelAdd = () => {
     setAddingParentId(undefined);
@@ -126,12 +245,18 @@ export default function TeamStandardFamilyList() {
   const startEdit = (node) => {
     setEditingId(node.id);
     setEditingName(node.name);
+    setEditingSequence(node.sequence_number ?? '');
+    setEditingItemType(node.item_type || 'CATEGORY');
+    setEditingDescription(node.description ?? '');
     setStatus(null);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditingName('');
+    setEditingSequence('');
+    setEditingItemType('CATEGORY');
+    setEditingDescription('');
   };
 
   const submitEdit = async (nodeId) => {
@@ -141,10 +266,29 @@ export default function TeamStandardFamilyList() {
       return;
     }
     try {
+      const normalizedSequence = editingSequence.trim();
+      const normalizedDescription = editingDescription.trim();
+      const original = familyItems.find((item) => item.id === nodeId);
+      const payload = { name: trimmed };
+
+      if (editingItemType !== (original?.item_type || 'CATEGORY')) {
+        payload.item_type = editingItemType;
+      }
+
+      const originalSequence = (original?.sequence_number ?? '').toString().trim();
+      if (normalizedSequence !== originalSequence) {
+        payload.sequence_number = normalizedSequence;
+      }
+
+      const originalDescription = (original?.description ?? '').toString().trim();
+      if (normalizedDescription !== originalDescription) {
+        payload.description = normalizedDescription;
+      }
+
       const response = await fetch(`${API_BASE_URL}/family-list/${nodeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         const errorBody = await response.json().catch(() => null);
@@ -155,7 +299,7 @@ export default function TeamStandardFamilyList() {
           : '수정에 실패했습니다.';
         throw new Error(message);
       }
-      setStatus({ type: 'success', message: '이름이 수정되었습니다.' });
+      setStatus({ type: 'success', message: '항목이 수정되었습니다.' });
       cancelEdit();
       await refreshFamilyItems();
     } catch (error) {
@@ -185,8 +329,16 @@ export default function TeamStandardFamilyList() {
     }
   };
 
+  const handleFamilySelect = (node) => {
+    setSelectedFamilyNode(node);
+  };
+
   const renderFamilyNode = (node, level = 0) => {
     const hasChildren = node.children && node.children.length > 0;
+    const isFamily = node.item_type === 'FAMILY';
+    const hasSequence = Boolean(isFamily && node.sequence_number);
+    const description = node.description?.trim();
+    const isSelected = selectedFamilyNode?.id === node.id;
     return (
       <div key={node.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div
@@ -200,33 +352,100 @@ export default function TeamStandardFamilyList() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             {level > 0 && <span style={{ fontSize: 12, color: '#94a3b8' }}>{'·'.repeat(level)}</span>}
             {editingId === node.id ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  style={{ padding: 4, borderRadius: 4, border: '1px solid #d1d5db', minWidth: 140 }}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <input
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    style={{ padding: 4, borderRadius: 4, border: '1px solid #d1d5db', minWidth: 140, flex: '1 1 180px' }}
+                  />
+                  <select
+                    value={editingItemType}
+                    onChange={(e) => setEditingItemType(e.target.value)}
+                    style={{ padding: 4, borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }}
+                  >
+                    <option value="CATEGORY">Category</option>
+                    <option value="FAMILY">Family</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Sequence"
+                    value={editingSequence}
+                    onChange={(e) => setEditingSequence(e.target.value)}
+                    style={{ padding: 4, borderRadius: 4, border: '1px solid #d1d5db', minWidth: 100 }}
+                  />
+                </div>
+                <textarea
+                  value={editingDescription}
+                  onChange={(e) => setEditingDescription(e.target.value)}
+                  placeholder="설명 (선택)"
+                  rows={2}
+                  style={{ width: '100%', minWidth: 0, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 12, resize: 'vertical' }}
                 />
-                <button
-                  type="button"
-                  onClick={() => submitEdit(node.id)}
-                  style={{ padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #cbd5f5' }}
-                >
-                  저장
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  style={{ padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #cbd5f5' }}
-                >
-                  취소
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => submitEdit(node.id)}
+                    style={{ padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #cbd5f5' }}
+                  >
+                    저장
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    style={{ padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #cbd5f5' }}
+                  >
+                    취소
+                  </button>
+                </div>
               </div>
             ) : (
               <>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
-                  {node.name}
-                </span>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>({node.item_type})</span>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleFamilySelect(node)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleFamilySelect(node);
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                    cursor: 'pointer',
+                    borderRadius: 6,
+                    padding: '4px 6px',
+                    background: isSelected ? '#e7f4ff' : 'transparent',
+                  }}
+                >
+                  {hasSequence && (
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        padding: '0 6px',
+                        borderRadius: 4,
+                        background: '#e0f2fe',
+                      }}
+                    >
+                      {node.sequence_number}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                    {node.name}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>({node.item_type})</span>
+                </div>
+                {description && (
+                  <div style={{ fontSize: 11, color: '#475467', marginLeft: level * 16 + 8 }}>
+                    {description}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -295,9 +514,6 @@ export default function TeamStandardFamilyList() {
             overflow: 'hidden',
           }}
         >
-          <div style={{ padding: 16, borderBottom: '1px solid #eef2ff', fontSize: 13, fontWeight: 600, color: '#475467' }}>
-            Standard Tree
-          </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <StandardTreeManager />
           </div>
@@ -420,6 +636,136 @@ export default function TeamStandardFamilyList() {
               familyTree.map((node) => renderFamilyNode(node))
             ) : (
               <div style={{ color: '#64748b', fontSize: 12 }}>등록된 가족 항목이 없습니다.</div>
+            )}
+          </div>
+        </div>
+        <div
+          style={{
+            flex: '0 0 320px',
+            minHeight: 0,
+            borderRadius: 14,
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 10px 30px rgba(15,23,42,0.08)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ padding: 16, borderBottom: '1px solid #eef2ff', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#475467' }}>Calc Dictionary</div>
+            {isFamilySelected && selectedFamilyNode ? (
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>Seq#{selectedFamilyNode.sequence_number || '—'}</div>
+            ) : (
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>Family 항목을 선택하면, 일치하는 calc_code를 보여줍니다.</div>
+            )}
+          </div>
+          {isFamilySelected && (
+            <div
+              style={{
+                padding: '0 16px 12px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                alignItems: 'center',
+                background: '#f9fafb',
+                borderBottom: '1px solid #eef2ff',
+              }}
+            >
+              <input
+                placeholder="Calc Code"
+                value={newCalcCodeInput}
+                onChange={(e) => setNewCalcCodeInput(e.target.value)}
+                style={{ flex: '1 1 120px', padding: 6, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 120 }}
+              />
+              <input
+                placeholder="Symbol Key"
+                value={newCalcSymbolKey}
+                onChange={(e) => setNewCalcSymbolKey(e.target.value)}
+                style={{ flex: '1 1 140px', padding: 6, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 140 }}
+              />
+              <input
+                placeholder="Symbol Value"
+                value={newCalcSymbolValue}
+                onChange={(e) => setNewCalcSymbolValue(e.target.value)}
+                style={{ flex: '1 1 180px', padding: 6, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 160 }}
+              />
+              <button
+                type="button"
+                onClick={handleCreateCalcEntry}
+                disabled={creatingCalcEntry || !newCalcSymbolKey.trim() || !newCalcSymbolValue.trim()}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #2563eb',
+                  background: creatingCalcEntry ? '#93c5fd' : '#2563eb',
+                  color: '#fff',
+                  fontSize: 12,
+                  cursor: creatingCalcEntry ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {creatingCalcEntry ? '저장 중...' : '새 항목 추가'}
+              </button>
+            </div>
+          )}
+          <div style={{ flex: 1, minHeight: 0, padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {!selectedFamilyNode && (
+              <div style={{ color: '#64748b', fontSize: 12 }}>Tree에서 Family 항목을 먼저 선택해주세요.</div>
+            )}
+            {selectedFamilyNode && !isFamilySelected && (
+              <div style={{ color: '#64748b', fontSize: 12 }}>Family 타입 항목만 calc dictionary를 지원합니다.</div>
+            )}
+            {isFamilySelected && (
+              <>
+                {calcDictionaryLoading && (
+                  <div style={{ color: '#0f172a', fontSize: 12 }}>관련 calc_dictionary를 불러오는 중입니다...</div>
+                )}
+                {calcDictionaryError && (
+                  <div style={{ color: '#b91c1c', fontSize: 12 }}>{calcDictionaryError}</div>
+                )}
+                {!calcDictionaryLoading && !calcDictionaryError && (
+                  matchingCalcDictionaryEntries.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr',
+                          gap: 12,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#475467',
+                          borderBottom: '1px solid #e5e7eb',
+                          paddingBottom: 6,
+                        }}
+                      >
+                        <span>Calc Code</span>
+                        <span>심벌키</span>
+                        <span>심벌값</span>
+                      </div>
+                      {matchingCalcDictionaryEntries.map((entry) => (
+                        <div
+                          key={entry.id}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr 1fr',
+                            gap: 12,
+                            fontSize: 13,
+                            color: '#0f172a',
+                            padding: '4px 0',
+                            borderBottom: '1px solid #f3f4f6',
+                          }}
+                        >
+                          <span style={{ fontWeight: 600 }}>{entry.calc_code || '—'}</span>
+                          <span>{entry.symbol_key}</span>
+                          <span>{entry.symbol_value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#64748b', fontSize: 12 }}>선택된 순번과 calc_code가 일치하는 항목이 없습니다.</div>
+                  )
+                )}
+              </>
             )}
           </div>
         </div>
