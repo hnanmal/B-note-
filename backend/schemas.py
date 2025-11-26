@@ -142,6 +142,14 @@ class CalcDictionaryEntryCreate(CalcDictionaryEntryBase):
     pass
 
 
+class CalcDictionaryEntryUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    calc_code: Optional[str] = None
+    symbol_key: Optional[str] = None
+    symbol_value: Optional[str] = None
+
+
 class CalcDictionaryEntry(CalcDictionaryEntryBase):
     model_config = ConfigDict(from_attributes=True)
 

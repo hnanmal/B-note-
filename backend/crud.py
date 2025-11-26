@@ -237,6 +237,36 @@ def create_calc_dictionary_entry(
     return db_entry
 
 
+def get_calc_dictionary_entry(db: Session, entry_id: int):
+    return (
+        db.query(models.CalcDictionaryEntry)
+        .filter(models.CalcDictionaryEntry.id == entry_id)
+        .first()
+    )
+
+
+def update_calc_dictionary_entry(db: Session, entry_id: int, updates: dict):
+    entry = get_calc_dictionary_entry(db, entry_id)
+    if not entry:
+        return None
+    for key, value in updates.items():
+        if hasattr(entry, key):
+            setattr(entry, key, value)
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def delete_calc_dictionary_entry(db: Session, entry_id: int):
+    entry = get_calc_dictionary_entry(db, entry_id)
+    if not entry:
+        return None
+    db.delete(entry)
+    db.commit()
+    return entry
+
+
 def get_standard_item(db: Session, standard_item_id: int):
     return (
         db.query(models.StandardItem)

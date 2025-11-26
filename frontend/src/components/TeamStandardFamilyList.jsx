@@ -20,6 +20,15 @@ const normalizeSequenceString = (value) => {
   return value?.toString?.().trim?.() ?? '';
 };
 
+const safeString = (value) => {
+  if (value === undefined || value === null) return '';
+  try {
+    return String(value);
+  } catch {
+    return '';
+  }
+};
+
 const getSequenceIdentifier = (node) => {
   return parseSequenceIdentifier(node.sequence_number) ?? parseSequenceIdentifier(node.name);
 };
@@ -201,6 +210,7 @@ export default function TeamStandardFamilyList() {
   const [newCalcSymbolValue, setNewCalcSymbolValue] = useState('');
   const [newCalcCodeInput, setNewCalcCodeInput] = useState('');
   const [creatingCalcEntry, setCreatingCalcEntry] = useState(false);
+  const [editingCalcEntryId, setEditingCalcEntryId] = useState(null);
   const [copiedCalcEntries, setCopiedCalcEntries] = useState([]);
   const [copiedFromSequence, setCopiedFromSequence] = useState('');
   const [batchCopyLoading, setBatchCopyLoading] = useState(false);
@@ -517,9 +527,12 @@ export default function TeamStandardFamilyList() {
   const cleanedCalcCode = selectedFamilyNode?.sequence_number?.trim();
   const matchingCalcDictionaryEntries = useMemo(() => {
     if (!cleanedCalcCode) return [];
-    return calcDictionaryEntries.filter((entry) => (entry.calc_code || '').trim() === cleanedCalcCode);
+    return calcDictionaryEntries.filter(
+      (entry) => safeString(entry.calc_code).trim() === cleanedCalcCode
+    );
   }, [calcDictionaryEntries, cleanedCalcCode]);
   const isFamilySelected = selectedFamilyNode?.item_type === 'FAMILY';
+  const isEditingCalcEntry = Boolean(editingCalcEntryId);
   const checkboxSelectionCount = selectedStdItems.size;
   const assignmentModeInfoText = assignmentMode
     ? checkboxSelectionCount
@@ -723,6 +736,17 @@ export default function TeamStandardFamilyList() {
     };
   }, [clearPendingSave]);
 
+  const resetCalcEntryForm = () => {
+    setEditingCalcEntryId(null);
+    setNewCalcSymbolKey('');
+    setNewCalcSymbolValue('');
+    if (selectedFamilyNode?.item_type === 'FAMILY') {
+      setNewCalcCodeInput((selectedFamilyNode.sequence_number ?? '').trim());
+    } else {
+      setNewCalcCodeInput('');
+    }
+  };
+
   const handleCreateCalcEntry = async () => {
     if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
     const symbolKey = newCalcSymbolKey.trim();
@@ -740,23 +764,26 @@ export default function TeamStandardFamilyList() {
       };
       const trimmedCalcCode = newCalcCodeInput.trim();
       if (trimmedCalcCode) payload.calc_code = trimmedCalcCode;
-      const response = await fetch(
-        `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
-      );
+      const isEditing = Boolean(editingCalcEntryId);
+      const endpoint = isEditing
+        ? `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary/${editingCalcEntryId}`
+        : `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary`;
+      const response = await fetch(endpoint, {
+        method: isEditing ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         const message =
           body?.detail || body?.message || 'calc_dictionary 항목을 저장하지 못했습니다.';
         throw new Error(message);
       }
-      setNewCalcSymbolKey('');
-      setNewCalcSymbolValue('');
-      setNewCalcCodeInput((selectedFamilyNode.sequence_number ?? '').trim());
+      const successMessage = isEditing
+        ? 'Calc Dictionary 항목이 저장되었습니다.'
+        : 'Calc Dictionary 항목이 추가되었습니다.';
+      setStatus({ type: 'success', message: successMessage });
+      resetCalcEntryForm();
       await loadCalcDictionary();
     } catch (error) {
       if (error.name !== 'AbortError') {
@@ -765,6 +792,26 @@ export default function TeamStandardFamilyList() {
     } finally {
       setCreatingCalcEntry(false);
     }
+  };
+
+  const handleStartCalcEntryEdit = (entry) => {
+    if (!entry) return;
+    setEditingCalcEntryId(entry.id ?? null);
+    setNewCalcSymbolKey(safeString(entry.symbol_key));
+    setNewCalcSymbolValue(safeString(entry.symbol_value));
+    if (entry.calc_code) {
+      setNewCalcCodeInput(safeString(entry.calc_code));
+    } else if (selectedFamilyNode?.item_type === 'FAMILY') {
+      setNewCalcCodeInput((selectedFamilyNode.sequence_number ?? '').trim());
+    } else {
+      setNewCalcCodeInput('');
+    }
+    setCalcDictionaryError(null);
+  };
+
+  const handleCancelCalcEntryEdit = () => {
+    resetCalcEntryForm();
+    setCalcDictionaryError(null);
   };
 
   const handleCalcDictionarySubmit = (event) => {
@@ -783,8 +830,8 @@ export default function TeamStandardFamilyList() {
     }
     const cleaned = matchingCalcDictionaryEntries
       .map((entry) => ({
-        symbol_key: String(entry?.symbol_key ?? '').trim(),
-        symbol_value: String(entry?.symbol_value ?? '').trim(),
+        symbol_key: safeString(entry.symbol_key).trim(),
+        symbol_value: safeString(entry.symbol_value).trim(),
       }))
       .filter((entry) => entry.symbol_key || entry.symbol_value);
     if (!cleaned.length) {
@@ -853,6 +900,31 @@ export default function TeamStandardFamilyList() {
     selectedFamilyNode,
     setStatus,
   ]);
+
+  const handleDeleteCalcEntry = useCallback(
+    async (entry) => {
+      if (!entry?.id || !selectedFamilyNode) return;
+      if (!window.confirm('이 Calc Dictionary 항목을 정말 삭제하시겠습니까?')) return;
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary/${entry.id}`,
+          { method: 'DELETE' }
+        );
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          const message =
+            body?.detail || body?.message || 'Calc Dictionary 항목을 삭제하지 못했습니다.';
+          throw new Error(message);
+        }
+        setStatus({ type: 'success', message: '항목을 삭제했습니다.' });
+        await loadCalcDictionary();
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        setStatus({ type: 'error', message: error.message });
+      }
+    },
+    [loadCalcDictionary, selectedFamilyNode, setStatus]
+  );
 
   const filteredItems = useMemo(() => {
     if (filterType === 'ALL') return familyItems;
@@ -1693,8 +1765,28 @@ export default function TeamStandardFamilyList() {
                   cursor: creatingCalcEntry ? 'not-allowed' : 'pointer',
                 }}
               >
-                {creatingCalcEntry ? '저장 중...' : '새 항목 추가'}
+                {creatingCalcEntry
+                  ? '저장 중...'
+                  : isEditingCalcEntry
+                  ? '수정 저장'
+                  : '새 항목 추가'}
               </button>
+              {isEditingCalcEntry && (
+                <button
+                  type="button"
+                  onClick={handleCancelCalcEntryEdit}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #cbd5f5',
+                    background: '#fff',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  편집 취소
+                </button>
+              )}
             </form>
           )}
           <div style={{ flex: 1, minHeight: 0, padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1718,7 +1810,7 @@ export default function TeamStandardFamilyList() {
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '1fr 1fr 1fr',
+                          gridTemplateColumns: '1fr 1fr 1fr 120px',
                           gap: 12,
                           fontSize: 12,
                           fontWeight: 600,
@@ -1730,13 +1822,14 @@ export default function TeamStandardFamilyList() {
                         <span>Calc Code</span>
                         <span>심벌키</span>
                         <span>심벌값</span>
+                        <span style={{ textAlign: 'right' }}>작업</span>
                       </div>
                       {matchingCalcDictionaryEntries.map((entry) => (
                         <div
                           key={entry.id}
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: '1fr 1fr 1fr',
+                            gridTemplateColumns: '1fr 1fr 1fr 120px',
                             gap: 12,
                             fontSize: 13,
                             color: '#0f172a',
@@ -1747,6 +1840,40 @@ export default function TeamStandardFamilyList() {
                           <span style={{ fontWeight: 600 }}>{entry.calc_code || '—'}</span>
                           <span>{entry.symbol_key}</span>
                           <span>{entry.symbol_value}</span>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'flex-end',
+                              gap: 6,
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleStartCalcEntryEdit(entry)}
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                border: '1px solid #cbd5f5',
+                                background: '#fff',
+                                fontSize: 11,
+                              }}
+                            >
+                              수정
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCalcEntry(entry)}
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                border: '1px solid #fecaca',
+                                background: '#fee2e2',
+                                fontSize: 11,
+                              }}
+                            >
+                              삭제
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

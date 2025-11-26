@@ -326,6 +326,53 @@ def create_family_calc_dictionary_entry(
     return crud.create_calc_dictionary_entry(db, family_item_id=item_id, entry_in=entry)
 
 
+@router.patch(
+    "/family-list/{item_id}/calc-dictionary/{entry_id}",
+    response_model=schemas.CalcDictionaryEntry,
+    tags=["Family List"],
+)
+def update_family_calc_dictionary_entry(
+    item_id: int,
+    entry_id: int,
+    payload: schemas.CalcDictionaryEntryUpdate,
+    db: Session = Depends(get_db),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    entry = crud.get_calc_dictionary_entry(db, entry_id)
+    if not entry or entry.family_list_id != item_id:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    updates = payload.model_dump(exclude_none=True)
+    if not updates:
+        return entry
+    updated = crud.update_calc_dictionary_entry(db, entry_id=entry_id, updates=updates)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    return updated
+
+
+@router.delete(
+    "/family-list/{item_id}/calc-dictionary/{entry_id}",
+    tags=["Family List"],
+)
+def delete_family_calc_dictionary_entry(
+    item_id: int,
+    entry_id: int,
+    db: Session = Depends(get_db),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    entry = crud.get_calc_dictionary_entry(db, entry_id)
+    if not entry or entry.family_list_id != item_id:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    deleted = crud.delete_calc_dictionary_entry(db, entry_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    return {"message": "deleted", "id": entry_id}
+
+
 @router.get(
     "/family-list/{item_id}/assignments",
     response_model=List[schemas.GwmFamilyAssign],
