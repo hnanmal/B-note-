@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE_URL } from '../apiConfig';
 import StandardTreeManager from './StandardTreeManager';
 
@@ -18,6 +18,20 @@ const buildFamilyTree = (items) => {
   });
 
   return roots;
+};
+
+const normalizeAssignmentIds = (values) => {
+  const iterable =
+    values instanceof Set ? Array.from(values) : Array.isArray(values) ? values : [];
+  const normalized = [];
+  iterable.forEach((value) => {
+    const num = Number(value);
+    if (Number.isFinite(num)) {
+      normalized.push(num);
+    }
+  });
+  normalized.sort((a, b) => a - b);
+  return { array: normalized, key: normalized.join(',') };
 };
 
 export default function TeamStandardFamilyList() {
@@ -42,6 +56,48 @@ export default function TeamStandardFamilyList() {
   const [newCalcSymbolValue, setNewCalcSymbolValue] = useState('');
   const [newCalcCodeInput, setNewCalcCodeInput] = useState('');
   const [creatingCalcEntry, setCreatingCalcEntry] = useState(false);
+  const [assignmentMode, setAssignmentMode] = useState(false);
+  const [selectedStdItems, setSelectedStdItems] = useState(() => new Set());
+  const assignmentSyncBlocked = useRef(false);
+  const lastSyncedAssignmentKey = useRef('');
+  const loadAssignmentsController = useRef(null);
+  const saveAssignmentsController = useRef(null);
+  const handleCheckboxSelectionChange = useCallback((ids = []) => {
+    const normalized = normalizeAssignmentIds(ids).array;
+    setSelectedStdItems(new Set(normalized));
+  }, []);
+
+  const fetchAssignmentsForFamily = useCallback(
+    async (signal) => {
+      if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments`,
+          signal ? { signal } : undefined
+        );
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          const message =
+            body?.detail || body?.message || '할당 데이터를 불러오는 데 실패했습니다.';
+          throw new Error(message);
+        }
+        const payload = await response.json().catch(() => []);
+        const assignmentIds = Array.isArray(payload)
+          ? payload
+              .map((entry) => entry?.standard_item_id)
+              .filter((value) => Number.isFinite(Number(value)))
+          : [];
+        const normalized = normalizeAssignmentIds(assignmentIds);
+        assignmentSyncBlocked.current = true;
+        lastSyncedAssignmentKey.current = normalized.key;
+        setSelectedStdItems(new Set(normalized.array));
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        setStatus({ type: 'error', message: error.message });
+      }
+    },
+    [selectedFamilyNode]
+  );
 
   const refreshFamilyItems = useCallback(async () => {
     setLoading(true);
@@ -121,6 +177,132 @@ export default function TeamStandardFamilyList() {
     return () => controller.abort();
   }, [loadCalcDictionary, selectedFamilyNode]);
 
+  const cleanedCalcCode = selectedFamilyNode?.sequence_number?.trim();
+  const matchingCalcDictionaryEntries = useMemo(() => {
+    if (!cleanedCalcCode) return [];
+    return calcDictionaryEntries.filter((entry) => (entry.calc_code || '').trim() === cleanedCalcCode);
+  }, [calcDictionaryEntries, cleanedCalcCode]);
+  const isFamilySelected = selectedFamilyNode?.item_type === 'FAMILY';
+  const checkboxSelectionCount = selectedStdItems.size;
+  const assignmentModeInfoText = assignmentMode
+    ? checkboxSelectionCount
+      ? `${checkboxSelectionCount}개의 최상위 항목 다음 레벨 항목이 체크되어 있습니다.`
+      : '최상위 항목 바로 아래 레벨 체크박스를 사용해 대상 표준 항목을 선택하세요.'
+    : '버튼을 눌러 Standard GWM Tree에서 최상위 항목 다음 레벨의 체크박스를 활성화하세요.';
+  const assignmentSummaryText = checkboxSelectionCount
+    ? `${checkboxSelectionCount}개 선택된 표준 항목`
+    : '선택된 표준 항목이 없습니다.';
+
+  useEffect(() => {
+    if (!assignmentMode) {
+      if (loadAssignmentsController.current) {
+        loadAssignmentsController.current.abort();
+        loadAssignmentsController.current = null;
+      }
+      if (saveAssignmentsController.current) {
+        saveAssignmentsController.current.abort();
+        saveAssignmentsController.current = null;
+      }
+      assignmentSyncBlocked.current = false;
+      lastSyncedAssignmentKey.current = '';
+      setSelectedStdItems(new Set());
+      return;
+    }
+
+    if (!isFamilySelected) {
+      if (loadAssignmentsController.current) {
+        loadAssignmentsController.current.abort();
+        loadAssignmentsController.current = null;
+      }
+      if (saveAssignmentsController.current) {
+        saveAssignmentsController.current.abort();
+        saveAssignmentsController.current = null;
+      }
+      return;
+    }
+
+    const controller = new AbortController();
+    loadAssignmentsController.current = controller;
+    fetchAssignmentsForFamily(controller.signal);
+    return () => {
+      controller.abort();
+      if (loadAssignmentsController.current === controller) {
+        loadAssignmentsController.current = null;
+      }
+    };
+  }, [assignmentMode, isFamilySelected, fetchAssignmentsForFamily]);
+
+  useEffect(() => {
+    if (!assignmentMode) {
+      if (saveAssignmentsController.current) {
+        saveAssignmentsController.current.abort();
+        saveAssignmentsController.current = null;
+      }
+      return;
+    }
+
+    if (!isFamilySelected || !selectedFamilyNode) {
+      if (saveAssignmentsController.current) {
+        saveAssignmentsController.current.abort();
+        saveAssignmentsController.current = null;
+      }
+      return;
+    }
+
+    if (assignmentSyncBlocked.current) {
+      assignmentSyncBlocked.current = false;
+      return;
+    }
+
+    const normalized = normalizeAssignmentIds(selectedStdItems);
+    const idsToSend = normalized.array;
+    const key = normalized.key;
+    if (lastSyncedAssignmentKey.current === key) {
+      return;
+    }
+
+    const controller = new AbortController();
+    if (saveAssignmentsController.current) {
+      saveAssignmentsController.current.abort();
+    }
+    saveAssignmentsController.current = controller;
+
+    (async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ standard_item_ids: idsToSend }),
+            signal: controller.signal,
+          }
+        );
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          const message =
+            body?.detail || body?.message || '할당을 저장하지 못했습니다.';
+          throw new Error(message);
+        }
+        lastSyncedAssignmentKey.current = key;
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        setStatus({ type: 'error', message: error.message });
+      } finally {
+        if (saveAssignmentsController.current === controller) {
+          saveAssignmentsController.current = null;
+        }
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      if (saveAssignmentsController.current === controller) {
+        saveAssignmentsController.current = null;
+      }
+    };
+  }, [assignmentMode, isFamilySelected, selectedStdItems, selectedFamilyNode]);
+
   const handleCreateCalcEntry = async () => {
     if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
     const symbolKey = newCalcSymbolKey.trim();
@@ -171,12 +353,6 @@ export default function TeamStandardFamilyList() {
   }, [familyItems, filterType]);
 
   const familyTree = useMemo(() => buildFamilyTree(filteredItems), [filteredItems]);
-  const cleanedCalcCode = selectedFamilyNode?.sequence_number?.trim();
-  const matchingCalcDictionaryEntries = useMemo(() => {
-    if (!cleanedCalcCode) return [];
-    return calcDictionaryEntries.filter((entry) => (entry.calc_code || '').trim() === cleanedCalcCode);
-  }, [calcDictionaryEntries, cleanedCalcCode]);
-  const isFamilySelected = selectedFamilyNode?.item_type === 'FAMILY';
 
   const cancelAdd = () => {
     setAddingParentId(undefined);
@@ -514,9 +690,15 @@ export default function TeamStandardFamilyList() {
             overflow: 'hidden',
           }}
         >
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <StandardTreeManager />
-          </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <StandardTreeManager
+                // enable checkboxes only when assignmentMode is active AND a Family node is selected
+                level2CheckboxesEnabled={assignmentMode && isFamilySelected}
+                checkboxDepth={1}
+                onCheckboxSelectionChange={handleCheckboxSelectionChange}
+                externalCheckboxSelection={Array.from(selectedStdItems)}
+              />
+            </div>
         </div>
         <div
           style={{
@@ -572,6 +754,44 @@ export default function TeamStandardFamilyList() {
             <span style={{ marginLeft: 'auto' }}>
               Data source: <strong>FamilyList</strong>
             </span>
+          </div>
+          <div
+            style={{
+              padding: '8px 16px',
+              borderBottom: '1px solid #eef2ff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              background: '#f8fafc',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setAssignmentMode((prev) => !prev)}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #2563eb',
+                  background: assignmentMode ? '#1d4ed8' : '#eff6ff',
+                  color: assignmentMode ? '#fff' : '#1d4ed8',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                {assignmentMode ? '할당 모드 종료' : 'GWM / SWM 할당'}
+              </button>
+              <span style={{ fontSize: 12, color: '#475467' }}>
+                {assignmentMode
+                  ? isFamilySelected
+                    ? '레벨2 항목 체크박스 활성화 중'
+                    : 'Family 항목을 먼저 선택해야 체크박스를 사용할 수 있습니다.'
+                  : '레벨2 항목 체크박스를 켜면 선택이 가능합니다.'}
+              </span>
+              <div style={{ marginLeft: 'auto', fontSize: 12, color: '#475467', fontWeight: 600 }}>{assignmentSummaryText}</div>
+            </div>
+            <div style={{ width: '100%', fontSize: 11, color: '#64748b' }}>{assignmentModeInfoText}</div>
           </div>
           {status && (
             <div

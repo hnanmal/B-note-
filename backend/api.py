@@ -327,6 +327,36 @@ def create_family_calc_dictionary_entry(
 
 
 @router.get(
+    "/family-list/{item_id}/assignments",
+    response_model=List[schemas.GwmFamilyAssign],
+    tags=["Family List"],
+)
+def read_family_assignments(item_id: int, db: Session = Depends(get_db)):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.list_gwm_family_assignments(db, family_id=item_id)
+
+
+@router.post(
+    "/family-list/{item_id}/assignments",
+    response_model=List[schemas.GwmFamilyAssign],
+    tags=["Family List"],
+)
+def replace_family_assignments(
+    item_id: int,
+    payload: schemas.GwmFamilyAssignmentPayload,
+    db: Session = Depends(get_db),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.replace_gwm_family_assignments(
+        db, family_id=item_id, standard_item_ids=payload.standard_item_ids
+    )
+
+
+@router.get(
     "/project-db/",
     response_model=List[schemas.ProjectDbItem],
     tags=["Project DB"],

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 import datetime
 
@@ -148,6 +148,26 @@ class CalcDictionaryEntry(CalcDictionaryEntryBase):
     id: int
     family_list_id: int
     created_at: datetime.datetime
+
+
+class GwmFamilyAssignmentPayload(BaseModel):
+    standard_item_ids: List[int] = Field(default_factory=list)
+
+
+class GwmFamilyAssignBase(BaseModel):
+    family_list_id: int
+    standard_item_id: int
+    formula: Optional[str] = None
+    description: Optional[str] = None
+
+
+class GwmFamilyAssign(GwmFamilyAssignBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    assigned_at: datetime.datetime
+    formula: Optional[str] = None
+    description: Optional[str] = None
 
 
 # Project Schemas

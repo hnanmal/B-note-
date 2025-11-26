@@ -8,6 +8,7 @@ from sqlalchemy import (
     Text,
     Table,
     Enum,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 import datetime
@@ -167,3 +168,23 @@ class CalcDictionaryEntry(Base):
     family_list_item = relationship(
         "FamilyListItem", back_populates="calc_dictionary_entries"
     )
+
+
+class GwmFamilyAssign(Base):
+    __tablename__ = "gwm_family_assign"
+    __table_args__ = (
+        UniqueConstraint(
+            "family_list_id", "standard_item_id", name="uq_gfa_family_standard"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    family_list_id = Column(Integer, ForeignKey("family_list.id"), nullable=False)
+    standard_item_id = Column(Integer, ForeignKey("standard_items.id"), nullable=False)
+    assigned_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    formula = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+
+    family_list_item = relationship("FamilyListItem")
+    standard_item = relationship("StandardItem")

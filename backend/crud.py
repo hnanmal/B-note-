@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from typing import Optional
+from typing import Optional, List
 from . import models, schemas
 from . import security
 
@@ -243,6 +243,66 @@ def get_standard_item(db: Session, standard_item_id: int):
         .filter(models.StandardItem.id == standard_item_id)
         .first()
     )
+
+
+def _collect_standard_item_tree_ids(db: Session, roots: List[int]):
+    collected: set[int] = set()
+    stack = [int(r) for r in roots if r is not None]
+    while stack:
+        current = stack.pop()
+        if current in collected:
+            continue
+        collected.add(current)
+        children = (
+            db.query(models.StandardItem.id)
+            .filter(models.StandardItem.parent_id == current)
+            .all()
+        )
+        for (child_id,) in children:
+            if child_id not in collected:
+                stack.append(child_id)
+    return collected
+
+
+def list_gwm_family_assignments(db: Session, family_id: int):
+    return (
+        db.query(models.GwmFamilyAssign)
+        .filter(models.GwmFamilyAssign.family_list_id == family_id)
+        .all()
+    )
+
+
+def replace_gwm_family_assignments(
+    db: Session, family_id: int, standard_item_ids: List[int]
+):
+    import datetime
+
+    root_ids = [int(i) for i in set(standard_item_ids or []) if i is not None]
+    expanded_ids = _collect_standard_item_tree_ids(db, root_ids) if root_ids else set()
+
+    (
+        db.query(models.GwmFamilyAssign)
+        .filter(models.GwmFamilyAssign.family_list_id == family_id)
+        .delete(synchronize_session=False)
+    )
+
+    if not expanded_ids:
+        db.commit()
+        return []
+
+    now = datetime.datetime.utcnow()
+    assignments = [
+        models.GwmFamilyAssign(
+            family_list_id=family_id,
+            standard_item_id=std_id,
+            assigned_at=now,
+            created_at=now,
+        )
+        for std_id in expanded_ids
+    ]
+    db.bulk_save_objects(assignments)
+    db.commit()
+    return list_gwm_family_assignments(db, family_id=family_id)
 
 
 def assign_work_master_to_standard_item(

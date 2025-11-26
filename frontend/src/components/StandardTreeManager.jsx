@@ -1,7 +1,22 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { API_BASE_URL } from '../apiConfig';
 
-export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
+const setsAreEqual = (a, b) => {
+    if (a.size !== b.size) return false;
+    for (const value of a) {
+        if (!b.has(value)) return false;
+    }
+    return true;
+};
+
+export default function StandardTreeManager({
+    onNodeSelect,
+    refreshSignal,
+    level2CheckboxesEnabled = false,
+    checkboxDepth = 2,
+    onCheckboxSelectionChange,
+    externalCheckboxSelection = [],
+}) {
     const [items, setItems] = useState([]);
     const [tree, setTree] = useState([]);
     const [selected, setSelected] = useState(null);
@@ -20,6 +35,7 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
     const nodeRefs = useRef(new Map());
     const [collapsedNodes, setCollapsedNodes] = useState(new Set());
     const [viewLevel, setViewLevel] = useState(3);
+    const [checkboxSelection, setCheckboxSelection] = useState(() => new Set());
 
     const scrollMatchIntoView = (matchId) => {
         const target = nodeRefs.current.get(matchId);
@@ -132,6 +148,47 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
             }, 0);
         }
     }, [addingForParent]);
+
+    const normalizedExternalSelection = useMemo(() => {
+        const normalized = new Set();
+        (Array.isArray(externalCheckboxSelection) ? externalCheckboxSelection : []).forEach((value) => {
+            if (value != null) {
+                normalized.add(Number(value));
+            }
+        });
+        return normalized;
+    }, [externalCheckboxSelection]);
+
+    const prevExternalSelection = useRef(new Set());
+
+    useEffect(() => {
+        if (!level2CheckboxesEnabled) {
+            if (checkboxSelection.size) {
+                setCheckboxSelection(new Set());
+            }
+            prevExternalSelection.current = new Set();
+            return;
+        }
+    }, [level2CheckboxesEnabled, checkboxSelection.size]);
+
+    useEffect(() => {
+        if (!level2CheckboxesEnabled) {
+            return;
+        }
+
+        if (setsAreEqual(prevExternalSelection.current, normalizedExternalSelection)) {
+            return;
+        }
+
+        prevExternalSelection.current = new Set(normalizedExternalSelection);
+        setCheckboxSelection(new Set(normalizedExternalSelection));
+    }, [level2CheckboxesEnabled, normalizedExternalSelection]);
+
+    useEffect(() => {
+        if (onCheckboxSelectionChange) {
+            onCheckboxSelectionChange(Array.from(checkboxSelection));
+        }
+    }, [checkboxSelection, onCheckboxSelectionChange]);
 
     const handleDelete = async (id) => {
         if (!window.confirm('정말 삭제하시겠습니까? (하위 항목도 함께 삭제될 수 있습니다)')) return;
@@ -272,6 +329,8 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
         if (level >= viewLevel) return null;
         const isCollapsed = collapsedNodes.has(node.id);
         const shouldRenderChildren = hasChildren && level + 1 < viewLevel;
+    const allowCheckbox = level2CheckboxesEnabled && level === checkboxDepth;
+    const isLevel2Checked = checkboxSelection.has(node.id);
         return (
             <div
                 key={node.id}
@@ -319,18 +378,50 @@ export default function StandardTreeManager({ onNodeSelect, refreshSignal }) {
                                 <button style={{ ...smallBtn }} onClick={cancelEdit}>취소</button>
                             </div>
                         ) : (
-                            <span
+                            <div
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => selectNode(node.id, level, node)}
-                                style={{ cursor: 'pointer', fontWeight: node.id === selected ? '600' : '400', display: 'flex', alignItems: 'center', gap: 6 }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        selectNode(node.id, level, node);
+                                    }
+                                }}
+                                style={{
+                                    cursor: 'pointer',
+                                    fontWeight: node.id === selected ? '600' : '400',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                }}
                             >
-                                {level === 2 && (
-                                    // <span style={{ fontWeight: 600 }}>▶</span>
-                                    <span style={{ fontWeight: 600, fontSize: 12 }}>▸</span>
+                                {allowCheckbox && (
+                                    <input
+                                        type="checkbox"
+                                        checked={isLevel2Checked}
+                                        onChange={(e) => {
+                                            e.stopPropagation();
+                                            setCheckboxSelection((prev) => {
+                                                const next = new Set(prev);
+                                                if (next.has(node.id)) next.delete(node.id);
+                                                else next.add(node.id);
+                                                return next;
+                                            });
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ width: 16, height: 16 }}
+                                    />
                                 )}
-                                <span style={{ fontSize: 12 }}>
-                                    {node.name} <small style={{ color: '#666', fontSize: 10 }}>({node.type})</small>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    {level === 2 && (
+                                        <span style={{ fontWeight: 600, fontSize: 12 }}>▸</span>
+                                    )}
+                                    <span style={{ fontSize: 12 }}>
+                                        {node.name} <small style={{ color: '#666', fontSize: 10 }}>({node.type})</small>
+                                    </span>
                                 </span>
-                            </span>
+                            </div>
                         )}
                     </div>
                 </div>

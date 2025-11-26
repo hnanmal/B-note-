@@ -49,3 +49,28 @@ def ensure_calc_dictionary_columns(engine):
         column_names = [col[1] for col in columns]
         if "calc_code" not in column_names:
             conn.execute(text("ALTER TABLE calc_dictionary ADD COLUMN calc_code TEXT"))
+
+
+def ensure_gwm_family_assign_columns(engine):
+    with engine.connect() as conn:
+        try:
+            columns = conn.execute(
+                text("PRAGMA table_info('gwm_family_assign')")
+            ).fetchall()
+        except OperationalError:
+            return
+        column_names = [col[1] for col in columns]
+        if "assigned_at" not in column_names:
+            conn.execute(
+                text("ALTER TABLE gwm_family_assign ADD COLUMN assigned_at DATETIME")
+            )
+        if "formula" not in column_names:
+            conn.execute(text("ALTER TABLE gwm_family_assign ADD COLUMN formula TEXT"))
+        if "description" not in column_names:
+            conn.execute(
+                text("ALTER TABLE gwm_family_assign ADD COLUMN description TEXT")
+            )
+        if "created_at" not in column_names:
+            conn.execute(
+                text("ALTER TABLE gwm_family_assign ADD COLUMN created_at DATETIME")
+            )

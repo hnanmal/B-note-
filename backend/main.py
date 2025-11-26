@@ -6,12 +6,14 @@ from .database import (
     Base,
     ensure_family_list_columns,
     ensure_calc_dictionary_columns,
+    ensure_gwm_family_assign_columns,
 )
 
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
 ensure_family_list_columns(engine)
 ensure_calc_dictionary_columns(engine)
+ensure_gwm_family_assign_columns(engine)
 
 app = FastAPI(
     title="B-note API",
