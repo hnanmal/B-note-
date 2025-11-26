@@ -2,6 +2,70 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { API_BASE_URL } from '../apiConfig';
 import StandardTreeManager from './StandardTreeManager';
 
+const parseSequenceIdentifier = (value) => {
+  const trimmed = value?.toString()?.trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(/^(\d+(?:\.\d+)*)([a-zA-Z]*)/);
+  if (!match) return null;
+  const numbers = match[1].split('.').map((segment) => Number(segment));
+  if (numbers.some((num) => !Number.isFinite(num))) return null;
+  return {
+    numbers,
+    suffix: match[2] ? match[2].toLowerCase() : '',
+  };
+};
+
+const normalizeSequenceString = (value) => {
+  if (value === undefined || value === null) return value;
+  return value?.toString?.().trim?.() ?? '';
+};
+
+const getSequenceIdentifier = (node) => {
+  return parseSequenceIdentifier(node.sequence_number) ?? parseSequenceIdentifier(node.name);
+};
+
+const compareSequenceIdentifiers = (a, b) => {
+  const maxLength = Math.max(a.numbers.length, b.numbers.length);
+  for (let i = 0; i < maxLength; i += 1) {
+    const valueA = i < a.numbers.length ? a.numbers[i] : 0;
+    const valueB = i < b.numbers.length ? b.numbers[i] : 0;
+    if (valueA !== valueB) return valueA - valueB;
+  }
+  if (a.suffix !== b.suffix) {
+    if (!a.suffix) return -1;
+    if (!b.suffix) return 1;
+    return a.suffix.localeCompare(b.suffix, undefined, { sensitivity: 'base' });
+  }
+  return 0;
+};
+
+const compareFamilyNodes = (a, b) => {
+  const identifierA = getSequenceIdentifier(a);
+  const identifierB = getSequenceIdentifier(b);
+  if (identifierA && identifierB) {
+    const comparison = compareSequenceIdentifiers(identifierA, identifierB);
+    if (comparison !== 0) return comparison;
+  } else if (identifierA) {
+    return -1;
+  } else if (identifierB) {
+    return 1;
+  }
+  const nameA = (a?.name ?? '').trim();
+  const nameB = (b?.name ?? '').trim();
+  if (!nameA) return nameB ? 1 : 0;
+  if (!nameB) return -1;
+  return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+};
+
+const sortFamilyTreeNodes = (nodes) => {
+  nodes.sort(compareFamilyNodes);
+  nodes.forEach((node) => {
+    if (node.children && node.children.length > 0) {
+      sortFamilyTreeNodes(node.children);
+    }
+  });
+};
+
 const buildFamilyTree = (items) => {
   const map = new Map();
   items.forEach((item) => {
@@ -17,8 +81,12 @@ const buildFamilyTree = (items) => {
     }
   });
 
+  sortFamilyTreeNodes(roots);
+
   return roots;
 };
+
+const ASSIGNMENT_CHECKBOX_DEPTH = 1;
 
 const normalizeAssignmentIds = (values) => {
   const iterable =
@@ -32,6 +100,59 @@ const normalizeAssignmentIds = (values) => {
   });
   normalized.sort((a, b) => a - b);
   return { array: normalized, key: normalized.join(',') };
+};
+
+const buildStandardTreeWithDepth = (items) => {
+  const map = new Map();
+  items.forEach((item) => {
+    map.set(item.id, { ...item, children: [] });
+  });
+
+  const roots = [];
+  map.forEach((node) => {
+    if (node.parent_id && map.has(node.parent_id)) {
+      map.get(node.parent_id).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  const ancestorMap = new Map();
+  const walk = (node, depth = 0, currentAncestor = null) => {
+    const nextAncestor = depth === ASSIGNMENT_CHECKBOX_DEPTH ? node.id : currentAncestor;
+    ancestorMap.set(node.id, nextAncestor);
+    (node.children || []).forEach((child) => walk(child, depth + 1, nextAncestor));
+  };
+  roots.forEach((root) => walk(root));
+
+  return { roots, ancestorMap };
+};
+
+const cloneNodeWithChildren = (node) => {
+  return {
+    ...node,
+    children: (node.children || []).map((child) => cloneNodeWithChildren(child)),
+  };
+};
+
+const buildAssignedSubtree = (nodes, assignedRoots, ancestorMap, metadata) => {
+  const result = [];
+  nodes.forEach((node) => {
+    const ancestorId = ancestorMap.get(node.id);
+    if (ancestorId && assignedRoots.has(ancestorId)) {
+      const clone = cloneNodeWithChildren(node);
+      clone.metadata = metadata.get(node.id) ?? null;
+      result.push(clone);
+      return;
+    }
+    const childMatches = buildAssignedSubtree(node.children || [], assignedRoots, ancestorMap, metadata);
+    if (childMatches.length) {
+      const clone = { ...node, children: childMatches };
+      clone.metadata = metadata.get(node.id) ?? null;
+      result.push(clone);
+    }
+  });
+  return result;
 };
 
 export default function TeamStandardFamilyList() {
@@ -58,15 +179,31 @@ export default function TeamStandardFamilyList() {
   const [creatingCalcEntry, setCreatingCalcEntry] = useState(false);
   const [assignmentMode, setAssignmentMode] = useState(false);
   const [selectedStdItems, setSelectedStdItems] = useState(() => new Set());
+  const [standardItems, setStandardItems] = useState([]);
+  const [standardTree, setStandardTree] = useState([]);
+  const [standardTreeError, setStandardTreeError] = useState(null);
+  const [checkboxAncestorMap, setCheckboxAncestorMap] = useState(() => new Map());
+  const [assignmentMetadata, setAssignmentMetadata] = useState(() => new Map());
+  const [editingAssignmentId, setEditingAssignmentId] = useState(null);
+  const [editingAssignmentFields, setEditingAssignmentFields] = useState({
+    formula: '',
+    description: '',
+  });
+  const treeContainerRef = useRef(null);
+  const [pendingFocusNodeId, setPendingFocusNodeId] = useState(null);
+  const [pendingScrollNodeId, setPendingScrollNodeId] = useState(null);
   const assignmentSyncBlocked = useRef(false);
   const lastSyncedAssignmentKey = useRef('');
   const loadAssignmentsController = useRef(null);
   const saveAssignmentsController = useRef(null);
+  const pendingSave = useRef({ ids: [], key: '' });
+  const saveTimer = useRef(null);
+  const isSavingAssignment = useRef(false);
+  const performSaveRef = useRef(() => {});
   const handleCheckboxSelectionChange = useCallback((ids = []) => {
     const normalized = normalizeAssignmentIds(ids).array;
     setSelectedStdItems(new Set(normalized));
   }, []);
-
   const fetchAssignmentsForFamily = useCallback(
     async (signal) => {
       if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
@@ -87,17 +224,106 @@ export default function TeamStandardFamilyList() {
               .map((entry) => entry?.standard_item_id)
               .filter((value) => Number.isFinite(Number(value)))
           : [];
-        const normalized = normalizeAssignmentIds(assignmentIds);
+        const metadataMap = new Map();
+        if (Array.isArray(payload)) {
+          payload.forEach((entry) => {
+            if (!entry) return;
+            const id = Number(entry.standard_item_id);
+            if (!Number.isFinite(id)) return;
+            metadataMap.set(id, {
+              id: entry.id,
+              formula: entry.formula ?? null,
+              description: entry.description ?? null,
+            });
+          });
+        }
+        const rootCandidates = new Set();
+        assignmentIds.forEach((id) => {
+          const ancestor = checkboxAncestorMap.get(id);
+          if (ancestor != null) {
+            rootCandidates.add(ancestor);
+          }
+        });
+        const effectiveIds =
+          rootCandidates.size > 0 ? Array.from(rootCandidates) : assignmentIds;
+        const normalized = normalizeAssignmentIds(effectiveIds);
         assignmentSyncBlocked.current = true;
-        lastSyncedAssignmentKey.current = normalized.key;
+  lastSyncedAssignmentKey.current = normalized.key;
+  setAssignmentMetadata(metadataMap);
         setSelectedStdItems(new Set(normalized.array));
       } catch (error) {
         if (error.name === 'AbortError') return;
         setStatus({ type: 'error', message: error.message });
       }
     },
-    [selectedFamilyNode]
+    [selectedFamilyNode, checkboxAncestorMap]
   );
+
+  const handleStartAssignmentEdit = useCallback(
+    (node) => {
+      const metadata = assignmentMetadata.get(node.id) ?? node.metadata;
+      if (!metadata?.id) return;
+      setEditingAssignmentId(metadata.id);
+      setEditingAssignmentFields({
+        formula: metadata.formula ?? '',
+        description: metadata.description ?? '',
+      });
+    },
+    [assignmentMetadata]
+  );
+
+  const handleCancelAssignmentEdit = useCallback(() => {
+    setEditingAssignmentId(null);
+    setEditingAssignmentFields({ formula: '', description: '' });
+  }, []);
+
+  const handleAssignmentFieldChange = useCallback((field, value) => {
+    setEditingAssignmentFields((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleSaveAssignmentMetadata = useCallback(async () => {
+    if (!editingAssignmentId || !selectedFamilyNode) return;
+    try {
+      const trimmedFormula = editingAssignmentFields.formula.trim();
+      const trimmedDescription = editingAssignmentFields.description.trim();
+      const payload = {
+        formula: trimmedFormula === '' ? null : trimmedFormula,
+        description: trimmedDescription === '' ? null : trimmedDescription,
+      };
+      const response = await fetch(
+        `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments/${editingAssignmentId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message =
+          body?.detail || body?.message || '할당 메타데이터를 저장하지 못했습니다.';
+        throw new Error(message);
+      }
+      const updated = await response.json();
+      setAssignmentMetadata((prev) => {
+        const next = new Map(prev);
+        const standardItemId = Number(updated?.standard_item_id);
+        if (Number.isFinite(standardItemId)) {
+          next.set(standardItemId, {
+            id: updated.id,
+            formula: updated.formula ?? null,
+            description: updated.description ?? null,
+          });
+        }
+        return next;
+      });
+      setStatus({ type: 'success', message: '메타데이터가 저장되었습니다.' });
+      handleCancelAssignmentEdit();
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      setStatus({ type: 'error', message: error.message });
+    }
+  }, [editingAssignmentId, editingAssignmentFields, selectedFamilyNode, handleCancelAssignmentEdit]);
 
   const refreshFamilyItems = useCallback(async () => {
     setLoading(true);
@@ -107,7 +333,13 @@ export default function TeamStandardFamilyList() {
         throw new Error('FamilyList를 불러오는 데 실패했습니다.');
       }
       const data = await response.json();
-      setFamilyItems(data);
+      const normalizedFamilyItems = Array.isArray(data)
+        ? data.map((item) => ({
+            ...item,
+            sequence_number: normalizeSequenceString(item.sequence_number),
+          }))
+        : [];
+      setFamilyItems(normalizedFamilyItems);
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     } finally {
@@ -118,6 +350,75 @@ export default function TeamStandardFamilyList() {
   useEffect(() => {
     refreshFamilyItems();
   }, [refreshFamilyItems]);
+
+  useEffect(() => {
+    if (!pendingFocusNodeId) return;
+    const matched = familyItems.find((item) => item.id === pendingFocusNodeId);
+    if (!matched) return;
+    setSelectedFamilyNode(matched);
+    setPendingFocusNodeId(null);
+    setPendingScrollNodeId(matched.id);
+  }, [familyItems, pendingFocusNodeId]);
+
+  const pendingScrollRetry = useRef(0);
+  useEffect(() => {
+    if (!pendingScrollNodeId) return;
+    const container = treeContainerRef.current;
+    const attemptScroll = () => {
+      const target = container?.querySelector(
+        `[data-family-node-id="${pendingScrollNodeId}"]`
+      );
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setPendingScrollNodeId(null);
+        pendingScrollRetry.current = 0;
+        return;
+      }
+      if (pendingScrollRetry.current < 4) {
+        pendingScrollRetry.current += 1;
+        setTimeout(attemptScroll, 80);
+      } else {
+        setPendingScrollNodeId(null);
+        pendingScrollRetry.current = 0;
+      }
+    };
+    attemptScroll();
+  }, [pendingScrollNodeId]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/standard-items/`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => null);
+          const message =
+            errorBody?.detail || errorBody?.message || '표준 항목을 불러오는 데 실패했습니다.';
+          throw new Error(message);
+        }
+        const payload = await response.json();
+        if (!active) return;
+        setStandardItems(Array.isArray(payload) ? payload : []);
+        setStandardTreeError(null);
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        setStandardTreeError(error.message);
+      }
+    })();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const { roots, ancestorMap } = buildStandardTreeWithDepth(standardItems);
+    setStandardTree(roots);
+    setCheckboxAncestorMap(ancestorMap);
+  }, [standardItems]);
 
   useEffect(() => {
     if (selectedFamilyNode?.item_type === 'FAMILY') {
@@ -193,6 +494,110 @@ export default function TeamStandardFamilyList() {
     ? `${checkboxSelectionCount}개 선택된 표준 항목`
     : '선택된 표준 항목이 없습니다.';
 
+  const normalizedAssignedStandardIds = useMemo(() => {
+    const ids = new Set();
+    selectedStdItems.forEach((value) => {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        ids.add(num);
+      }
+    });
+    return ids;
+  }, [selectedStdItems]);
+
+  const assignedStandardTree = useMemo(() => {
+    if (!normalizedAssignedStandardIds.size || !standardTree.length) {
+      return [];
+    }
+    return buildAssignedSubtree(
+      standardTree,
+      normalizedAssignedStandardIds,
+      checkboxAncestorMap,
+      assignmentMetadata
+    );
+  }, [standardTree, normalizedAssignedStandardIds, checkboxAncestorMap, assignmentMetadata]);
+
+  const clearPendingSave = useCallback(() => {
+    pendingSave.current = { ids: [], key: '' };
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+  }, []);
+
+  const scheduleSave = useCallback((ids, key, delay = 150) => {
+    pendingSave.current = { ids, key };
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+    }
+    if (isSavingAssignment.current) {
+      return;
+    }
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      performSaveRef.current();
+    }, delay);
+  }, []);
+
+  const performSave = useCallback(async () => {
+    if (!assignmentMode || !isFamilySelected || !selectedFamilyNode) {
+      isSavingAssignment.current = false;
+      return;
+    }
+    const pending = pendingSave.current;
+    const hasAssignments = pending.ids && pending.ids.length > 0;
+    const alreadyCleared = !hasAssignments && lastSyncedAssignmentKey.current === '';
+    const keyMatches = hasAssignments && pending.key === lastSyncedAssignmentKey.current;
+    if (alreadyCleared || keyMatches) {
+      isSavingAssignment.current = false;
+      return;
+    }
+    if (isSavingAssignment.current) {
+      return;
+    }
+    isSavingAssignment.current = true;
+    if (saveAssignmentsController.current) {
+      saveAssignmentsController.current.abort();
+    }
+    const controller = new AbortController();
+    saveAssignmentsController.current = controller;
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ standard_item_ids: pending.ids }),
+          signal: controller.signal,
+        }
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message =
+          body?.detail || body?.message || '할당을 저장하지 못했습니다.';
+        throw new Error(message);
+      }
+      lastSyncedAssignmentKey.current = pending.key;
+      fetchAssignmentsForFamily();
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      setStatus({ type: 'error', message: error.message });
+    } finally {
+      if (saveAssignmentsController.current === controller) {
+        saveAssignmentsController.current = null;
+      }
+      isSavingAssignment.current = false;
+      if (
+        pendingSave.current.key &&
+        pendingSave.current.key !== lastSyncedAssignmentKey.current
+      ) {
+        scheduleSave(pendingSave.current.ids, pendingSave.current.key, 0);
+      }
+    }
+  }, [assignmentMode, isFamilySelected, selectedFamilyNode, scheduleSave, fetchAssignmentsForFamily]);
+
+  performSaveRef.current = performSave;
+
   useEffect(() => {
     if (!assignmentMode) {
       if (loadAssignmentsController.current) {
@@ -206,6 +611,10 @@ export default function TeamStandardFamilyList() {
       assignmentSyncBlocked.current = false;
       lastSyncedAssignmentKey.current = '';
       setSelectedStdItems(new Set());
+      setAssignmentMetadata(new Map());
+      setEditingAssignmentId(null);
+      setEditingAssignmentFields({ formula: '', description: '' });
+      clearPendingSave();
       return;
     }
 
@@ -218,6 +627,9 @@ export default function TeamStandardFamilyList() {
         saveAssignmentsController.current.abort();
         saveAssignmentsController.current = null;
       }
+      setAssignmentMetadata(new Map());
+      setEditingAssignmentId(null);
+      setEditingAssignmentFields({ formula: '', description: '' });
       return;
     }
 
@@ -230,7 +642,7 @@ export default function TeamStandardFamilyList() {
         loadAssignmentsController.current = null;
       }
     };
-  }, [assignmentMode, isFamilySelected, fetchAssignmentsForFamily]);
+  }, [assignmentMode, isFamilySelected, fetchAssignmentsForFamily, clearPendingSave]);
 
   useEffect(() => {
     if (!assignmentMode) {
@@ -238,6 +650,7 @@ export default function TeamStandardFamilyList() {
         saveAssignmentsController.current.abort();
         saveAssignmentsController.current = null;
       }
+      clearPendingSave();
       return;
     }
 
@@ -261,47 +674,18 @@ export default function TeamStandardFamilyList() {
       return;
     }
 
-    const controller = new AbortController();
-    if (saveAssignmentsController.current) {
-      saveAssignmentsController.current.abort();
-    }
-    saveAssignmentsController.current = controller;
+    scheduleSave(idsToSend, key);
+  }, [assignmentMode, isFamilySelected, selectedStdItems, selectedFamilyNode, scheduleSave, clearPendingSave]);
 
-    (async () => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ standard_item_ids: idsToSend }),
-            signal: controller.signal,
-          }
-        );
-        if (!response.ok) {
-          const body = await response.json().catch(() => null);
-          const message =
-            body?.detail || body?.message || '할당을 저장하지 못했습니다.';
-          throw new Error(message);
-        }
-        lastSyncedAssignmentKey.current = key;
-      } catch (error) {
-        if (error.name === 'AbortError') return;
-        setStatus({ type: 'error', message: error.message });
-      } finally {
-        if (saveAssignmentsController.current === controller) {
-          saveAssignmentsController.current = null;
-        }
-      }
-    })();
-
+  useEffect(() => {
     return () => {
-      controller.abort();
-      if (saveAssignmentsController.current === controller) {
+      clearPendingSave();
+      if (saveAssignmentsController.current) {
+        saveAssignmentsController.current.abort();
         saveAssignmentsController.current = null;
       }
     };
-  }, [assignmentMode, isFamilySelected, selectedStdItems, selectedFamilyNode]);
+  }, [clearPendingSave]);
 
   const handleCreateCalcEntry = async () => {
     if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
@@ -410,12 +794,19 @@ export default function TeamStandardFamilyList() {
           : '생성에 실패했습니다.';
         throw new Error(message);
       }
+      const createdItem = await response.json();
       setStatus({ type: 'success', message: '가족 항목이 등록되었습니다.' });
       cancelAdd();
+      setPendingFocusNodeId(createdItem?.id ?? null);
       await refreshFamilyItems();
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     }
+  };
+
+  const handleAddFormSubmit = (event) => {
+    event.preventDefault();
+    submitCreate();
   };
 
   const startEdit = (node) => {
@@ -477,6 +868,7 @@ export default function TeamStandardFamilyList() {
       }
       setStatus({ type: 'success', message: '항목이 수정되었습니다.' });
       cancelEdit();
+      setPendingFocusNodeId(nodeId);
       await refreshFamilyItems();
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
@@ -509,6 +901,142 @@ export default function TeamStandardFamilyList() {
     setSelectedFamilyNode(node);
   };
 
+  const renderAssignedStandardNodes = (nodes, level = 0) => {
+    if (!nodes || !nodes.length) return null;
+    return nodes.map((node) => {
+      const metadata = assignmentMetadata.get(node.id) ?? node.metadata;
+      const formulaText = metadata?.formula ?? '';
+      const descriptionText = metadata?.description ?? '';
+      const isEditing = Boolean(metadata?.id && editingAssignmentId === metadata.id);
+      return (
+        <div
+          key={`assigned-${node.id}-${level}`}
+          style={{
+            marginLeft: level * 16,
+            marginBottom: 10,
+            paddingBottom: 4,
+            borderBottom: '1px dashed rgba(148, 163, 184, 0.3)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{node.name}</span>
+            <span style={{ fontSize: 11, color: '#475467' }}>({node.type || '표준'})</span>
+          </div>
+          <div
+            style={{
+              marginTop: 6,
+              display: 'flex',
+              gap: 8,
+              alignItems: 'flex-start',
+            }}
+          >
+            <div style={{ flex: 1, fontSize: 11, color: '#1f2937' }}>
+              {formulaText || descriptionText ? (
+                <div>
+                  {formulaText && (
+                    <div style={{ marginBottom: descriptionText ? 4 : 0, fontStyle: 'italic', color: '#0f172a' }}>
+                      수식: {formulaText}
+                    </div>
+                  )}
+                  {descriptionText && (
+                    <div style={{ color: '#475467', whiteSpace: 'pre-line' }}>{descriptionText}</div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ color: '#94a3b8' }}>등록된 수식 / 설명이 없습니다.</div>
+              )}
+            </div>
+            {metadata?.id && (
+              <button
+                type="button"
+                onClick={() => handleStartAssignmentEdit(node)}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: 11,
+                  borderRadius: 4,
+                  border: '1px solid #cbd5f5',
+                  background: isEditing ? '#e0f2fe' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                {isEditing ? '편집 중' : '수정'}
+              </button>
+            )}
+          </div>
+          {isEditing && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: 10,
+                borderRadius: 6,
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              <input
+                value={editingAssignmentFields.formula}
+                onChange={(event) => handleAssignmentFieldChange('formula', event.target.value)}
+                placeholder="수식 입력 (선택)"
+                style={{
+                  padding: 6,
+                  borderRadius: 6,
+                  border: '1px solid #cbd5f5',
+                  fontSize: 12,
+                }}
+              />
+              <textarea
+                rows={2}
+                value={editingAssignmentFields.description}
+                onChange={(event) => handleAssignmentFieldChange('description', event.target.value)}
+                placeholder="설명 입력 (선택)"
+                style={{
+                  padding: 6,
+                  borderRadius: 6,
+                  border: '1px solid #cbd5f5',
+                  fontSize: 12,
+                  resize: 'vertical',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={handleSaveAssignmentMetadata}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    border: '1px solid #2563eb',
+                    background: '#2563eb',
+                    color: '#fff',
+                    fontSize: 12,
+                  }}
+                >
+                  저장
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelAssignmentEdit}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    border: '1px solid #cbd5f5',
+                    background: '#fff',
+                    fontSize: 12,
+                  }}
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          )}
+          {node.children && node.children.length > 0 && renderAssignedStandardNodes(node.children, level + 1)}
+        </div>
+      );
+    });
+  };
+
   const renderFamilyNode = (node, level = 0) => {
     const hasChildren = node.children && node.children.length > 0;
     const isFamily = node.item_type === 'FAMILY';
@@ -516,7 +1044,11 @@ export default function TeamStandardFamilyList() {
     const description = node.description?.trim();
     const isSelected = selectedFamilyNode?.id === node.id;
     return (
-      <div key={node.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div
+        key={node.id}
+        data-family-node-id={node.id}
+        style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+      >
         <div
           style={{
             display: 'flex',
@@ -626,7 +1158,7 @@ export default function TeamStandardFamilyList() {
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {level < 2 && (
+            {level === 0 && (
               <button
                 type="button"
                 onClick={() => handleAdd(node.id)}
@@ -807,7 +1339,10 @@ export default function TeamStandardFamilyList() {
             </div>
           )}
           {addingParentId !== undefined && (
-            <div style={{ padding: 12, borderBottom: '1px dashed #cbd5f5', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            <form
+              onSubmit={handleAddFormSubmit}
+              style={{ padding: 12, borderBottom: '1px dashed #cbd5f5', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}
+            >
               <input
                 value={addingName}
                 onChange={(e) => setAddingName(e.target.value)}
@@ -833,8 +1368,7 @@ export default function TeamStandardFamilyList() {
                 </select>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
-                  type="button"
-                  onClick={submitCreate}
+                  type="submit"
                   style={{ padding: '4px 12px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', fontSize: 12 }}
                 >
                   저장
@@ -847,16 +1381,56 @@ export default function TeamStandardFamilyList() {
                   취소
                 </button>
               </div>
-            </div>
+            </form>
           )}
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16 }}>
-            {loading ? (
-              <div style={{ color: '#64748b', fontSize: 12 }}>데이터를 불러오는 중입니다...</div>
-            ) : familyTree.length > 0 ? (
-              familyTree.map((node) => renderFamilyNode(node))
-            ) : (
-              <div style={{ color: '#64748b', fontSize: 12 }}>등록된 가족 항목이 없습니다.</div>
-            )}
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 16 }}>
+            <div
+              ref={treeContainerRef}
+              style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
+            >
+              {loading ? (
+                <div style={{ color: '#64748b', fontSize: 12 }}>데이터를 불러오는 중입니다...</div>
+              ) : familyTree.length > 0 ? (
+                familyTree.map((node) => renderFamilyNode(node))
+              ) : (
+                <div style={{ color: '#64748b', fontSize: 12 }}>등록된 가족 항목이 없습니다.</div>
+              )}
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 6,
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                  {selectedFamilyNode ? `${selectedFamilyNode.name}에 할당된 표준 항목` : '할당된 표준 항목'}
+                </div>
+                <div style={{ fontSize: 11, color: '#475467' }}>{selectedStdItems.size}개</div>
+              </div>
+              <div
+                style={{
+                  maxHeight: 220,
+                  overflowY: 'auto',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 10,
+                  padding: 12,
+                  background: '#f9fafc',
+                }}
+              >
+                {standardTreeError ? (
+                  <div style={{ fontSize: 12, color: '#b91c1c' }}>{standardTreeError}</div>
+                ) : assignedStandardTree.length > 0 ? (
+                  renderAssignedStandardNodes(assignedStandardTree)
+                ) : (
+                  <div style={{ fontSize: 12, color: '#64748b' }}>
+                    할당된 표준 항목이 없습니다.
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
         <div

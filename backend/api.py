@@ -356,6 +356,28 @@ def replace_family_assignments(
     )
 
 
+@router.patch(
+    "/family-list/{item_id}/assignments/{assignment_id}",
+    response_model=schemas.GwmFamilyAssign,
+    tags=["Family List"],
+)
+def update_family_assignment_metadata(
+    item_id: int,
+    assignment_id: int,
+    payload: schemas.GwmFamilyAssignUpdate,
+    db: Session = Depends(get_db),
+):
+    updated = crud.update_gwm_family_assignment(
+        db,
+        family_id=item_id,
+        assignment_id=assignment_id,
+        updates=payload.model_dump(exclude_none=True),
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return updated
+
+
 @router.get(
     "/project-db/",
     response_model=List[schemas.ProjectDbItem],

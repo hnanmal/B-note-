@@ -170,6 +170,11 @@ class GwmFamilyAssign(GwmFamilyAssignBase):
     description: Optional[str] = None
 
 
+class GwmFamilyAssignUpdate(BaseModel):
+    formula: Optional[str] = None
+    description: Optional[str] = None
+
+
 # Project Schemas
 class ProjectBase(BaseModel):
     project_name: str

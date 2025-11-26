@@ -305,6 +305,29 @@ def replace_gwm_family_assignments(
     return list_gwm_family_assignments(db, family_id=family_id)
 
 
+def update_gwm_family_assignment(
+    db: Session, family_id: int, assignment_id: int, updates: dict
+):
+    assignment = (
+        db.query(models.GwmFamilyAssign)
+        .filter(models.GwmFamilyAssign.family_list_id == family_id)
+        .filter(models.GwmFamilyAssign.id == assignment_id)
+        .first()
+    )
+    if not assignment:
+        return None
+
+    if "formula" in updates:
+        assignment.formula = updates["formula"]
+    if "description" in updates:
+        assignment.description = updates["description"]
+
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+
 def assign_work_master_to_standard_item(
     db: Session, standard_item_id: int, work_master_id: int
 ):
