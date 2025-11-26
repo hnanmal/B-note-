@@ -1494,11 +1494,29 @@ export default function TeamStandardFamilyList() {
         >
           <div style={{ padding: 16, borderBottom: '1px solid #eef2ff', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#475467' }}>Calc Dictionary</div>
-            {isFamilySelected && selectedFamilyNode ? (
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>Seq#{selectedFamilyNode.sequence_number || '—'}</div>
-            ) : (
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>Family 항목을 선택하면, 일치하는 calc_code를 보여줍니다.</div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                {isFamilySelected && selectedFamilyNode
+                  ? `Seq#${selectedFamilyNode.sequence_number || '—'}`
+                  : 'Family 항목을 선택하면, 일치하는 calc_code를 보여줍니다.'}
+              </div>
+              <button
+                type="button"
+                onClick={() => {}}
+                disabled={!matchingCalcDictionaryEntries.length}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  border: '1px solid #cbd5f5',
+                  background: matchingCalcDictionaryEntries.length ? '#e2e8f0' : '#f1f5f9',
+                  color: '#0f172a',
+                  fontSize: 11,
+                  cursor: matchingCalcDictionaryEntries.length ? 'pointer' : 'not-allowed',
+                }}
+              >
+                일괄 복사
+              </button>
+            </div>
           </div>
           {isFamilySelected && (
             <form
