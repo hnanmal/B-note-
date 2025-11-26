@@ -86,6 +86,30 @@ const buildFamilyTree = (items) => {
   return roots;
 };
 
+const flattenFamilyTreeNodes = (nodes = [], accumulator = []) => {
+  nodes.forEach((node) => {
+    accumulator.push(node);
+    if (node.children && node.children.length > 0) {
+      flattenFamilyTreeNodes(node.children, accumulator);
+    }
+  });
+  return accumulator;
+};
+
+const getScrollTargetIdForDeletion = (nodeId, renderedItems) => {
+  if (!nodeId || !renderedItems || renderedItems.length === 0) return null;
+  const snapshotItems = renderedItems.map((item) => ({ ...item }));
+  const treeSnapshot = buildFamilyTree(snapshotItems);
+  const flattened = flattenFamilyTreeNodes(treeSnapshot);
+  if (!flattened.length) return null;
+  const currentIndex = flattened.findIndex((item) => item.id === nodeId);
+  if (currentIndex > 0) {
+    return flattened[currentIndex - 1]?.id ?? null;
+  }
+  const alternative = flattened.find((item) => item.id !== nodeId);
+  return alternative?.id ?? null;
+};
+
 const ASSIGNMENT_CHECKBOX_DEPTH = 1;
 
 const normalizeAssignmentIds = (values) => {
@@ -190,6 +214,7 @@ export default function TeamStandardFamilyList() {
     description: '',
   });
   const treeContainerRef = useRef(null);
+  const addNameInputRef = useRef(null);
   const [pendingFocusNodeId, setPendingFocusNodeId] = useState(null);
   const [pendingScrollNodeId, setPendingScrollNodeId] = useState(null);
   const assignmentSyncBlocked = useRef(false);
@@ -350,6 +375,14 @@ export default function TeamStandardFamilyList() {
   useEffect(() => {
     refreshFamilyItems();
   }, [refreshFamilyItems]);
+
+  useEffect(() => {
+    if (addingParentId === undefined || !addNameInputRef.current) return;
+    const rafId = window.requestAnimationFrame(() => {
+      addNameInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [addingParentId]);
 
   useEffect(() => {
     if (!pendingFocusNodeId) return;
@@ -731,6 +764,11 @@ export default function TeamStandardFamilyList() {
     }
   };
 
+  const handleCalcDictionarySubmit = (event) => {
+    event.preventDefault();
+    handleCreateCalcEntry();
+  };
+
   const filteredItems = useMemo(() => {
     if (filterType === 'ALL') return familyItems;
     return familyItems.filter((item) => item.item_type === filterType);
@@ -877,6 +915,10 @@ export default function TeamStandardFamilyList() {
 
   const handleDelete = async (nodeId) => {
     if (!window.confirm('정말 삭제하시겠습니까? 하위 항목도 함께 삭제됩니다.')) return;
+    const scrollTargetId = getScrollTargetIdForDeletion(nodeId, filteredItems);
+    if (selectedFamilyNode?.id === nodeId) {
+      setSelectedFamilyNode(null);
+    }
     try {
       const response = await fetch(`${API_BASE_URL}/family-list/${nodeId}`, {
         method: 'DELETE',
@@ -892,6 +934,9 @@ export default function TeamStandardFamilyList() {
       }
       setStatus({ type: 'success', message: '항목이 삭제되었습니다.' });
       await refreshFamilyItems();
+      if (scrollTargetId) {
+        setPendingScrollNodeId(scrollTargetId);
+      }
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     }
@@ -1344,7 +1389,8 @@ export default function TeamStandardFamilyList() {
               style={{ padding: 12, borderBottom: '1px dashed #cbd5f5', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}
             >
               <input
-                value={addingName}
+          ref={addNameInputRef}
+          value={addingName}
                 onChange={(e) => setAddingName(e.target.value)}
                 placeholder="새 항목 이름"
                 style={{ flex: '1 1 180px', padding: 6, borderRadius: 6, border: '1px solid #d1d5db' }}
@@ -1455,7 +1501,8 @@ export default function TeamStandardFamilyList() {
             )}
           </div>
           {isFamilySelected && (
-            <div
+            <form
+              onSubmit={handleCalcDictionarySubmit}
               style={{
                 padding: '0 16px 12px',
                 display: 'flex',
@@ -1485,8 +1532,7 @@ export default function TeamStandardFamilyList() {
                 style={{ flex: '1 1 180px', padding: 6, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 160 }}
               />
               <button
-                type="button"
-                onClick={handleCreateCalcEntry}
+                type="submit"
                 disabled={creatingCalcEntry || !newCalcSymbolKey.trim() || !newCalcSymbolValue.trim()}
                 style={{
                   padding: '6px 12px',
@@ -1500,7 +1546,7 @@ export default function TeamStandardFamilyList() {
               >
                 {creatingCalcEntry ? '저장 중...' : '새 항목 추가'}
               </button>
-            </div>
+            </form>
           )}
           <div style={{ flex: 1, minHeight: 0, padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {!selectedFamilyNode && (
