@@ -201,6 +201,9 @@ export default function TeamStandardFamilyList() {
   const [newCalcSymbolValue, setNewCalcSymbolValue] = useState('');
   const [newCalcCodeInput, setNewCalcCodeInput] = useState('');
   const [creatingCalcEntry, setCreatingCalcEntry] = useState(false);
+  const [copiedCalcEntries, setCopiedCalcEntries] = useState([]);
+  const [copiedFromSequence, setCopiedFromSequence] = useState('');
+  const [batchCopyLoading, setBatchCopyLoading] = useState(false);
   const [assignmentMode, setAssignmentMode] = useState(false);
   const [selectedStdItems, setSelectedStdItems] = useState(() => new Set());
   const [standardItems, setStandardItems] = useState([]);
@@ -768,6 +771,88 @@ export default function TeamStandardFamilyList() {
     event.preventDefault();
     handleCreateCalcEntry();
   };
+
+  const handleBatchCopy = useCallback(() => {
+    if (!isFamilySelected) {
+      setStatus({ type: 'error', message: 'Family 항목을 먼저 선택하세요.' });
+      return;
+    }
+    if (!matchingCalcDictionaryEntries.length) {
+      setStatus({ type: 'error', message: '복사할 Calc Dictionary 항목이 없습니다.' });
+      return;
+    }
+    const cleaned = matchingCalcDictionaryEntries
+      .map((entry) => ({
+        symbol_key: String(entry?.symbol_key ?? '').trim(),
+        symbol_value: String(entry?.symbol_value ?? '').trim(),
+      }))
+      .filter((entry) => entry.symbol_key || entry.symbol_value);
+    if (!cleaned.length) {
+      setStatus({ type: 'error', message: '복사할 데이터가 없습니다.' });
+      return;
+    }
+    setCopiedCalcEntries(cleaned);
+    setCopiedFromSequence(cleanedCalcCode);
+    setStatus({ type: 'success', message: `${cleaned.length}개 항목을 복사했습니다.` });
+  }, [cleanedCalcCode, matchingCalcDictionaryEntries, setStatus, isFamilySelected]);
+
+  const handleBatchPaste = useCallback(async () => {
+    if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') {
+      setStatus({ type: 'error', message: 'Family 항목을 선택한 다음 붙여넣기 하세요.' });
+      return;
+    }
+    if (!copiedCalcEntries.length) {
+      setStatus({ type: 'error', message: '붙여넣을 데이터가 없습니다.' });
+      return;
+    }
+    const targetCalcCode = (selectedFamilyNode.sequence_number ?? '').trim();
+    if (!targetCalcCode) {
+      setStatus({ type: 'error', message: '선택된 항목에 순번이 있어야 합니다.' });
+      return;
+    }
+    if (targetCalcCode === copiedFromSequence) {
+      setStatus({ type: 'error', message: '다른 Family 항목을 선택한 뒤 붙여넣기 하세요.' });
+      return;
+    }
+    setBatchCopyLoading(true);
+    try {
+      await Promise.all(
+        copiedCalcEntries.map((entry) =>
+          fetch(`${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              symbol_key: entry.symbol_key,
+              symbol_value: entry.symbol_value,
+              calc_code: targetCalcCode,
+            }),
+          }).then(async (response) => {
+            if (!response.ok) {
+              const body = await response.json().catch(() => null);
+              const message =
+                body?.detail || body?.message || 'Calc Dictionary 항목을 저장하지 못했습니다.';
+              throw new Error(message);
+            }
+            return response.json().catch(() => null);
+          })
+        )
+      );
+      setStatus({ type: 'success', message: '복사된 항목을 붙여넣었습니다.' });
+      setNewCalcCodeInput(targetCalcCode);
+      await loadCalcDictionary();
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      setStatus({ type: 'error', message: error.message });
+    } finally {
+      setBatchCopyLoading(false);
+    }
+  }, [
+    copiedCalcEntries,
+    copiedFromSequence,
+    loadCalcDictionary,
+    selectedFamilyNode,
+    setStatus,
+  ]);
 
   const filteredItems = useMemo(() => {
     if (filterType === 'ALL') return familyItems;
@@ -1502,8 +1587,8 @@ export default function TeamStandardFamilyList() {
               </div>
               <button
                 type="button"
-                onClick={() => {}}
-                disabled={!matchingCalcDictionaryEntries.length}
+                onClick={handleBatchCopy}
+                disabled={!isFamilySelected || !matchingCalcDictionaryEntries.length}
                 style={{
                   padding: '4px 10px',
                   borderRadius: 6,
@@ -1516,6 +1601,52 @@ export default function TeamStandardFamilyList() {
               >
                 일괄 복사
               </button>
+              <button
+                type="button"
+                onClick={handleBatchPaste}
+                disabled={
+                  !copiedCalcEntries.length ||
+                  !isFamilySelected ||
+                  !selectedFamilyNode?.sequence_number?.trim() ||
+                  selectedFamilyNode?.sequence_number?.trim() === copiedFromSequence ||
+                  batchCopyLoading
+                }
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  border: '1px solid #2563eb',
+                  background:
+                    !copiedCalcEntries.length ||
+                    !isFamilySelected ||
+                    !selectedFamilyNode?.sequence_number?.trim() ||
+                    selectedFamilyNode?.sequence_number?.trim() === copiedFromSequence ||
+                    batchCopyLoading
+                      ? '#e2e8f0'
+                      : '#2563eb',
+                  color:
+                    !copiedCalcEntries.length ||
+                    !isFamilySelected ||
+                    !selectedFamilyNode?.sequence_number?.trim() ||
+                    selectedFamilyNode?.sequence_number?.trim() === copiedFromSequence ||
+                    batchCopyLoading
+                      ? '#94a3b8'
+                      : '#fff',
+                  fontSize: 11,
+                  cursor:
+                    !copiedCalcEntries.length ||
+                    !isFamilySelected ||
+                    !selectedFamilyNode?.sequence_number?.trim() ||
+                    selectedFamilyNode?.sequence_number?.trim() === copiedFromSequence ||
+                    batchCopyLoading
+                      ? 'not-allowed'
+                      : 'pointer',
+                }}
+              >
+                붙여넣기
+              </button>
+              {copiedCalcEntries.length > 0 && (
+                <span style={{ fontSize: 11 }}>{copiedCalcEntries.length}개 복사됨</span>
+              )}
             </div>
           </div>
           {isFamilySelected && (
