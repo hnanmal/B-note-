@@ -418,7 +418,7 @@ def update_family_assignment_metadata(
         db,
         family_id=item_id,
         assignment_id=assignment_id,
-        updates=payload.model_dump(exclude_none=True),
+        updates=payload.model_dump(exclude_unset=True),
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Assignment not found")

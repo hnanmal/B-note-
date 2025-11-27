@@ -297,8 +297,10 @@ export default function TeamStandardFamilyList() {
     [selectedFamilyNode, checkboxAncestorMap]
   );
 
+  const [editingAssignmentAllowsFormula, setEditingAssignmentAllowsFormula] = useState(true);
+
   const handleStartAssignmentEdit = useCallback(
-    (node) => {
+    (node, level) => {
       const metadata = assignmentMetadata.get(node.id) ?? node.metadata;
       if (!metadata?.id) return;
       setEditingAssignmentId(metadata.id);
@@ -306,6 +308,7 @@ export default function TeamStandardFamilyList() {
         formula: metadata.formula ?? '',
         description: metadata.description ?? '',
       });
+      setEditingAssignmentAllowsFormula(level >= 2);
     },
     [assignmentMetadata]
   );
@@ -313,6 +316,7 @@ export default function TeamStandardFamilyList() {
   const handleCancelAssignmentEdit = useCallback(() => {
     setEditingAssignmentId(null);
     setEditingAssignmentFields({ formula: '', description: '' });
+    setEditingAssignmentAllowsFormula(true);
   }, []);
 
   const handleAssignmentFieldChange = useCallback((field, value) => {
@@ -324,10 +328,11 @@ export default function TeamStandardFamilyList() {
     try {
       const trimmedFormula = editingAssignmentFields.formula.trim();
       const trimmedDescription = editingAssignmentFields.description.trim();
-      const payload = {
-        formula: trimmedFormula === '' ? null : trimmedFormula,
-        description: trimmedDescription === '' ? null : trimmedDescription,
-      };
+      const payload = {};
+      if (editingAssignmentAllowsFormula) {
+        payload.formula = trimmedFormula === '' ? null : trimmedFormula;
+      }
+      payload.description = trimmedDescription === '' ? null : trimmedDescription;
       const response = await fetch(
         `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments/${editingAssignmentId}`,
         {
@@ -361,7 +366,7 @@ export default function TeamStandardFamilyList() {
       if (error.name === 'AbortError') return;
       setStatus({ type: 'error', message: error.message });
     }
-  }, [editingAssignmentId, editingAssignmentFields, selectedFamilyNode, handleCancelAssignmentEdit]);
+  }, [editingAssignmentId, editingAssignmentFields, selectedFamilyNode, handleCancelAssignmentEdit, editingAssignmentAllowsFormula]);
 
   const refreshFamilyItems = useCallback(async () => {
     setLoading(true);
@@ -953,6 +958,7 @@ export default function TeamStandardFamilyList() {
   }, [familyItems, filterType]);
 
   const familyTree = useMemo(() => buildFamilyTree(filteredItems), [filteredItems]);
+  const flattenedFamilyNodes = useMemo(() => flattenFamilyTreeNodes(familyTree), [familyTree]);
 
   const cancelAdd = () => {
     setAddingParentId(undefined);
@@ -1120,9 +1126,28 @@ export default function TeamStandardFamilyList() {
     }
   };
 
-  const handleFamilySelect = (node) => {
+  const handleFamilySelect = useCallback((node) => {
     setSelectedFamilyNode(node);
-  };
+  }, []);
+
+  const handleTreeKeyDown = useCallback(
+    (event) => {
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      if (!selectedFamilyNode) return;
+      const currentIndex = flattenedFamilyNodes.findIndex((item) => item.id === selectedFamilyNode.id);
+      if (currentIndex === -1) return;
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      const nextIndex = currentIndex + delta;
+      if (nextIndex < 0 || nextIndex >= flattenedFamilyNodes.length) return;
+      const nextNode = flattenedFamilyNodes[nextIndex];
+      if (nextNode) {
+        event.preventDefault();
+        handleFamilySelect(nextNode);
+        setPendingScrollNodeId(nextNode.id);
+      }
+    },
+    [flattenedFamilyNodes, handleFamilySelect, selectedFamilyNode]
+  );
 
   const renderAssignedStandardNodes = (nodes, level = 0) => {
     if (!nodes || !nodes.length) return null;
@@ -1131,6 +1156,7 @@ export default function TeamStandardFamilyList() {
       const formulaText = metadata?.formula ?? '';
       const descriptionText = metadata?.description ?? '';
       const isEditing = Boolean(metadata?.id && editingAssignmentId === metadata.id);
+      const hasChildren = node.children && node.children.length > 0;
       return (
         <div
           key={`assigned-${node.id}-${level}`}
@@ -1169,16 +1195,22 @@ export default function TeamStandardFamilyList() {
                 <div style={{ color: '#94a3b8' }}>등록된 수식 / 설명이 없습니다.</div>
               )}
             </div>
-            {metadata?.id && (
+            {metadata?.id && (level <= 1 || !hasChildren) && (
               <button
                 type="button"
-                onClick={() => handleStartAssignmentEdit(node)}
+                onClick={() => handleStartAssignmentEdit(node, level)}
                 style={{
                   padding: '2px 8px',
                   fontSize: 11,
                   borderRadius: 4,
                   border: '1px solid #cbd5f5',
-                  background: isEditing ? '#e0f2fe' : '#fff',
+                  background: isEditing
+                    ? hasChildren
+                      ? '#e0f2fe'
+                      : '#fef3c7'
+                    : hasChildren
+                    ? '#fff'
+                    : '#fefce8',
                   cursor: 'pointer',
                 }}
               >
@@ -1199,17 +1231,24 @@ export default function TeamStandardFamilyList() {
                 gap: 6,
               }}
             >
-              <input
-                value={editingAssignmentFields.formula}
-                onChange={(event) => handleAssignmentFieldChange('formula', event.target.value)}
-                placeholder="수식 입력 (선택)"
-                style={{
-                  padding: 6,
-                  borderRadius: 6,
-                  border: '1px solid #cbd5f5',
-                  fontSize: 12,
-                }}
-              />
+              {editingAssignmentAllowsFormula && (
+                <input
+                  value={editingAssignmentFields.formula}
+                  onChange={(event) => handleAssignmentFieldChange('formula', event.target.value)}
+                  placeholder="수식 입력 (선택)"
+                  style={{
+                    padding: 6,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5f5',
+                    fontSize: 12,
+                  }}
+                />
+              )}
+              {!editingAssignmentAllowsFormula && (
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  레벨 0/1 항목은 수식 편집이 제한되어 있습니다.
+                </div>
+              )}
               <textarea
                 rows={2}
                 value={editingAssignmentFields.description}
@@ -1254,7 +1293,7 @@ export default function TeamStandardFamilyList() {
               </div>
             </div>
           )}
-          {node.children && node.children.length > 0 && renderAssignedStandardNodes(node.children, level + 1)}
+          {hasChildren && renderAssignedStandardNodes(node.children, level + 1)}
         </div>
       );
     });
@@ -1610,6 +1649,8 @@ export default function TeamStandardFamilyList() {
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 16 }}>
             <div
               ref={treeContainerRef}
+              tabIndex={0}
+              onKeyDown={handleTreeKeyDown}
               style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
             >
               {loading ? (
