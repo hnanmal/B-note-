@@ -511,8 +511,19 @@ export default function TeamStandardFamilyList() {
     [selectedFamilyNode]
   );
 
+  const isFamilySelected = selectedFamilyNode?.item_type === 'FAMILY';
+  const cleanedCalcCode = (selectedFamilyNode?.sequence_number ?? '').trim();
+  const sequenceContainsUnderscore = cleanedCalcCode.includes('_');
+  const isCalcDictionaryAllowed = isFamilySelected && !sequenceContainsUnderscore;
+  const matchingCalcDictionaryEntries = useMemo(() => {
+    if (!cleanedCalcCode) return [];
+    return calcDictionaryEntries.filter(
+      (entry) => safeString(entry.calc_code).trim() === cleanedCalcCode
+    );
+  }, [calcDictionaryEntries, cleanedCalcCode]);
+
   useEffect(() => {
-    if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') {
+    if (!isCalcDictionaryAllowed) {
       setCalcDictionaryEntries([]);
       setCalcDictionaryLoading(false);
       setCalcDictionaryError(null);
@@ -522,16 +533,7 @@ export default function TeamStandardFamilyList() {
     const controller = new AbortController();
     loadCalcDictionary(controller.signal);
     return () => controller.abort();
-  }, [loadCalcDictionary, selectedFamilyNode]);
-
-  const cleanedCalcCode = selectedFamilyNode?.sequence_number?.trim();
-  const matchingCalcDictionaryEntries = useMemo(() => {
-    if (!cleanedCalcCode) return [];
-    return calcDictionaryEntries.filter(
-      (entry) => safeString(entry.calc_code).trim() === cleanedCalcCode
-    );
-  }, [calcDictionaryEntries, cleanedCalcCode]);
-  const isFamilySelected = selectedFamilyNode?.item_type === 'FAMILY';
+  }, [isCalcDictionaryAllowed, loadCalcDictionary]);
   const isEditingCalcEntry = Boolean(editingCalcEntryId);
   const checkboxSelectionCount = selectedStdItems.size;
   const assignmentModeInfoText = assignmentMode
@@ -749,6 +751,10 @@ export default function TeamStandardFamilyList() {
 
   const handleCreateCalcEntry = async () => {
     if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
+    if (!isCalcDictionaryAllowed) {
+      setCalcDictionaryError('Sequence 번호에 언더바가 포함된 항목에서는 Calc Dictionary를 사용할 수 없습니다.');
+      return;
+    }
     const symbolKey = newCalcSymbolKey.trim();
     const symbolValue = newCalcSymbolValue.trim();
     if (!symbolKey || !symbolValue) {
@@ -820,6 +826,13 @@ export default function TeamStandardFamilyList() {
   };
 
   const handleBatchCopy = useCallback(() => {
+    if (!isCalcDictionaryAllowed) {
+      setStatus({
+        type: 'error',
+        message: 'Sequence 번호에 언더바가 포함된 Family 항목은 Calc Dictionary를 사용할 수 없습니다.',
+      });
+      return;
+    }
     if (!isFamilySelected) {
       setStatus({ type: 'error', message: 'Family 항목을 먼저 선택하세요.' });
       return;
@@ -841,9 +854,16 @@ export default function TeamStandardFamilyList() {
     setCopiedCalcEntries(cleaned);
     setCopiedFromSequence(cleanedCalcCode);
     setStatus({ type: 'success', message: `${cleaned.length}개 항목을 복사했습니다.` });
-  }, [cleanedCalcCode, matchingCalcDictionaryEntries, setStatus, isFamilySelected]);
+  }, [cleanedCalcCode, matchingCalcDictionaryEntries, setStatus, isFamilySelected, isCalcDictionaryAllowed]);
 
   const handleBatchPaste = useCallback(async () => {
+    if (!isCalcDictionaryAllowed) {
+      setStatus({
+        type: 'error',
+        message: 'Sequence 번호에 언더바가 포함된 Family 항목은 Calc Dictionary를 사용할 수 없습니다.',
+      });
+      return;
+    }
     if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') {
       setStatus({ type: 'error', message: 'Family 항목을 선택한 다음 붙여넣기 하세요.' });
       return;
@@ -899,6 +919,7 @@ export default function TeamStandardFamilyList() {
     loadCalcDictionary,
     selectedFamilyNode,
     setStatus,
+    isCalcDictionaryAllowed,
   ]);
 
   const handleDeleteCalcEntry = useCallback(
@@ -1660,15 +1681,21 @@ export default function TeamStandardFamilyList() {
               <button
                 type="button"
                 onClick={handleBatchCopy}
-                disabled={!isFamilySelected || !matchingCalcDictionaryEntries.length}
+                disabled={!isCalcDictionaryAllowed || !matchingCalcDictionaryEntries.length}
                 style={{
                   padding: '4px 10px',
                   borderRadius: 6,
                   border: '1px solid #cbd5f5',
-                  background: matchingCalcDictionaryEntries.length ? '#e2e8f0' : '#f1f5f9',
+                  background:
+                    isCalcDictionaryAllowed && matchingCalcDictionaryEntries.length
+                      ? '#e2e8f0'
+                      : '#f1f5f9',
                   color: '#0f172a',
                   fontSize: 11,
-                  cursor: matchingCalcDictionaryEntries.length ? 'pointer' : 'not-allowed',
+                  cursor:
+                    isCalcDictionaryAllowed && matchingCalcDictionaryEntries.length
+                      ? 'pointer'
+                      : 'not-allowed',
                 }}
               >
                 일괄 복사
@@ -1678,7 +1705,7 @@ export default function TeamStandardFamilyList() {
                 onClick={handleBatchPaste}
                 disabled={
                   !copiedCalcEntries.length ||
-                  !isFamilySelected ||
+                  !isCalcDictionaryAllowed ||
                   !selectedFamilyNode?.sequence_number?.trim() ||
                   selectedFamilyNode?.sequence_number?.trim() === copiedFromSequence ||
                   batchCopyLoading
@@ -1689,7 +1716,7 @@ export default function TeamStandardFamilyList() {
                   border: '1px solid #2563eb',
                   background:
                     !copiedCalcEntries.length ||
-                    !isFamilySelected ||
+                    !isCalcDictionaryAllowed ||
                     !selectedFamilyNode?.sequence_number?.trim() ||
                     selectedFamilyNode?.sequence_number?.trim() === copiedFromSequence ||
                     batchCopyLoading
@@ -1697,7 +1724,7 @@ export default function TeamStandardFamilyList() {
                       : '#2563eb',
                   color:
                     !copiedCalcEntries.length ||
-                    !isFamilySelected ||
+                    !isCalcDictionaryAllowed ||
                     !selectedFamilyNode?.sequence_number?.trim() ||
                     selectedFamilyNode?.sequence_number?.trim() === copiedFromSequence ||
                     batchCopyLoading
@@ -1706,7 +1733,7 @@ export default function TeamStandardFamilyList() {
                   fontSize: 11,
                   cursor:
                     !copiedCalcEntries.length ||
-                    !isFamilySelected ||
+                    !isCalcDictionaryAllowed ||
                     !selectedFamilyNode?.sequence_number?.trim() ||
                     selectedFamilyNode?.sequence_number?.trim() === copiedFromSequence ||
                     batchCopyLoading
@@ -1721,7 +1748,7 @@ export default function TeamStandardFamilyList() {
               )}
             </div>
           </div>
-          {isFamilySelected && (
+          {isCalcDictionaryAllowed && (
             <form
               onSubmit={handleCalcDictionarySubmit}
               style={{
@@ -1789,6 +1816,20 @@ export default function TeamStandardFamilyList() {
               )}
             </form>
           )}
+          {isFamilySelected && !isCalcDictionaryAllowed && (
+            <div
+              style={{
+                padding: 24,
+                fontSize: 12,
+                color: '#ea580c',
+                background: '#fff7ed',
+                borderTop: '1px solid #fed7aa',
+                borderBottom: '1px solid #fed7aa',
+              }}
+            >
+              Sequence 번호에 언더바(_)가 포함된 Family 항목은 Calc Dictionary를 사용할 수 없습니다.
+            </div>
+          )}
           <div style={{ flex: 1, minHeight: 0, padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {!selectedFamilyNode && (
               <div style={{ color: '#64748b', fontSize: 12 }}>Tree에서 Family 항목을 먼저 선택해주세요.</div>
@@ -1798,88 +1839,97 @@ export default function TeamStandardFamilyList() {
             )}
             {isFamilySelected && (
               <>
-                {calcDictionaryLoading && (
-                  <div style={{ color: '#0f172a', fontSize: 12 }}>관련 calc_dictionary를 불러오는 중입니다...</div>
+                {sequenceContainsUnderscore && (
+                  <div style={{ color: '#ea580c', fontSize: 12 }}>
+                    Sequence 번호에 언더바(_)가 포함되어 있어 Calc Dictionary 조회가 제한됩니다.
+                  </div>
                 )}
-                {calcDictionaryError && (
-                  <div style={{ color: '#b91c1c', fontSize: 12 }}>{calcDictionaryError}</div>
-                )}
-                {!calcDictionaryLoading && !calcDictionaryError && (
-                  matchingCalcDictionaryEntries.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr 1fr 120px',
-                          gap: 12,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: '#475467',
-                          borderBottom: '1px solid #e5e7eb',
-                          paddingBottom: 6,
-                        }}
-                      >
-                        <span>Calc Code</span>
-                        <span>심벌키</span>
-                        <span>심벌값</span>
-                        <span style={{ textAlign: 'right' }}>작업</span>
-                      </div>
-                      {matchingCalcDictionaryEntries.map((entry) => (
-                        <div
-                          key={entry.id}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr 1fr 120px',
-                            gap: 12,
-                            fontSize: 13,
-                            color: '#0f172a',
-                            padding: '4px 0',
-                            borderBottom: '1px solid #f3f4f6',
-                          }}
-                        >
-                          <span style={{ fontWeight: 600 }}>{entry.calc_code || '—'}</span>
-                          <span>{entry.symbol_key}</span>
-                          <span>{entry.symbol_value}</span>
+                {isCalcDictionaryAllowed && (
+                  <>
+                    {calcDictionaryLoading && (
+                      <div style={{ color: '#0f172a', fontSize: 12 }}>관련 calc_dictionary를 불러오는 중입니다...</div>
+                    )}
+                    {calcDictionaryError && (
+                      <div style={{ color: '#b91c1c', fontSize: 12 }}>{calcDictionaryError}</div>
+                    )}
+                    {!calcDictionaryLoading && !calcDictionaryError && (
+                      matchingCalcDictionaryEntries.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           <div
                             style={{
-                              display: 'flex',
-                              justifyContent: 'flex-end',
-                              gap: 6,
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr 1fr 120px',
+                              gap: 10,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#475467',
+                              borderBottom: '1px solid #e5e7eb',
+                              paddingBottom: 6,
                             }}
                           >
-                            <button
-                              type="button"
-                              onClick={() => handleStartCalcEntryEdit(entry)}
-                              style={{
-                                padding: '2px 8px',
-                                borderRadius: 4,
-                                border: '1px solid #cbd5f5',
-                                background: '#fff',
-                                fontSize: 11,
-                              }}
-                            >
-                              수정
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCalcEntry(entry)}
-                              style={{
-                                padding: '2px 8px',
-                                borderRadius: 4,
-                                border: '1px solid #fecaca',
-                                background: '#fee2e2',
-                                fontSize: 11,
-                              }}
-                            >
-                              삭제
-                            </button>
+                            <span>Calc Code</span>
+                            <span>심벌키</span>
+                            <span>심벌값</span>
+                            <span style={{ textAlign: 'right' }}>작업</span>
                           </div>
+                          {matchingCalcDictionaryEntries.map((entry) => (
+                            <div
+                              key={entry.id}
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr 1fr 120px',
+                                gap: 10,
+                                fontSize: 11,
+                                color: '#0f172a',
+                                padding: '3px 0',
+                                borderBottom: '1px solid #f3f4f6',
+                              }}
+                            >
+                              <span style={{ fontWeight: 600 }}>{entry.calc_code || '—'}</span>
+                              <span>{entry.symbol_key}</span>
+                              <span>{entry.symbol_value}</span>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'flex-end',
+                                  gap: 6,
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartCalcEntryEdit(entry)}
+                                  style={{
+                                    padding: '2px 8px',
+                                    borderRadius: 4,
+                                    border: '1px solid #cbd5f5',
+                                    background: '#fff',
+                                    fontSize: 11,
+                                  }}
+                                >
+                                  수정
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCalcEntry(entry)}
+                                  style={{
+                                    padding: '2px 8px',
+                                    borderRadius: 4,
+                                    border: '1px solid #fecaca',
+                                    background: '#fee2e2',
+                                    fontSize: 11,
+                                  }}
+                                >
+                                  삭제
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ color: '#64748b', fontSize: 12 }}>선택된 순번과 calc_code가 일치하는 항목이 없습니다.</div>
-                  )
+                      ) : (
+                        <div style={{ color: '#64748b', fontSize: 12 }}>선택된 순번과 calc_code가 일치하는 항목이 없습니다.</div>
+                      )
+                    )}
+                  </>
                 )}
               </>
             )}
