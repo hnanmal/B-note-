@@ -1598,14 +1598,14 @@ export default function TeamStandardFamilyList() {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: 18,
-        padding: 24,
+        gap: 14,
+        padding: '0px 10px 10px',
       }}
     >
       <header>
         <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>Team Standard Family List</div>
         <p style={{ margin: '6px 0 0', color: '#475467', lineHeight: 1.6 }}>
-          좌측의 표준 트리 위젯을 기준으로 베이스를 확인하고, 우측에서는 FamilyList 테이블을 기반으로 가족 계층을 실시간 관리합니다.
+          FamilyList와 GWM/SWM 과의 매칭, 그리고 매칭된 GWM/SWM 항목 별 산출 수식을 지정하는 페이지 입니다.
         </p>
       </header>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
