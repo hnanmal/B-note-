@@ -221,6 +221,7 @@ export default function TeamStandardFamilyList() {
   const [standardTreeError, setStandardTreeError] = useState(null);
   const [checkboxAncestorMap, setCheckboxAncestorMap] = useState(() => new Map());
   const [assignmentMetadata, setAssignmentMetadata] = useState(() => new Map());
+  const [copiedAssignmentFields, setCopiedAssignmentFields] = useState(null);
   const [editingAssignmentId, setEditingAssignmentId] = useState(null);
   const [editingAssignmentFields, setEditingAssignmentFields] = useState({
     formula: '',
@@ -300,23 +301,113 @@ export default function TeamStandardFamilyList() {
   const [editingAssignmentAllowsFormula, setEditingAssignmentAllowsFormula] = useState(true);
 
   const handleStartAssignmentEdit = useCallback(
-    (node, level) => {
+    (node, level, options = {}) => {
       const metadata = assignmentMetadata.get(node.id) ?? node.metadata;
       if (!metadata?.id) return;
       setEditingAssignmentId(metadata.id);
+      setEditingAssignmentAllowsFormula(level >= 2);
       setEditingAssignmentFields({
+        formula:
+          options.formula !== undefined
+            ? options.formula
+            : metadata.formula ?? '',
+        description:
+          options.description !== undefined
+            ? options.description
+            : metadata.description ?? '',
+      });
+    },
+    [assignmentMetadata]
+  );
+
+  const handleCopyAssignmentMetadata = useCallback(
+    (node) => {
+      const metadata = assignmentMetadata.get(node.id) ?? node.metadata;
+      if (!metadata) return;
+      if (!metadata.formula && !metadata.description) return;
+      setCopiedAssignmentFields({
         formula: metadata.formula ?? '',
         description: metadata.description ?? '',
       });
-      setEditingAssignmentAllowsFormula(level >= 2);
+      setStatus({ type: 'success', message: '수식/설명이 복사되었습니다.' });
     },
     [assignmentMetadata]
+  );
+
+  const handlePasteAssignmentMetadata = useCallback(() => {
+    if (!copiedAssignmentFields) return;
+    setEditingAssignmentFields((prev) => ({
+      formula: editingAssignmentAllowsFormula
+        ? copiedAssignmentFields.formula
+        : prev.formula,
+      description: copiedAssignmentFields.description ?? '',
+    }));
+    setStatus({ type: 'success', message: '복사한 내용을 붙여넣었습니다.' });
+  }, [copiedAssignmentFields, editingAssignmentAllowsFormula]);
+
+  const applyAssignmentMetadataChange = useCallback(
+    async (assignmentId, updates) => {
+      if (!selectedFamilyNode) return false;
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments/${assignmentId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+          }
+        );
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          const message =
+            body?.detail || body?.message || '할당 메타데이터를 저장하지 못했습니다.';
+          throw new Error(message);
+        }
+        const updated = await response.json();
+        setAssignmentMetadata((prev) => {
+          const next = new Map(prev);
+          const standardItemId = Number(updated?.standard_item_id);
+          if (Number.isFinite(standardItemId)) {
+            next.set(standardItemId, {
+              id: updated.id,
+              formula: updated.formula ?? null,
+              description: updated.description ?? null,
+            });
+          }
+          return next;
+        });
+        return true;
+      } catch (error) {
+        setStatus({ type: 'error', message: error.message });
+        return false;
+      }
+    },
+    [selectedFamilyNode]
+  );
+
+  const handlePasteToNode = useCallback(
+    async (node, level) => {
+      if (!copiedAssignmentFields) return;
+      const metadata = assignmentMetadata.get(node.id) ?? node.metadata;
+      if (!metadata?.id) return;
+      const payload = {};
+      if (level >= 2) {
+        payload.formula = copiedAssignmentFields.formula ?? null;
+      }
+      payload.description = copiedAssignmentFields.description ?? null;
+      const success = await applyAssignmentMetadataChange(metadata.id, payload);
+      if (success) {
+        setStatus({ type: 'success', message: '복사한 내용을 붙여넣었습니다.' });
+      }
+    },
+    [assignmentMetadata, copiedAssignmentFields, applyAssignmentMetadataChange]
   );
 
   const handleCancelAssignmentEdit = useCallback(() => {
     setEditingAssignmentId(null);
     setEditingAssignmentFields({ formula: '', description: '' });
     setEditingAssignmentAllowsFormula(true);
+    setCopiedAssignmentFields(null);
   }, []);
 
   const handleAssignmentFieldChange = useCallback((field, value) => {
@@ -1196,26 +1287,58 @@ export default function TeamStandardFamilyList() {
               )}
             </div>
             {metadata?.id && (level <= 1 || !hasChildren) && (
-              <button
-                type="button"
-                onClick={() => handleStartAssignmentEdit(node, level)}
-                style={{
-                  padding: '2px 8px',
-                  fontSize: 11,
-                  borderRadius: 4,
-                  border: '1px solid #cbd5f5',
-                  background: isEditing
-                    ? hasChildren
-                      ? '#e0f2fe'
-                      : '#fef3c7'
-                    : hasChildren
-                    ? '#fff'
-                    : '#fefce8',
-                  cursor: 'pointer',
-                }}
-              >
-                {isEditing ? '편집 중' : '수정'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleStartAssignmentEdit(node, level)}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: 11,
+                    borderRadius: 4,
+                    border: '1px solid #cbd5f5',
+                    background: isEditing
+                      ? hasChildren
+                        ? '#e0f2fe'
+                        : '#fef3c7'
+                      : hasChildren
+                      ? '#fff'
+                      : '#fefce8',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isEditing ? '편집 중' : '수정'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopyAssignmentMetadata(node)}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: 11,
+                    borderRadius: 4,
+                    border: '1px solid #cbd5f5',
+                    background: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  복사
+                </button>
+                {copiedAssignmentFields && (
+                  <button
+                    type="button"
+                    onClick={() => handlePasteToNode(node, level)}
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: 11,
+                      borderRadius: 4,
+                      border: '1px solid #cbd5f5',
+                      background: '#fff7ed',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    붙여넣기
+                  </button>
+                )}
+              </>
             )}
           </div>
           {isEditing && (
@@ -1290,6 +1413,21 @@ export default function TeamStandardFamilyList() {
                 >
                   취소
                 </button>
+                {copiedAssignmentFields && (
+                  <button
+                    type="button"
+                    onClick={handlePasteAssignmentMetadata}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #cbd5f5',
+                      background: '#fff7ed',
+                      fontSize: 12,
+                    }}
+                  >
+                    붙여넣기
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1678,7 +1816,7 @@ export default function TeamStandardFamilyList() {
                 </div>
                 <div
                   style={{
-                    maxHeight: 220,
+                    maxHeight: 300,
                     overflowY: 'auto',
                     border: '1px solid #e5e7eb',
                     borderRadius: 10,
