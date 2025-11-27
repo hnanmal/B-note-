@@ -1661,41 +1661,43 @@ export default function TeamStandardFamilyList() {
                 <div style={{ color: '#64748b', fontSize: 12 }}>등록된 가족 항목이 없습니다.</div>
               )}
             </div>
-            <div style={{ marginTop: 16 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: 6,
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                  {selectedFamilyNode ? `${selectedFamilyNode.name}에 할당된 표준 항목` : '할당된 표준 항목'}
-                </div>
-                <div style={{ fontSize: 11, color: '#475467' }}>{selectedStdItems.size}개</div>
-              </div>
-              <div
-                style={{
-                  maxHeight: 220,
-                  overflowY: 'auto',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 10,
-                  padding: 12,
-                  background: '#f9fafc',
-                }}
-              >
-                {standardTreeError ? (
-                  <div style={{ fontSize: 12, color: '#b91c1c' }}>{standardTreeError}</div>
-                ) : assignedStandardTree.length > 0 ? (
-                  renderAssignedStandardNodes(assignedStandardTree)
-                ) : (
-                  <div style={{ fontSize: 12, color: '#64748b' }}>
-                    할당된 표준 항목이 없습니다.
+            {assignmentMode && (
+              <div style={{ marginTop: 16 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 6,
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                    {selectedFamilyNode ? `${selectedFamilyNode.name}에 할당된 표준 항목` : '할당된 표준 항목'}
                   </div>
-                )}
+                  <div style={{ fontSize: 11, color: '#475467' }}>{selectedStdItems.size}개</div>
+                </div>
+                <div
+                  style={{
+                    maxHeight: 220,
+                    overflowY: 'auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 10,
+                    padding: 12,
+                    background: '#f9fafc',
+                  }}
+                >
+                  {standardTreeError ? (
+                    <div style={{ fontSize: 12, color: '#b91c1c' }}>{standardTreeError}</div>
+                  ) : assignedStandardTree.length > 0 ? (
+                    renderAssignedStandardNodes(assignedStandardTree)
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#64748b' }}>
+                      할당된 표준 항목이 없습니다.
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
         <div
