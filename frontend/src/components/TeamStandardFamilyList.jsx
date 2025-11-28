@@ -1274,7 +1274,14 @@ export default function TeamStandardFamilyList() {
               {formulaText || descriptionText ? (
                 <div>
                   {formulaText && (
-                    <div style={{ marginBottom: descriptionText ? 4 : 0, fontStyle: 'italic', color: '#0f172a' }}>
+                    <div
+                      style={{
+                        marginBottom: descriptionText ? 4 : 0,
+                        fontStyle: 'italic',
+                        color: '#eb00ebff',
+                        fontWeight: 600,
+                      }}
+                    >
                       수식: {formulaText}
                     </div>
                   )}
@@ -1299,10 +1306,10 @@ export default function TeamStandardFamilyList() {
                     background: isEditing
                       ? hasChildren
                         ? '#e0f2fe'
-                        : '#fef3c7'
+                        : '#ede9fe'
                       : hasChildren
                       ? '#fff'
-                      : '#fefce8',
+                      : '#f88ff8ff',
                     cursor: 'pointer',
                   }}
                 >
@@ -1821,7 +1828,7 @@ export default function TeamStandardFamilyList() {
                     border: '1px solid #e5e7eb',
                     borderRadius: 10,
                     padding: 12,
-                    background: '#f9fafc',
+                    background: '#fff9df',
                   }}
                 >
                   {standardTreeError ? (
