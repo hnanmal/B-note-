@@ -310,6 +310,17 @@ def replace_gwm_family_assignments(
     root_ids = [int(i) for i in set(standard_item_ids or []) if i is not None]
     expanded_ids = _collect_standard_item_tree_ids(db, root_ids) if root_ids else set()
 
+    existing_metadata = {}
+    if expanded_ids:
+        current_assignments = list_gwm_family_assignments(db, family_id=family_id)
+        existing_metadata = {
+            assignment.standard_item_id: {
+                'formula': assignment.formula,
+                'description': assignment.description,
+            }
+            for assignment in current_assignments
+        }
+
     (
         db.query(models.GwmFamilyAssign)
         .filter(models.GwmFamilyAssign.family_list_id == family_id)
@@ -327,6 +338,8 @@ def replace_gwm_family_assignments(
             standard_item_id=std_id,
             assigned_at=now,
             created_at=now,
+            formula=existing_metadata.get(std_id, {}).get('formula'),
+            description=existing_metadata.get(std_id, {}).get('description'),
         )
         for std_id in expanded_ids
     ]

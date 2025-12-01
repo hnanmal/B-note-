@@ -218,6 +218,7 @@ export default function TeamStandardFamilyList() {
   const [selectedStdItems, setSelectedStdItems] = useState(() => new Set());
   const [copiedAssignmentIds, setCopiedAssignmentIds] = useState(() => new Set());
   const [copiedAssignmentSource, setCopiedAssignmentSource] = useState(null);
+  const [copiedAssignmentMetadata, setCopiedAssignmentMetadata] = useState(() => new Map());
   const [standardItems, setStandardItems] = useState([]);
   const [standardTree, setStandardTree] = useState([]);
   const [standardTreeError, setStandardTreeError] = useState(null);
@@ -236,6 +237,10 @@ export default function TeamStandardFamilyList() {
   const addNameInputRef = useRef(null);
   const [pendingFocusNodeId, setPendingFocusNodeId] = useState(null);
   const [pendingScrollNodeId, setPendingScrollNodeId] = useState(null);
+  const pendingMetadataMergeRef = useRef(false);
+  const pendingMetadataMergeTargetRef = useRef(null);
+  const pendingMetadataPatchRef = useRef(new Map());
+  const pendingMetadataPatchTargetRef = useRef(null);
   const assignmentSyncBlocked = useRef(false);
   const lastSyncedAssignmentKey = useRef('');
   const loadAssignmentsController = useRef(null);
@@ -248,6 +253,66 @@ export default function TeamStandardFamilyList() {
     const normalized = normalizeAssignmentIds(ids).array;
     setSelectedStdItems(new Set(normalized));
   }, []);
+  const applyAssignmentMetadataChange = useCallback(
+    async (assignmentId, updates) => {
+      if (!selectedFamilyNode) return false;
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments/${assignmentId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+          }
+        );
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          const message =
+            body?.detail || body?.message || '할당 메타데이터를 저장하지 못했습니다.';
+          throw new Error(message);
+        }
+        const updated = await response.json();
+        setAssignmentMetadata((prev) => {
+          const next = new Map(prev);
+          const standardItemId = Number(updated?.standard_item_id);
+          if (Number.isFinite(standardItemId)) {
+            next.set(standardItemId, {
+              id: updated.id,
+              formula: updated.formula ?? null,
+              description: updated.description ?? null,
+            });
+          }
+          return next;
+        });
+        return true;
+      } catch (error) {
+        setStatus({ type: 'error', message: error.message });
+        return false;
+      }
+    },
+    [selectedFamilyNode]
+  );
+
+  const persistPendingMetadataPatch = useCallback(
+    (metadataMap) => {
+      if (!selectedFamilyNode) return;
+      if (pendingMetadataPatchTargetRef.current !== selectedFamilyNode.id) return;
+      if (!pendingMetadataPatchRef.current.size) return;
+      const entries = Array.from(pendingMetadataPatchRef.current.entries());
+      pendingMetadataPatchRef.current = new Map();
+      pendingMetadataPatchTargetRef.current = null;
+      entries.forEach(([standardId, metadata]) => {
+        const entry = metadataMap.get(standardId);
+        if (!entry?.id) return;
+        applyAssignmentMetadataChange(entry.id, {
+          formula: metadata.formula ?? null,
+          description: metadata.description ?? null,
+        });
+      });
+    },
+    [applyAssignmentMetadataChange, selectedFamilyNode]
+  );
+
   const fetchAssignmentsForFamily = useCallback(
     async (signal) => {
       if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
@@ -292,15 +357,35 @@ export default function TeamStandardFamilyList() {
           rootCandidates.size > 0 ? Array.from(rootCandidates) : assignmentIds;
         const normalized = normalizeAssignmentIds(effectiveIds);
         assignmentSyncBlocked.current = true;
-  lastSyncedAssignmentKey.current = normalized.key;
-  setAssignmentMetadata(metadataMap);
+        lastSyncedAssignmentKey.current = normalized.key;
+        const shouldMergeCopiedMetadata =
+          pendingMetadataMergeRef.current &&
+          pendingMetadataMergeTargetRef.current === selectedFamilyNode?.id &&
+          copiedAssignmentMetadata.size > 0;
+        const finalMetadata = new Map(metadataMap);
+        if (shouldMergeCopiedMetadata) {
+          pendingMetadataMergeRef.current = false;
+          pendingMetadataMergeTargetRef.current = null;
+          copiedAssignmentMetadata.forEach((metadata, id) => {
+            const existing = finalMetadata.get(id);
+            finalMetadata.set(id, {
+              id: existing?.id ?? metadata.id ?? null,
+              formula: metadata.formula ?? existing?.formula ?? null,
+              description: metadata.description ?? existing?.description ?? null,
+            });
+          });
+        }
+        setAssignmentMetadata(finalMetadata);
         setSelectedStdItems(new Set(normalized.array));
+        if (shouldMergeCopiedMetadata) {
+          persistPendingMetadataPatch(finalMetadata);
+        }
       } catch (error) {
         if (error.name === 'AbortError') return;
         setStatus({ type: 'error', message: error.message });
       }
     },
-    [selectedFamilyNode, checkboxAncestorMap]
+    [checkboxAncestorMap, copiedAssignmentMetadata, persistPendingMetadataPatch, selectedFamilyNode]
   );
 
   const [editingAssignmentAllowsFormula, setEditingAssignmentAllowsFormula] = useState(true);
@@ -349,46 +434,6 @@ export default function TeamStandardFamilyList() {
     }));
     setStatus({ type: 'success', message: '복사한 내용을 붙여넣었습니다.' });
   }, [copiedAssignmentFields, editingAssignmentAllowsFormula]);
-
-  const applyAssignmentMetadataChange = useCallback(
-    async (assignmentId, updates) => {
-      if (!selectedFamilyNode) return false;
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments/${assignmentId}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updates),
-          }
-        );
-        if (!response.ok) {
-          const body = await response.json().catch(() => null);
-          const message =
-            body?.detail || body?.message || '할당 메타데이터를 저장하지 못했습니다.';
-          throw new Error(message);
-        }
-        const updated = await response.json();
-        setAssignmentMetadata((prev) => {
-          const next = new Map(prev);
-          const standardItemId = Number(updated?.standard_item_id);
-          if (Number.isFinite(standardItemId)) {
-            next.set(standardItemId, {
-              id: updated.id,
-              formula: updated.formula ?? null,
-              description: updated.description ?? null,
-            });
-          }
-          return next;
-        });
-        return true;
-      } catch (error) {
-        setStatus({ type: 'error', message: error.message });
-        return false;
-      }
-    },
-    [selectedFamilyNode]
-  );
 
   const handlePasteToNode = useCallback(
     async (node, level) => {
@@ -655,10 +700,31 @@ export default function TeamStandardFamilyList() {
       setStatus({ type: 'error', message: '복사할 할당 항목이 없습니다.' });
       return;
     }
-    setCopiedAssignmentIds(new Set(selectedStdItems));
+    const idsToCopy = new Set();
+    const metadataClone = new Map();
+    const shouldIncludeId = (id) => {
+      if (selectedStdItems.has(id)) return true;
+      const ancestor = checkboxAncestorMap.get(id);
+      return ancestor != null && selectedStdItems.has(ancestor);
+    };
+    assignmentMetadata.forEach((metadata, id) => {
+      if (!metadata) return;
+      if (!shouldIncludeId(id)) return;
+      idsToCopy.add(id);
+      if (metadata.formula || metadata.description) {
+        metadataClone.set(id, {
+          id: metadata.id ?? null,
+          formula: metadata.formula ?? '',
+          description: metadata.description ?? '',
+        });
+      }
+    });
+    selectedStdItems.forEach((id) => idsToCopy.add(id));
+    setCopiedAssignmentIds(idsToCopy);
     setCopiedAssignmentSource(selectedFamilyNode?.id ?? null);
-    setStatus({ type: 'success', message: `${selectedStdItems.size}개의 할당을 복사했습니다.` });
-  }, [assignmentMode, isFamilySelected, selectedStdItems, selectedFamilyNode]);
+    setCopiedAssignmentMetadata(metadataClone);
+    setStatus({ type: 'success', message: `${idsToCopy.size}개의 할당과 수식/설명을 복사했습니다.` });
+  }, [assignmentMode, isFamilySelected, selectedStdItems, selectedFamilyNode, assignmentMetadata, checkboxAncestorMap]);
 
   const handlePasteAssignments = useCallback(() => {
     if (!copiedAssignmentIds || !copiedAssignmentIds.size) {
@@ -673,10 +739,46 @@ export default function TeamStandardFamilyList() {
       setStatus({ type: 'error', message: '같은 항목에는 붙여넣을 수 없습니다.' });
       return;
     }
+    pendingMetadataMergeRef.current = true;
+    pendingMetadataMergeTargetRef.current = selectedFamilyNode?.id ?? null;
+    pendingMetadataPatchRef.current = new Map(copiedAssignmentMetadata);
+    pendingMetadataPatchTargetRef.current = selectedFamilyNode?.id ?? null;
     setAssignmentMode(true);
     setSelectedStdItems(new Set(copiedAssignmentIds));
+    if (copiedAssignmentMetadata.size) {
+      setAssignmentMetadata((prev) => {
+        const updated = new Map(prev);
+        copiedAssignmentMetadata.forEach((metadata, id) => {
+          updated.set(id, { ...metadata });
+        });
+        return updated;
+      });
+    }
     setStatus({ type: 'success', message: '복사한 할당이 적용되었습니다. 확인 후 저장하세요.' });
-  }, [copiedAssignmentIds, copiedAssignmentSource, selectedFamilyNode]);
+  }, [copiedAssignmentIds, copiedAssignmentMetadata, copiedAssignmentSource, selectedFamilyNode]);
+
+  const handleRemoveAssignmentLevel = useCallback(
+    (node) => {
+      const idsToRemove = new Set();
+      const collectIds = (current) => {
+        idsToRemove.add(current.id);
+        (current.children || []).forEach((child) => collectIds(child));
+      };
+      collectIds(node);
+      setSelectedStdItems((prev) => {
+        const updated = new Set(prev);
+        idsToRemove.forEach((id) => updated.delete(id));
+        return updated;
+      });
+      setAssignmentMetadata((prev) => {
+        const updated = new Map(prev);
+        idsToRemove.forEach((id) => updated.delete(id));
+        return updated;
+      });
+      setStatus({ type: 'success', message: `${node.name} 및 하위 GWM 항목의 할당을 제거했습니다.` });
+    },
+    []
+  );
 
   const normalizedAssignedStandardIds = useMemo(() => {
     const ids = new Set();
@@ -835,6 +937,8 @@ export default function TeamStandardFamilyList() {
         saveAssignmentsController.current = null;
       }
       clearPendingSave();
+      pendingMetadataPatchRef.current = new Map();
+      pendingMetadataPatchTargetRef.current = null;
       return;
     }
 
@@ -858,8 +962,21 @@ export default function TeamStandardFamilyList() {
       return;
     }
 
+    const metadataEntries = new Map();
+    assignmentMetadata.forEach((metadata, id) => {
+      if (!metadata) return;
+      if (!metadata.formula && !metadata.description) return;
+      metadataEntries.set(id, {
+        id: metadata.id ?? null,
+        formula: metadata.formula ?? null,
+        description: metadata.description ?? null,
+      });
+    });
+    pendingMetadataPatchRef.current = metadataEntries;
+    pendingMetadataPatchTargetRef.current = selectedFamilyNode?.id ?? null;
+
     scheduleSave(idsToSend, key);
-  }, [assignmentMode, isFamilySelected, selectedStdItems, selectedFamilyNode, scheduleSave, clearPendingSave]);
+  }, [assignmentMode, isFamilySelected, selectedStdItems, selectedFamilyNode, scheduleSave, clearPendingSave, assignmentMetadata]);
 
   useEffect(() => {
     return () => {
@@ -1366,6 +1483,23 @@ export default function TeamStandardFamilyList() {
                 >
                   복사
                 </button>
+                {level <= 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAssignmentLevel(node)}
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: 11,
+                      borderRadius: 4,
+                      border: '1px solid #f87171',
+                      background: '#fef2f2',
+                      color: '#b91c1c',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    할당 삭제
+                  </button>
+                )}
                 {copiedAssignmentFields && (
                   <button
                     type="button"
