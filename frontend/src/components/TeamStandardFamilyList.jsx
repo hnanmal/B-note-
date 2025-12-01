@@ -216,6 +216,8 @@ export default function TeamStandardFamilyList() {
   const [batchCopyLoading, setBatchCopyLoading] = useState(false);
   const [assignmentMode, setAssignmentMode] = useState(false);
   const [selectedStdItems, setSelectedStdItems] = useState(() => new Set());
+  const [copiedAssignmentIds, setCopiedAssignmentIds] = useState(() => new Set());
+  const [copiedAssignmentSource, setCopiedAssignmentSource] = useState(null);
   const [standardItems, setStandardItems] = useState([]);
   const [standardTree, setStandardTree] = useState([]);
   const [standardTreeError, setStandardTreeError] = useState(null);
@@ -643,6 +645,38 @@ export default function TeamStandardFamilyList() {
   const assignmentSummaryText = checkboxSelectionCount
     ? `${checkboxSelectionCount}개 선택된 표준 항목`
     : '선택된 표준 항목이 없습니다.';
+
+  const handleCopyAssignments = useCallback(() => {
+    if (!assignmentMode || !isFamilySelected) {
+      setStatus({ type: 'error', message: 'Family 항목을 선택하고 할당 모드를 켠 뒤 복사하세요.' });
+      return;
+    }
+    if (!selectedStdItems.size) {
+      setStatus({ type: 'error', message: '복사할 할당 항목이 없습니다.' });
+      return;
+    }
+    setCopiedAssignmentIds(new Set(selectedStdItems));
+    setCopiedAssignmentSource(selectedFamilyNode?.id ?? null);
+    setStatus({ type: 'success', message: `${selectedStdItems.size}개의 할당을 복사했습니다.` });
+  }, [assignmentMode, isFamilySelected, selectedStdItems, selectedFamilyNode]);
+
+  const handlePasteAssignments = useCallback(() => {
+    if (!copiedAssignmentIds || !copiedAssignmentIds.size) {
+      setStatus({ type: 'error', message: '붙여넣을 복사본이 없습니다.' });
+      return;
+    }
+    if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') {
+      setStatus({ type: 'error', message: 'Family 항목을 선택한 후 붙여넣기 하세요.' });
+      return;
+    }
+    if (copiedAssignmentSource === selectedFamilyNode.id) {
+      setStatus({ type: 'error', message: '같은 항목에는 붙여넣을 수 없습니다.' });
+      return;
+    }
+    setAssignmentMode(true);
+    setSelectedStdItems(new Set(copiedAssignmentIds));
+    setStatus({ type: 'success', message: '복사한 할당이 적용되었습니다. 확인 후 저장하세요.' });
+  }, [copiedAssignmentIds, copiedAssignmentSource, selectedFamilyNode]);
 
   const normalizedAssignedStandardIds = useMemo(() => {
     const ids = new Set();
@@ -1837,6 +1871,56 @@ export default function TeamStandardFamilyList() {
                   </span>
                   <div style={{ marginLeft: 'auto', fontSize: 12, color: '#475467', fontWeight: 600 }}>{assignmentSummaryText}</div>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                  <button
+                    type="button"
+                    onClick={handleCopyAssignments}
+                    disabled={!assignmentMode || !isFamilySelected || !selectedStdItems.size}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #cbd5f5',
+                      background: '#fff',
+                      fontSize: 11,
+                      fontWeight: 500,
+                      cursor: !assignmentMode || !isFamilySelected || !selectedStdItems.size ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    할당 복사
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePasteAssignments}
+                    disabled={
+                      !copiedAssignmentIds.size ||
+                      !selectedFamilyNode ||
+                      selectedFamilyNode.item_type !== 'FAMILY' ||
+                      copiedAssignmentSource === selectedFamilyNode?.id
+                    }
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #cbd5f5',
+                      background: '#fff',
+                      fontSize: 11,
+                      fontWeight: 500,
+                      cursor:
+                        !copiedAssignmentIds.size ||
+                        !selectedFamilyNode ||
+                        selectedFamilyNode.item_type !== 'FAMILY' ||
+                        copiedAssignmentSource === selectedFamilyNode?.id
+                          ? 'not-allowed'
+                          : 'pointer',
+                    }}
+                  >
+                    할당 붙여넣기
+                  </button>
+                  {copiedAssignmentIds.size > 0 && (
+                    <span style={{ fontSize: 11, color: '#475467' }}>
+                      {copiedAssignmentIds.size}개 복사됨{copiedAssignmentSource ? ` · 원본: ${copiedAssignmentSource}` : ''}
+                    </span>
+                  )}
+                </div>
                 <div style={{ width: '100%', fontSize: 11, color: '#64748b' }}>{assignmentModeInfoText}</div>
               </div>
               {status && (
@@ -1925,6 +2009,54 @@ export default function TeamStandardFamilyList() {
                     >
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
                         {selectedFamilyNode ? `${selectedFamilyNode.name}에 할당된 표준 항목` : '할당된 표준 항목'}
+                        <button
+                          type="button"
+                          onClick={handleCopyAssignments}
+                          disabled={!assignmentMode || !isFamilySelected || !selectedStdItems.size}
+                          style={{
+                            marginLeft: 10,
+                            padding: '2px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #cbd5f5',
+                            background: '#fff',
+                            fontSize: 11,
+                            fontWeight: 500,
+                            cursor:
+                              !assignmentMode || !isFamilySelected || !selectedStdItems.size
+                                ? 'not-allowed'
+                                : 'pointer',
+                          }}
+                        >
+                          할당항목 복사
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePasteAssignments}
+                          disabled={
+                            !copiedAssignmentIds.size ||
+                            !selectedFamilyNode ||
+                            selectedFamilyNode.item_type !== 'FAMILY' ||
+                            copiedAssignmentSource === selectedFamilyNode?.id
+                          }
+                          style={{
+                            marginLeft: 6,
+                            padding: '2px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #cbd5f5',
+                            background: '#fff',
+                            fontSize: 11,
+                            fontWeight: 500,
+                            cursor:
+                              !copiedAssignmentIds.size ||
+                              !selectedFamilyNode ||
+                              selectedFamilyNode.item_type !== 'FAMILY' ||
+                              copiedAssignmentSource === selectedFamilyNode?.id
+                                ? 'not-allowed'
+                                : 'pointer',
+                          }}
+                        >
+                          할당항목 붙여넣기
+                        </button>
                       </div>
                       <div style={{ fontSize: 11, color: '#475467' }}>{selectedStdItems.size}개</div>
                     </div>
