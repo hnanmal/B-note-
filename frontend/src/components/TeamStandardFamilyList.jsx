@@ -1683,9 +1683,24 @@ export default function TeamStandardFamilyList() {
                 fontSize: 11,
                 color: '#64748b',
                 textAlign: 'center',
+                gap: 4,
               }}
             >
-              Standard GWM Tree가 닫힌 상태입니다.
+              <div>Standard GWM Tree가 닫힌 상태입니다.</div>
+              <button
+                type="button"
+                onClick={() => setIsStdTreeOpen(true)}
+                style={{
+                  padding: '2px 10px',
+                  borderRadius: 4,
+                  border: '1px solid #cbd5f5',
+                  background: '#fff',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                }}
+              >
+                열기
+              </button>
             </div>
           )}
         </div>
@@ -1951,7 +1966,23 @@ export default function TeamStandardFamilyList() {
                 textAlign: 'center',
               }}
             >
-              Family Tree View가 닫힌 상태입니다.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                <div>Family Tree View가 닫힌 상태입니다.</div>
+                <button
+                  type="button"
+                  onClick={() => setIsFamilyPanelOpen(true)}
+                  style={{
+                    padding: '2px 10px',
+                    borderRadius: 4,
+                    border: '1px solid #cbd5f5',
+                    background: '#fff',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                  }}
+                >
+                  열기
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -2279,7 +2310,23 @@ export default function TeamStandardFamilyList() {
                 textAlign: 'center',
               }}
             >
-              Calc Dictionary가 닫힌 상태입니다.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                <div>Calc Dictionary가 닫힌 상태입니다.</div>
+                <button
+                  type="button"
+                  onClick={() => setIsCalcPanelOpen(true)}
+                  style={{
+                    padding: '2px 10px',
+                    borderRadius: 4,
+                    border: '1px solid #cbd5f5',
+                    background: '#fff',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                  }}
+                >
+                  열기
+                </button>
+              </div>
             </div>
           )}
         </div>
