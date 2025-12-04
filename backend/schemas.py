@@ -156,6 +156,7 @@ class CalcDictionaryEntry(CalcDictionaryEntryBase):
     id: int
     family_list_id: int
     created_at: datetime.datetime
+    family_item: Optional[_FamilyListWithoutRelations] = None
 
 
 class GwmFamilyAssignmentPayload(BaseModel):

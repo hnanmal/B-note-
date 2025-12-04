@@ -374,6 +374,33 @@ def delete_family_calc_dictionary_entry(
 
 
 @router.get(
+    "/calc-dictionary",
+    response_model=List[schemas.CalcDictionaryEntry],
+    tags=["Calc Dictionary"],
+)
+def read_calc_dictionary_index(db: Session = Depends(get_db)):
+    return crud.list_all_calc_dictionary_entries(db)
+
+
+@router.patch(
+    "/calc-dictionary/{entry_id}",
+    response_model=schemas.CalcDictionaryEntry,
+    tags=["Calc Dictionary"],
+)
+def update_calc_dictionary_entry(entry_id: int, payload: schemas.CalcDictionaryEntryUpdate, db: Session = Depends(get_db)):
+    entry = crud.get_calc_dictionary_entry(db, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    updates = payload.model_dump(exclude_none=True)
+    if not updates:
+        return entry
+    updated = crud.update_calc_dictionary_entry(db, entry_id=entry_id, updates=updates)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    return updated
+
+
+@router.get(
     "/family-list/{item_id}/assignments",
     response_model=List[schemas.GwmFamilyAssign],
     tags=["Family List"],

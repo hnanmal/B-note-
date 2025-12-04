@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import './App.css'
+import { API_BASE_URL } from './apiConfig';
 import WorkMasterManager from './components/WorkMasterManager';
 import StandardGwmMatcher from './components/StandardGwmMatcher';
 import StandardTreeManager from './components/StandardTreeManager';
@@ -17,10 +18,99 @@ function App() {
   const [activePage, setActivePage] = useState('matching'); // 'matching' | 'workmaster' | 'project' | 'common'
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
+  const [calcDictionaryOverlayOpen, setCalcDictionaryOverlayOpen] = useState(false);
+  const [calcDictionaryOverlayEntries, setCalcDictionaryOverlayEntries] = useState([]);
+  const [calcDictionaryOverlayLoading, setCalcDictionaryOverlayLoading] = useState(false);
+  const [calcDictionaryOverlayError, setCalcDictionaryOverlayError] = useState(null);
+  const [editingCalcEntryId, setEditingCalcEntryId] = useState(null);
+  const [editingCalcEntryValues, setEditingCalcEntryValues] = useState({
+    calc_code: '',
+    symbol_key: '',
+    symbol_value: '',
+  });
+  const [savingCalcEntryId, setSavingCalcEntryId] = useState(null);
   const containerRef = useRef(null);
   const SIDEBAR_OPEN_WIDTH = 180;
   const SIDEBAR_COLLAPSED_WIDTH = 64;
   const PANEL_LEFT_WIDTH = 560;
+  const fetchCalcDictionaryIndex = useCallback(async () => {
+    setCalcDictionaryOverlayLoading(true);
+    setCalcDictionaryOverlayError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/calc-dictionary`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message =
+          body?.detail || body?.message || '전체 Calc Dictionary를 불러오지 못했습니다.';
+        throw new Error(message);
+      }
+      const payload = await response.json().catch(() => []);
+      setCalcDictionaryOverlayEntries(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : '전체 Calc Dictionary를 불러오지 못했습니다.';
+      setCalcDictionaryOverlayError(message);
+    } finally {
+      setCalcDictionaryOverlayLoading(false);
+    }
+  }, []);
+
+  const startEditingCalcEntry = useCallback((entry) => {
+    setEditingCalcEntryId(entry.id);
+    setEditingCalcEntryValues({
+      calc_code: entry.calc_code ?? '',
+      symbol_key: entry.symbol_key ?? '',
+      symbol_value: entry.symbol_value ?? '',
+    });
+    setCalcDictionaryOverlayError(null);
+  }, []);
+
+  const cancelEditingCalcEntry = useCallback(() => {
+    setEditingCalcEntryId(null);
+    setEditingCalcEntryValues({ calc_code: '', symbol_key: '', symbol_value: '' });
+  }, []);
+
+  const handleCalcEntryFieldChange = useCallback((field, value) => {
+    setEditingCalcEntryValues((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const saveEditedCalcEntry = useCallback(async () => {
+    if (!editingCalcEntryId) return;
+    setSavingCalcEntryId(editingCalcEntryId);
+    setCalcDictionaryOverlayError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/calc-dictionary/${editingCalcEntryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingCalcEntryValues),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.detail || body?.message || 'Calc Dictionary 항목을 저장하지 못했습니다.';
+        throw new Error(message);
+      }
+      await response.json();
+      setEditingCalcEntryId(null);
+      await fetchCalcDictionaryIndex();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Calc Dictionary 항목을 저장하지 못했습니다.';
+      setCalcDictionaryOverlayError(message);
+    } finally {
+      setSavingCalcEntryId(null);
+    }
+  }, [editingCalcEntryId, editingCalcEntryValues, fetchCalcDictionaryIndex]);
+
+  useEffect(() => {
+    if (!calcDictionaryOverlayOpen) return;
+    fetchCalcDictionaryIndex();
+  }, [calcDictionaryOverlayOpen, fetchCalcDictionaryIndex]);
+
+  useEffect(() => {
+    if (!calcDictionaryOverlayOpen && editingCalcEntryId) {
+      cancelEditingCalcEntry();
+    }
+  }, [calcDictionaryOverlayOpen, editingCalcEntryId, cancelEditingCalcEntry]);
 
   return (
     <div className="App" style={{ height: 'calc(100vh - 1.5rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
@@ -103,6 +193,28 @@ function App() {
                   {item.label}
                 </button>
               ))}
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setCalcDictionaryOverlayOpen(true)}
+                  style={{
+                    width: '100%',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    padding: '6px 0',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    border: 'none',
+                    borderRadius: 8,
+                    background: '#e2e8f0',
+                    color: '#111827',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                  }}
+                >
+                  전체 Calc Dictionary
+                </button>
+              </div>
               <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <button
                   type="button"
@@ -198,6 +310,32 @@ function App() {
                     </button>
                   ))}
                 </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Calc</div>
+                <button
+                  type="button"
+                  onClick={() => setCalcDictionaryOverlayOpen(true)}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: '1px solid #cbd5f5',
+                    background: '#fff',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    textAlign: 'center',
+                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#1d4ed8',
+                  }}
+                  aria-label="Calc Dictionary"
+                >
+                  Σ
+                </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                 <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Project User</div>
@@ -338,6 +476,220 @@ function App() {
           </>
         )}
       </main>
+      {calcDictionaryOverlayOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            zIndex: 30,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setCalcDictionaryOverlayOpen(false);
+            }
+          }}
+        >
+          <div
+            style={{
+              width: 'min(960px, 100%)',
+              maxHeight: '90vh',
+              background: '#fff',
+              borderRadius: 16,
+              boxShadow: '0 25px 45px rgba(15,23,42,0.35)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <header
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 24px',
+                borderBottom: '1px solid #e5e7eb',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>전체 Calc Dictionary</div>
+                <div style={{ fontSize: 12, color: '#475467' }}>
+                  Family 항목과 심벌 키/값을 한번에 확인합니다.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCalcDictionaryOverlayOpen(false)}
+                style={{
+                  border: 'none',
+                  background: '#eef2ff',
+                  color: '#1d4ed8',
+                  fontWeight: 600,
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                }}
+              >
+                닫기
+              </button>
+            </header>
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: 16,
+              }}
+            >
+              {calcDictionaryOverlayLoading ? (
+                <div style={{ fontSize: 12, color: '#0f172a' }}>
+                  전체 Calc Dictionary를 불러오는 중입니다...
+                </div>
+              ) : calcDictionaryOverlayError ? (
+                <div style={{ fontSize: 12, color: '#b91c1c' }}>{calcDictionaryOverlayError}</div>
+              ) : calcDictionaryOverlayEntries.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  등록된 Calc Dictionary 항목이 없습니다.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '120px 1fr 90px 1fr 1fr 1fr 140px',
+                      gap: 12,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#475467',
+                      borderBottom: '1px solid #e5e7eb',
+                      paddingBottom: 6,
+                    }}
+                  >
+                    <span>Sequence</span>
+                    <span>Family</span>
+                    <span>Type</span>
+                    <span>Calc Code</span>
+                    <span>Symbol Key</span>
+                    <span>Symbol Value</span>
+                    <span style={{ textAlign: 'right' }}>작업</span>
+                  </div>
+                  {calcDictionaryOverlayEntries.map((entry) => {
+                    const isEditing = editingCalcEntryId === entry.id;
+                    return (
+                      <div
+                        key={entry.id}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '120px 1fr 90px 1fr 1fr 1fr 140px',
+                          gap: 12,
+                          fontSize: 11,
+                          color: '#0f172a',
+                          padding: '6px 0',
+                          borderBottom: '1px solid #f1f5f9',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span>{entry.family_item?.sequence_number || '—'}</span>
+                        <span>{entry.family_item?.name || '—'}</span>
+                        <span>{entry.family_item?.item_type || '—'}</span>
+                        <span>
+                          {isEditing ? (
+                            <input
+                              value={editingCalcEntryValues.calc_code}
+                              onChange={(event) => handleCalcEntryFieldChange('calc_code', event.target.value)}
+                              style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 4, padding: '2px 4px' }}
+                            />
+                          ) : (
+                            <span style={{ fontWeight: 600 }}>{entry.calc_code || '—'}</span>
+                          )}
+                        </span>
+                        <span>
+                          {isEditing ? (
+                            <input
+                              value={editingCalcEntryValues.symbol_key}
+                              onChange={(event) => handleCalcEntryFieldChange('symbol_key', event.target.value)}
+                              style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 4, padding: '2px 4px' }}
+                            />
+                          ) : (
+                            entry.symbol_key
+                          )}
+                        </span>
+                        <span>
+                          {isEditing ? (
+                            <input
+                              value={editingCalcEntryValues.symbol_value}
+                              onChange={(event) => handleCalcEntryFieldChange('symbol_value', event.target.value)}
+                              style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 4, padding: '2px 4px' }}
+                            />
+                          ) : (
+                            entry.symbol_value
+                          )}
+                        </span>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                          {isEditing ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={saveEditedCalcEntry}
+                                disabled={savingCalcEntryId === entry.id}
+                                style={{
+                                  padding: '2px 10px',
+                                  borderRadius: 4,
+                                  border: '1px solid #2563eb',
+                                  background: savingCalcEntryId === entry.id ? '#93c5fd' : '#2563eb',
+                                  color: '#fff',
+                                  fontSize: 11,
+                                  cursor: savingCalcEntryId === entry.id ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                {savingCalcEntryId === entry.id ? '저장 중...' : '저장'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditingCalcEntry}
+                                style={{
+                                  padding: '2px 10px',
+                                  borderRadius: 4,
+                                  border: '1px solid #cbd5f5',
+                                  background: '#fff',
+                                  fontSize: 11,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                취소
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startEditingCalcEntry(entry)}
+                              style={{
+                                padding: '2px 10px',
+                                borderRadius: 4,
+                                border: '1px solid #cbd5f5',
+                                background: '#fff',
+                                fontSize: 11,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              수정
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

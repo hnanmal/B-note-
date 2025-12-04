@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from typing import Optional, List
 from . import models, schemas
@@ -218,6 +218,15 @@ def list_calc_dictionary_entries(db: Session, family_item_id: int):
         db.query(models.CalcDictionaryEntry)
         .filter(models.CalcDictionaryEntry.family_list_id == family_item_id)
         .order_by(models.CalcDictionaryEntry.symbol_key)
+        .all()
+    )
+
+
+def list_all_calc_dictionary_entries(db: Session):
+    return (
+        db.query(models.CalcDictionaryEntry)
+        .options(joinedload(models.CalcDictionaryEntry.family_list_item))
+        .order_by(models.CalcDictionaryEntry.created_at.desc())
         .all()
     )
 
