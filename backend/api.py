@@ -452,6 +452,25 @@ def update_family_assignment_metadata(
     return updated
 
 
+@router.post(
+    "/family-list/{item_id}/assignments/{standard_item_id}",
+    response_model=schemas.GwmFamilyAssign,
+    tags=["Family List"],
+)
+def create_family_assignment(
+    item_id: int,
+    standard_item_id: int,
+    db: Session = Depends(get_db),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    assignment = crud.create_gwm_family_assignment(
+        db, family_id=item_id, standard_item_id=standard_item_id
+    )
+    return assignment
+
+
 @router.get(
     "/project-db/",
     response_model=List[schemas.ProjectDbItem],

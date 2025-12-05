@@ -420,6 +420,39 @@ export default function TeamStandardFamilyList() {
 
   const [editingAssignmentAllowsFormula, setEditingAssignmentAllowsFormula] = useState(true);
 
+  const ensureAssignmentEntry = useCallback(
+    async (standardItemId) => {
+      if (!selectedFamilyNode) return null;
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments/${standardItemId}`,
+          { method: 'POST' }
+        );
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => null);
+          const message =
+            errorBody?.detail || errorBody?.message || '할당을 생성하지 못했습니다.';
+          throw new Error(message);
+        }
+        const created = await response.json();
+        setAssignmentMetadata((prev) => {
+          const next = new Map(prev);
+          next.set(standardItemId, {
+            id: created.id,
+            formula: created.formula ?? null,
+            description: created.description ?? null,
+          });
+          return next;
+        });
+        return created;
+      } catch (error) {
+        setStatus({ type: 'error', message: error.message });
+        return null;
+      }
+    },
+    [selectedFamilyNode, setStatus]
+  );
+
   const handleStartAssignmentEdit = useCallback(
     (node, level, options = {}) => {
       const metadata = assignmentMetadata.get(node.id) ?? node.metadata;
@@ -468,8 +501,16 @@ export default function TeamStandardFamilyList() {
   const handlePasteToNode = useCallback(
     async (node, level) => {
       if (!copiedAssignmentFields) return;
-      const metadata = assignmentMetadata.get(node.id) ?? node.metadata;
-      if (!metadata?.id) return;
+      let metadata = assignmentMetadata.get(node.id) ?? node.metadata;
+      if (!metadata?.id) {
+        const created = await ensureAssignmentEntry(node.id);
+        if (!created?.id) return;
+        metadata = {
+          id: created.id,
+          formula: created.formula ?? null,
+          description: created.description ?? null,
+        };
+      }
       const payload = {};
       if (level >= 2) {
         payload.formula = copiedAssignmentFields.formula ?? null;
@@ -480,7 +521,7 @@ export default function TeamStandardFamilyList() {
         setStatus({ type: 'success', message: '복사한 내용을 붙여넣었습니다.' });
       }
     },
-    [assignmentMetadata, copiedAssignmentFields, applyAssignmentMetadataChange]
+    [assignmentMetadata, copiedAssignmentFields, applyAssignmentMetadataChange, ensureAssignmentEntry]
   );
 
   const handleCancelAssignmentEdit = useCallback(() => {
@@ -489,6 +530,18 @@ export default function TeamStandardFamilyList() {
     setEditingAssignmentAllowsFormula(true);
     setCopiedAssignmentFields(null);
   }, []);
+
+  const handleEditAssignmentClick = useCallback(
+    async (node, level) => {
+      const metadata = assignmentMetadata.get(node.id) ?? node.metadata;
+      if (!metadata?.id) {
+        const created = await ensureAssignmentEntry(node.id);
+        if (!created?.id) return;
+      }
+      handleStartAssignmentEdit(node, level);
+    },
+    [assignmentMetadata, ensureAssignmentEntry, handleStartAssignmentEdit]
+  );
 
   const handleAssignmentFieldChange = useCallback((field, value) => {
     setEditingAssignmentFields((prev) => ({ ...prev, [field]: value }));
@@ -720,6 +773,10 @@ export default function TeamStandardFamilyList() {
   const assignmentSummaryText = checkboxSelectionCount
     ? `${checkboxSelectionCount}개 선택된 표준 항목`
     : '선택된 표준 항목이 없습니다.';
+  const selectedFamilySequenceLabel = safeString(selectedFamilyNode?.sequence_number).trim();
+  const assignedSectionLabel = selectedFamilyNode
+    ? `${selectedFamilySequenceLabel ? `${selectedFamilySequenceLabel} · ` : ''}${selectedFamilyNode.name}에 할당된 표준 항목`
+    : '할당된 표준 항목';
 
   const handleCopyAssignments = useCallback(() => {
     if (!assignmentMode || !isFamilySelected) {
@@ -1464,15 +1521,6 @@ export default function TeamStandardFamilyList() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{node.name}</span>
             <span style={{ fontSize: 11, color: '#475467' }}>({node.type || '표준'})</span>
-          </div>
-          <div
-            style={{
-              marginTop: 6,
-              display: 'flex',
-              gap: 8,
-              alignItems: 'flex-start',
-            }}
-          >
             <div style={{ flex: 1, fontSize: 11, color: '#1f2937' }}>
               {formulaText || descriptionText ? (
                 <div>
@@ -1496,11 +1544,11 @@ export default function TeamStandardFamilyList() {
                 <div style={{ color: '#94a3b8' }}>등록된 수식 / 설명이 없습니다.</div>
               )}
             </div>
-            {metadata?.id && (level <= 1 || !hasChildren) && (
+            {(level <= 1 || !hasChildren) && (
               <>
                 <button
                   type="button"
-                  onClick={() => handleStartAssignmentEdit(node, level)}
+                  onClick={() => handleEditAssignmentClick(node, level)}
                   style={{
                     padding: '2px 8px',
                     fontSize: 11,
@@ -2221,7 +2269,7 @@ export default function TeamStandardFamilyList() {
                       }}
                     >
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                        {selectedFamilyNode ? `${selectedFamilyNode.name}에 할당된 표준 항목` : '할당된 표준 항목'}
+                        {assignedSectionLabel}
                         <button
                           type="button"
                           onClick={handleCopyAssignments}

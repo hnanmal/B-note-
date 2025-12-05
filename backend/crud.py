@@ -329,6 +329,30 @@ def _collect_standard_item_tree_ids(db: Session, roots: List[int]):
                 stack.append(child_id)
     return collected
 
+def create_gwm_family_assignment(
+    db: Session, family_id: int, standard_item_id: int
+):
+    existing = (
+        db.query(models.GwmFamilyAssign)
+        .filter(
+            models.GwmFamilyAssign.family_list_id == family_id,
+            models.GwmFamilyAssign.standard_item_id == standard_item_id,
+        )
+        .first()
+    )
+    if existing:
+        return existing
+    assignment = models.GwmFamilyAssign(
+        family_list_id=family_id,
+        standard_item_id=standard_item_id,
+        formula=None,
+        description=None,
+    )
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
 
 def list_gwm_family_assignments(db: Session, family_id: int):
     return (
