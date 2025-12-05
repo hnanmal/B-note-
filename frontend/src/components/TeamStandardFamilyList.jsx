@@ -105,6 +105,35 @@ const flattenFamilyTreeNodes = (nodes = [], accumulator = []) => {
   return accumulator;
 };
 
+const flattenFamilyTreeNodesWithLevel = (nodes = [], level = 0, accumulator = []) => {
+  nodes.forEach((node) => {
+    accumulator.push({ id: node.id, name: node.name, level });
+    if (node.children && node.children.length > 0) {
+      flattenFamilyTreeNodesWithLevel(node.children, level + 1, accumulator);
+    }
+  });
+  return accumulator;
+};
+
+const findFamilyNodeById = (nodes, targetId) => {
+  if (!nodes || !nodes.length) return null;
+  for (const node of nodes) {
+    if (node.id === targetId) return node;
+    const found = findFamilyNodeById(node.children, targetId);
+    if (found) return found;
+  }
+  return null;
+};
+
+const collectFamilyDescendantIds = (node, accumulator = new Set()) => {
+  if (!node || !node.children || !node.children.length) return accumulator;
+  node.children.forEach((child) => {
+    accumulator.add(child.id);
+    collectFamilyDescendantIds(child, accumulator);
+  });
+  return accumulator;
+};
+
 const getScrollTargetIdForDeletion = (nodeId, renderedItems) => {
   if (!nodeId || !renderedItems || renderedItems.length === 0) return null;
   const snapshotItems = renderedItems.map((item) => ({ ...item }));
@@ -201,6 +230,7 @@ export default function TeamStandardFamilyList() {
   const [editingSequence, setEditingSequence] = useState('');
   const [editingItemType, setEditingItemType] = useState('CATEGORY');
   const [editingDescription, setEditingDescription] = useState('');
+  const [editingParentId, setEditingParentId] = useState(null);
   const [addingSequence, setAddingSequence] = useState('');
   const [selectedFamilyNode, setSelectedFamilyNode] = useState(null);
   const [calcDictionaryEntries, setCalcDictionaryEntries] = useState([]);
@@ -1204,6 +1234,17 @@ export default function TeamStandardFamilyList() {
 
   const familyTree = useMemo(() => buildFamilyTree(filteredItems), [filteredItems]);
   const flattenedFamilyNodes = useMemo(() => flattenFamilyTreeNodes(familyTree), [familyTree]);
+  const fullFamilyTree = useMemo(() => buildFamilyTree(familyItems), [familyItems]);
+  const parentSelectOptions = useMemo(() => {
+    if (!fullFamilyTree.length) return [];
+    const flattenedWithLevel = flattenFamilyTreeNodesWithLevel(fullFamilyTree);
+    if (!editingId) return flattenedWithLevel;
+    const editingNode = findFamilyNodeById(fullFamilyTree, editingId);
+    if (!editingNode) return flattenedWithLevel;
+    const excludedIds = collectFamilyDescendantIds(editingNode);
+    excludedIds.add(editingNode.id);
+    return flattenedWithLevel.filter((option) => !excludedIds.has(option.id));
+  }, [fullFamilyTree, editingId]);
 
   const cancelAdd = () => {
     setAddingParentId(undefined);
@@ -1282,6 +1323,7 @@ export default function TeamStandardFamilyList() {
     setEditingSequence(node.sequence_number ?? '');
     setEditingItemType(node.item_type || 'CATEGORY');
     setEditingDescription(node.description ?? '');
+    setEditingParentId(node.parent_id ?? null);
     setStatus(null);
   };
 
@@ -1291,6 +1333,7 @@ export default function TeamStandardFamilyList() {
     setEditingSequence('');
     setEditingItemType('CATEGORY');
     setEditingDescription('');
+    setEditingParentId(null);
   };
 
   const submitEdit = async (nodeId) => {
@@ -1317,6 +1360,12 @@ export default function TeamStandardFamilyList() {
       const originalDescription = (original?.description ?? '').toString().trim();
       if (normalizedDescription !== originalDescription) {
         payload.description = normalizedDescription;
+      }
+
+      const normalizedParentId = editingParentId ?? null;
+      const originalParentId = original?.parent_id ?? null;
+      if (normalizedParentId !== originalParentId) {
+        payload.parent_id = normalizedParentId;
       }
 
       const response = await fetch(`${API_BASE_URL}/family-list/${nodeId}`, {
@@ -1660,6 +1709,36 @@ export default function TeamStandardFamilyList() {
                     onChange={(e) => setEditingSequence(e.target.value)}
                     style={{ padding: 4, borderRadius: 4, border: '1px solid #d1d5db', minWidth: 100 }}
                   />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: '#475467' }}>부모 항목</span>
+                  <select
+                    value={editingParentId ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        setEditingParentId(null);
+                        return;
+                      }
+                      const parsed = Number(value);
+                      setEditingParentId(Number.isFinite(parsed) ? parsed : null);
+                    }}
+                    style={{
+                      padding: 4,
+                      borderRadius: 4,
+                      border: '1px solid #d1d5db',
+                      fontSize: 12,
+                      minWidth: 180,
+                    }}
+                  >
+                    <option value="">루트 (최상위)</option>
+                    {parentSelectOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.level > 0 ? `${'--'.repeat(option.level)} ` : ''}
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <textarea
                   value={editingDescription}
