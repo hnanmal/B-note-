@@ -169,6 +169,28 @@ def _normalize_family_sequence(item: Optional[models.FamilyListItem]):
     return item
 
 
+def _normalize_sequence_value(value: Optional[str]):
+    if value is None:
+        return None
+    trimmed = str(value).strip()
+    return trimmed if trimmed else None
+
+
+def _sync_family_calc_codes_on_sequence_change(
+    db: Session, family_item_id: int, old_sequence: Optional[str], new_sequence: Optional[str]
+):
+    if not old_sequence or old_sequence == new_sequence:
+        return
+    (
+        db.query(models.CalcDictionaryEntry)
+        .filter(
+            models.CalcDictionaryEntry.family_list_id == family_item_id,
+            models.CalcDictionaryEntry.calc_code == old_sequence,
+        )
+        .update({'calc_code': new_sequence}, synchronize_session=False)
+    )
+
+
 def list_family_items(db: Session):
     items = db.query(models.FamilyListItem).order_by(models.FamilyListItem.name).all()
     return [_normalize_family_sequence(item) for item in items]
@@ -195,9 +217,14 @@ def update_family_item(db: Session, item_id: int, updates: schemas.FamilyListUpd
     db_item = get_family_item(db, item_id)
     if not db_item:
         return None
+    old_sequence = _normalize_sequence_value(db_item.sequence_number)
     data = updates.dict(exclude_none=True)
+    sequence_is_modified = 'sequence_number' in data
     for key, value in data.items():
         setattr(db_item, key, value)
+    new_sequence = _normalize_sequence_value(db_item.sequence_number) if sequence_is_modified else old_sequence
+    if sequence_is_modified:
+        _sync_family_calc_codes_on_sequence_change(db, item_id, old_sequence, new_sequence)
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
