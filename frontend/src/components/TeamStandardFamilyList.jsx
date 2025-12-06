@@ -217,7 +217,7 @@ const buildAssignedSubtree = (nodes, assignedRoots, ancestorMap, metadata) => {
   return result;
 };
 
-export default function TeamStandardFamilyList() {
+export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
   const [familyItems, setFamilyItems] = useState([]);
   const [filterType, setFilterType] = useState('ALL');
   const [status, setStatus] = useState(null);
@@ -288,7 +288,7 @@ export default function TeamStandardFamilyList() {
       if (!selectedFamilyNode) return false;
       try {
         const response = await fetch(
-          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments/${assignmentId}`,
+          `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/assignments/${assignmentId}`,
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -348,7 +348,7 @@ export default function TeamStandardFamilyList() {
       if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
       try {
         const response = await fetch(
-          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments`,
+          `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/assignments`,
           signal ? { signal } : undefined
         );
         if (!response.ok) {
@@ -425,7 +425,7 @@ export default function TeamStandardFamilyList() {
       if (!selectedFamilyNode) return null;
       try {
         const response = await fetch(
-          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments/${standardItemId}`,
+          `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/assignments/${standardItemId}`,
           { method: 'POST' }
         );
         if (!response.ok) {
@@ -558,7 +558,7 @@ export default function TeamStandardFamilyList() {
       }
       payload.description = trimmedDescription === '' ? null : trimmedDescription;
       const response = await fetch(
-        `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments/${editingAssignmentId}`,
+        `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/assignments/${editingAssignmentId}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -595,7 +595,7 @@ export default function TeamStandardFamilyList() {
   const refreshFamilyItems = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/family-list/`);
+      const response = await fetch(`${apiBaseUrl}/family-list/`);
       if (!response.ok) {
         throw new Error('FamilyList를 불러오는 데 실패했습니다.');
       }
@@ -665,7 +665,7 @@ export default function TeamStandardFamilyList() {
     let active = true;
     (async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/standard-items/`, {
+        const response = await fetch(`${apiBaseUrl}/standard-items/`, {
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -710,7 +710,7 @@ export default function TeamStandardFamilyList() {
       setCalcDictionaryError(null);
       try {
         const response = await fetch(
-          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary`,
+          `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/calc-dictionary`,
           signal ? { signal } : undefined
         );
         let payload = null;
@@ -936,7 +936,7 @@ export default function TeamStandardFamilyList() {
     saveAssignmentsController.current = controller;
     try {
       const response = await fetch(
-        `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/assignments`,
+        `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/assignments`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1109,8 +1109,8 @@ export default function TeamStandardFamilyList() {
       if (trimmedCalcCode) payload.calc_code = trimmedCalcCode;
       const isEditing = Boolean(editingCalcEntryId);
       const endpoint = isEditing
-        ? `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary/${editingCalcEntryId}`
-        : `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary`;
+        ? `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/calc-dictionary/${editingCalcEntryId}`
+        : `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/calc-dictionary`;
       const response = await fetch(endpoint, {
         method: isEditing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1222,7 +1222,7 @@ export default function TeamStandardFamilyList() {
     try {
       await Promise.all(
         copiedCalcEntries.map((entry) =>
-          fetch(`${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary`, {
+          fetch(`${apiBaseUrl}/family-list/${selectedFamilyNode.id}/calc-dictionary`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1265,7 +1265,7 @@ export default function TeamStandardFamilyList() {
       if (!window.confirm('이 Calc Dictionary 항목을 정말 삭제하시겠습니까?')) return;
       try {
         const response = await fetch(
-          `${API_BASE_URL}/family-list/${selectedFamilyNode.id}/calc-dictionary/${entry.id}`,
+          `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/calc-dictionary/${entry.id}`,
           { method: 'DELETE' }
         );
         if (!response.ok) {
@@ -1345,7 +1345,7 @@ export default function TeamStandardFamilyList() {
         parent_id: addingParentId,
         sequence_number: sequenceNumber,
       };
-      const response = await fetch(`${API_BASE_URL}/family-list/`, {
+      const response = await fetch(`${apiBaseUrl}/family-list/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1425,7 +1425,7 @@ export default function TeamStandardFamilyList() {
         payload.parent_id = normalizedParentId;
       }
 
-      const response = await fetch(`${API_BASE_URL}/family-list/${nodeId}`, {
+      const response = await fetch(`${apiBaseUrl}/family-list/${nodeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1455,7 +1455,7 @@ export default function TeamStandardFamilyList() {
       setSelectedFamilyNode(null);
     }
     try {
-      const response = await fetch(`${API_BASE_URL}/family-list/${nodeId}`, {
+      const response = await fetch(`${apiBaseUrl}/family-list/${nodeId}`, {
         method: 'DELETE',
       });
       if (!response.ok) {

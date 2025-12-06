@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../apiConfig';
 
-function WorkMasterManager() {
+function WorkMasterManager({ apiBaseUrl = API_BASE_URL }) {
     const [workMasters, setWorkMasters] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [file, setFile] = useState(null);
@@ -9,7 +9,7 @@ function WorkMasterManager() {
 
     const fetchWorkMasters = async (query = '') => {
         try {
-            const url = query ? `${API_BASE_URL}/work-masters/?search=${query}` : `${API_BASE_URL}/work-masters/`;
+            const url = query ? `${apiBaseUrl}/work-masters/?search=${query}` : `${apiBaseUrl}/work-masters/`;
             const response = await fetch(url);
             if (!response.ok) throw new Error('Network response was not ok');
             const data = await response.json();
@@ -41,7 +41,7 @@ function WorkMasterManager() {
 
         try {
             setMessage('업로드 중...');
-            const response = await fetch(`${API_BASE_URL}/work-masters/upload`, {
+            const response = await fetch(`${apiBaseUrl}/work-masters/upload`, {
                 method: 'POST',
                 body: formData,
             });

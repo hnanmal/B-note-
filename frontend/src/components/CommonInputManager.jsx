@@ -42,7 +42,7 @@
     throw new Error(message);
   };
 
-  export default function CommonInputManager() {
+  export default function CommonInputManager({ apiBaseUrl = API_BASE_URL }) {
     const [entries, setEntries] = useState([]);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState(null);
@@ -83,7 +83,7 @@
     const fetchEntries = useCallback(async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/common-input/`);
+        const response = await fetch(`${apiBaseUrl}/common-input/`);
         const data = await handleResponse(response);
         setEntries(data);
       } catch (error) {
@@ -144,7 +144,7 @@
       }
       setOperationPending(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/common-input/`, {
+        const response = await fetch(`${apiBaseUrl}/common-input/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(form),
@@ -169,7 +169,7 @@
       }
       setOperationPending(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/common-input/${editingId}`, {
+        const response = await fetch(`${apiBaseUrl}/common-input/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editingValues),
@@ -189,7 +189,7 @@
       if (!window.confirm('정말 삭제하시겠습니까?')) return;
       setOperationPending(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/common-input/${id}`, {
+        const response = await fetch(`${apiBaseUrl}/common-input/${id}`, {
           method: 'DELETE',
         });
         await handleResponse(response);

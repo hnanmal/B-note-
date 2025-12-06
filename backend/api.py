@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Response
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 from typing import List, Optional
 import pandas as pd
 import io
@@ -16,6 +17,24 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_project_db_session(project_identifier: str):
+    try:
+        db_path = project_db.resolve_project_db_path(project_identifier)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    project_engine = create_engine(
+        f"sqlite:///{db_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    ProjectSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=project_engine)
+    db = ProjectSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        project_engine.dispose()
 
 
 router = APIRouter()
@@ -151,6 +170,95 @@ async def upload_work_masters(
         )
 
 
+@router.post(
+    "/project/{project_identifier}/work-masters/",
+    response_model=schemas.WorkMaster,
+    tags=["Project Data"],
+)
+def create_project_work_master(
+    project_identifier: str,
+    work_master: schemas.WorkMasterCreate,
+    db: Session = Depends(get_project_db_session),
+):
+    db_work_master = crud.get_work_master_by_work_master_code(
+        db, code=work_master.work_master_code
+    )
+    if db_work_master:
+        raise HTTPException(
+            status_code=400,
+            detail=f"WorkMaster with code '{work_master.work_master_code}' already exists",
+        )
+    return crud.create_work_master(db=db, work_master=work_master)
+
+
+@router.get(
+    "/project/{project_identifier}/work-masters/",
+    response_model=List[schemas.WorkMaster],
+    tags=["Project Data"],
+)
+def read_project_work_masters(
+    project_identifier: str,
+    skip: int = 0,
+    limit: int = None,
+    search: Optional[str] = None,
+    db: Session = Depends(get_project_db_session),
+):
+    return crud.get_work_masters(db, skip=skip, limit=limit, search=search)
+
+
+@router.post(
+    "/project/{project_identifier}/work-masters/upload",
+    summary="Upload and upsert Work Masters from Excel",
+    tags=["Project Data"],
+)
+async def upload_project_work_masters(
+    project_identifier: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_project_db_session),
+):
+    if not file.filename.endswith(".xlsx"):
+        raise HTTPException(
+            status_code=400, detail="Invalid file type. Please upload an .xlsx file."
+        )
+
+    created_count = 0
+    updated_count = 0
+
+    try:
+        contents = await file.read()
+        df = pd.read_excel(io.BytesIO(contents), header=3, dtype=str)
+        model_fields = list(schemas.WorkMasterCreate.model_fields.keys())
+        num_columns_to_use = min(len(df.columns), len(model_fields))
+        df = df.iloc[:, :num_columns_to_use]
+        df.columns = model_fields[:num_columns_to_use]
+
+        for _, row in df.iterrows():
+            row_data = row.where(pd.notna(row), None).to_dict()
+            work_master_in = schemas.WorkMasterCreate(**row_data)
+            db_work_master = crud.get_work_master_by_work_master_code(
+                db, code=work_master_in.work_master_code
+            )
+
+            if db_work_master:
+                crud.update_work_master(
+                    db, db_work_master=db_work_master, work_master_in=work_master_in
+                )
+                updated_count += 1
+            else:
+                crud.create_work_master(db, work_master=work_master_in)
+                created_count += 1
+
+        return {
+            "message": "Work Masters uploaded successfully",
+            "created": created_count,
+            "updated": updated_count,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"An error occurred while processing the file: {e}"
+        )
+
+
 # ===================
 #   StandardItem
 # ===================
@@ -215,6 +323,126 @@ def remove_work_master(
 )
 def create_standard_item(
     item: schemas.StandardItemCreate, db: Session = Depends(get_db)
+):
+    return crud.create_standard_item(db=db, standard_item=item)
+
+
+@router.get(
+    "/project/{project_identifier}/standard-items/",
+    response_model=List[schemas.StandardItem],
+    tags=["Project Data"],
+)
+def read_project_standard_items(
+    project_identifier: str,
+    skip: int = 0,
+    limit: int = None,
+    search: Optional[str] = None,
+    parent_id: Optional[int] = None,
+    db: Session = Depends(get_project_db_session),
+):
+    return crud.get_standard_items(
+        db=db, skip=skip, limit=limit, search=search, parent_id=parent_id
+    )
+
+
+@router.get(
+    "/project/{project_identifier}/standard-items/{standard_item_id}",
+    response_model=schemas.StandardItem,
+    tags=["Project Data"],
+)
+def get_project_standard_item(
+    project_identifier: str,
+    standard_item_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    std = crud.get_standard_item(db, standard_item_id=standard_item_id)
+    if not std:
+        raise HTTPException(status_code=404, detail="StandardItem not found")
+    return std
+
+
+@router.post(
+    "/project/{project_identifier}/standard-items/{standard_item_id}/assign",
+    tags=["Project Data"],
+)
+def assign_work_master_to_project(
+    project_identifier: str,
+    standard_item_id: int,
+    payload: schemas.AssignWorkMaster,
+    db: Session = Depends(get_project_db_session),
+):
+    std = crud.assign_work_master_to_standard_item(
+        db, standard_item_id=standard_item_id, work_master_id=payload.work_master_id
+    )
+    if not std:
+        raise HTTPException(
+            status_code=404, detail="StandardItem or WorkMaster not found"
+        )
+    return {"message": "assigned", "standard_item_id": std.id}
+
+
+@router.post(
+    "/project/{project_identifier}/standard-items/{standard_item_id}/remove",
+    tags=["Project Data"],
+)
+def remove_project_work_master(
+    project_identifier: str,
+    standard_item_id: int,
+    payload: schemas.AssignWorkMaster,
+    db: Session = Depends(get_project_db_session),
+):
+    std = crud.remove_work_master_from_standard_item(
+        db, standard_item_id=standard_item_id, work_master_id=payload.work_master_id
+    )
+    if not std:
+        raise HTTPException(
+            status_code=404, detail="StandardItem or WorkMaster not found"
+        )
+    return {"message": "removed", "standard_item_id": std.id}
+
+
+@router.delete(
+    "/project/{project_identifier}/standard-items/{standard_item_id}",
+    tags=["Project Data"],
+)
+def delete_project_standard_item(
+    project_identifier: str,
+    standard_item_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    std = crud.delete_standard_item(db, standard_item_id=standard_item_id)
+    if not std:
+        raise HTTPException(status_code=404, detail="StandardItem not found")
+    return {"message": "deleted", "standard_item_id": standard_item_id}
+
+
+@router.post(
+    "/project/{project_identifier}/standard-items/{standard_item_id}/rename",
+    tags=["Project Data"],
+)
+def rename_project_standard_item(
+    project_identifier: str,
+    standard_item_id: int,
+    payload: schemas.StandardItemRename,
+    db: Session = Depends(get_project_db_session),
+):
+    std = crud.update_standard_item_name(
+        db, standard_item_id=standard_item_id, new_name=payload.name
+    )
+    if not std:
+        raise HTTPException(status_code=404, detail="StandardItem not found")
+    return {"message": "renamed", "standard_item_id": std.id}
+
+
+@router.post(
+    "/project/{project_identifier}/standard-items/",
+    response_model=schemas.StandardItem,
+    tags=["Project Data"],
+)
+def create_project_standard_item(
+    project_identifier: str,
+    item: schemas.StandardItemCreate,
+    db: Session = Depends(get_project_db_session),
 ):
     return crud.create_standard_item(db=db, standard_item=item)
 
@@ -411,6 +639,111 @@ def sync_calc_dictionary_with_common_input(db: Session = Depends(get_db)):
 
 
 @router.get(
+    "/project/{project_identifier}/common-input/",
+    response_model=List[schemas.CommonInputItem],
+    tags=["Project Data"],
+)
+def list_project_common_input(
+    project_identifier: str, db: Session = Depends(get_project_db_session)
+):
+    return crud.list_common_inputs(db)
+
+
+@router.post(
+    "/project/{project_identifier}/common-input/",
+    response_model=schemas.CommonInputItem,
+    tags=["Project Data"],
+)
+def create_project_common_input(
+    project_identifier: str,
+    payload: schemas.CommonInputCreate,
+    db: Session = Depends(get_project_db_session),
+):
+    try:
+        return crud.create_common_input(db, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.put(
+    "/project/{project_identifier}/common-input/{item_id}",
+    response_model=schemas.CommonInputItem,
+    tags=["Project Data"],
+)
+def update_project_common_input(
+    project_identifier: str,
+    item_id: int,
+    payload: schemas.CommonInputUpdate,
+    db: Session = Depends(get_project_db_session),
+):
+    updated = crud.update_common_input(db, item_id, payload)
+    if not updated:
+        raise HTTPException(status_code=404, detail="CommonInput item not found")
+    return updated
+
+
+@router.delete(
+    "/project/{project_identifier}/common-input/{item_id}",
+    tags=["Project Data"],
+)
+def delete_project_common_input(
+    project_identifier: str,
+    item_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    deleted = crud.delete_common_input(db, item_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="CommonInput item not found")
+    return {"message": "deleted", "id": item_id}
+
+
+@router.get(
+    "/project/{project_identifier}/calc-dictionary",
+    response_model=List[schemas.CalcDictionaryEntry],
+    tags=["Project Data"],
+)
+def read_project_calc_dictionary(
+    project_identifier: str, db: Session = Depends(get_project_db_session)
+):
+    return crud.list_all_calc_dictionary_entries(db)
+
+
+@router.patch(
+    "/project/{project_identifier}/calc-dictionary/{entry_id}",
+    response_model=schemas.CalcDictionaryEntry,
+    tags=["Project Data"],
+)
+def update_project_calc_dictionary_entry(
+    project_identifier: str,
+    entry_id: int,
+    payload: schemas.CalcDictionaryEntryUpdate,
+    db: Session = Depends(get_project_db_session),
+):
+    entry = crud.get_calc_dictionary_entry(db, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    updates = payload.model_dump(exclude_none=True)
+    if not updates:
+        return entry
+    updated = crud.update_calc_dictionary_entry(db, entry_id=entry_id, updates=updates)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    return updated
+
+
+@router.post(
+    "/project/{project_identifier}/calc-dictionary/sync-with-common-input",
+    response_model=schemas.CalcDictionarySyncResult,
+    tags=["Project Data"],
+)
+def sync_project_calc_dictionary_with_common_input(
+    project_identifier: str, db: Session = Depends(get_project_db_session)
+):
+    updated_entries = crud.sync_calc_dictionary_with_common_inputs(db)
+    return schemas.CalcDictionarySyncResult(updated_entries=updated_entries)
+
+
+@router.get(
     "/family-list/{item_id}/assignments",
     response_model=List[schemas.GwmFamilyAssign],
     tags=["Family List"],
@@ -471,6 +804,215 @@ def create_family_assignment(
     item_id: int,
     standard_item_id: int,
     db: Session = Depends(get_db),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    assignment = crud.create_gwm_family_assignment(
+        db, family_id=item_id, standard_item_id=standard_item_id
+    )
+    return assignment
+
+
+@router.get(
+    "/project/{project_identifier}/family-list/",
+    response_model=List[schemas.FamilyListItem],
+    tags=["Project Data"],
+)
+def read_project_family_list(
+    project_identifier: str, db: Session = Depends(get_project_db_session)
+):
+    return crud.list_family_items(db)
+
+
+@router.post(
+    "/project/{project_identifier}/family-list/",
+    response_model=schemas.FamilyListItem,
+    tags=["Project Data"],
+)
+def create_project_family_list_item(
+    project_identifier: str, item: schemas.FamilyListCreate, db: Session = Depends(get_project_db_session)
+):
+    return crud.create_family_item(db, item)
+
+
+@router.put(
+    "/project/{project_identifier}/family-list/{item_id}",
+    response_model=schemas.FamilyListItem,
+    tags=["Project Data"],
+)
+def update_project_family_list_item(
+    project_identifier: str,
+    item_id: int,
+    payload: schemas.FamilyListUpdate,
+    db: Session = Depends(get_project_db_session),
+):
+    updated = crud.update_family_item(db, item_id, payload)
+    if not updated:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return updated
+
+
+@router.delete(
+    "/project/{project_identifier}/family-list/{item_id}", tags=["Project Data"]
+)
+def delete_project_family_list_item(
+    project_identifier: str, item_id: int, db: Session = Depends(get_project_db_session)
+):
+    deleted = crud.delete_family_item(db, item_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return {"message": "deleted", "id": item_id}
+
+
+@router.get(
+    "/project/{project_identifier}/family-list/{item_id}/calc-dictionary",
+    response_model=List[schemas.CalcDictionaryEntry],
+    tags=["Project Data"],
+)
+def read_project_family_calc_dictionary(
+    project_identifier: str,
+    item_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.list_calc_dictionary_entries(db, family_item_id=item_id)
+
+
+@router.post(
+    "/project/{project_identifier}/family-list/{item_id}/calc-dictionary",
+    response_model=schemas.CalcDictionaryEntry,
+    tags=["Project Data"],
+)
+def create_project_family_calc_dictionary_entry(
+    project_identifier: str,
+    item_id: int,
+    entry: schemas.CalcDictionaryEntryCreate,
+    db: Session = Depends(get_project_db_session),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.create_calc_dictionary_entry(db, family_item_id=item_id, entry_in=entry)
+
+
+@router.patch(
+    "/project/{project_identifier}/family-list/{item_id}/calc-dictionary/{entry_id}",
+    response_model=schemas.CalcDictionaryEntry,
+    tags=["Project Data"],
+)
+def update_project_family_calc_dictionary_entry(
+    project_identifier: str,
+    item_id: int,
+    entry_id: int,
+    payload: schemas.CalcDictionaryEntryUpdate,
+    db: Session = Depends(get_project_db_session),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    entry = crud.get_calc_dictionary_entry(db, entry_id)
+    if not entry or entry.family_list_id != item_id:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    updates = payload.model_dump(exclude_none=True)
+    if not updates:
+        return entry
+    updated = crud.update_calc_dictionary_entry(db, entry_id=entry_id, updates=updates)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    return updated
+
+
+@router.delete(
+    "/project/{project_identifier}/family-list/{item_id}/calc-dictionary/{entry_id}",
+    tags=["Project Data"],
+)
+def delete_project_family_calc_dictionary_entry(
+    project_identifier: str,
+    item_id: int,
+    entry_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    entry = crud.get_calc_dictionary_entry(db, entry_id)
+    if not entry or entry.family_list_id != item_id:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    deleted = crud.delete_calc_dictionary_entry(db, entry_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    return {"message": "deleted", "id": entry_id}
+
+
+@router.get(
+    "/project/{project_identifier}/family-list/{item_id}/assignments",
+    response_model=List[schemas.GwmFamilyAssign],
+    tags=["Project Data"],
+)
+def read_project_family_assignments(
+    project_identifier: str, item_id: int, db: Session = Depends(get_project_db_session)
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.list_gwm_family_assignments(db, family_id=item_id)
+
+
+@router.post(
+    "/project/{project_identifier}/family-list/{item_id}/assignments",
+    response_model=List[schemas.GwmFamilyAssign],
+    tags=["Project Data"],
+)
+def replace_project_family_assignments(
+    project_identifier: str,
+    item_id: int,
+    payload: schemas.GwmFamilyAssignmentPayload,
+    db: Session = Depends(get_project_db_session),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.replace_gwm_family_assignments(
+        db, family_id=item_id, standard_item_ids=payload.standard_item_ids
+    )
+
+
+@router.patch(
+    "/project/{project_identifier}/family-list/{item_id}/assignments/{assignment_id}",
+    response_model=schemas.GwmFamilyAssign,
+    tags=["Project Data"],
+)
+def update_project_family_assignment_metadata(
+    project_identifier: str,
+    item_id: int,
+    assignment_id: int,
+    payload: schemas.GwmFamilyAssignUpdate,
+    db: Session = Depends(get_project_db_session),
+):
+    updated = crud.update_gwm_family_assignment(
+        db,
+        family_id=item_id,
+        assignment_id=assignment_id,
+        updates=payload.model_dump(exclude_unset=True),
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return updated
+
+
+@router.post(
+    "/project/{project_identifier}/family-list/{item_id}/assignments/{standard_item_id}",
+    response_model=schemas.GwmFamilyAssign,
+    tags=["Project Data"],
+)
+def create_project_family_assignment(
+    project_identifier: str,
+    item_id: int,
+    standard_item_id: int,
+    db: Session = Depends(get_project_db_session),
 ):
     family_item = crud.get_family_item(db, item_id)
     if not family_item:

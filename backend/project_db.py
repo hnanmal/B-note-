@@ -85,6 +85,11 @@ def _resolve_path(file_name: str) -> Path:
     return resolved
 
 
+def resolve_project_db_path(identifier: str) -> Path:
+    candidate_file = identifier if identifier.endswith('.db') else f"{identifier}.db"
+    return _resolve_path(candidate_file)
+
+
 def _register_entry(
     file_name: str, display_name: str, created_at: Optional[str] = None
 ) -> None:

@@ -16,6 +16,7 @@ export default function StandardTreeManager({
     checkboxDepth = 2,
     onCheckboxSelectionChange,
     externalCheckboxSelection = [],
+    apiBaseUrl = API_BASE_URL,
 }) {
     const [items, setItems] = useState([]);
     const [tree, setTree] = useState([]);
@@ -50,7 +51,7 @@ export default function StandardTreeManager({
 
     const fetchAll = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/standard-items/`);
+            const res = await fetch(`${apiBaseUrl}/standard-items/`);
             if (!res.ok) throw new Error('표준 항목 조회 실패');
             const data = await res.json();
             setItems(data);
@@ -118,7 +119,7 @@ export default function StandardTreeManager({
             return;
         }
         try {
-            const res = await fetch(`${API_BASE_URL}/standard-items/`, {
+            const res = await fetch(`${apiBaseUrl}/standard-items/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, type, parent_id: parentId }),
@@ -193,7 +194,7 @@ export default function StandardTreeManager({
     const handleDelete = async (id) => {
         if (!window.confirm('정말 삭제하시겠습니까? (하위 항목도 함께 삭제될 수 있습니다)')) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/standard-items/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${apiBaseUrl}/standard-items/${id}`, { method: 'DELETE' });
             if (!res.ok) {
                 const err = await res.json();
                 throw new Error(err.detail || '삭제 실패');
@@ -223,7 +224,7 @@ export default function StandardTreeManager({
         const name = (editingName || '').trim();
         if (!name) { setMessage('이름을 입력하세요'); return; }
         try {
-            const res = await fetch(`${API_BASE_URL}/standard-items/${id}/rename`, {
+            const res = await fetch(`${apiBaseUrl}/standard-items/${id}/rename`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
             });
             if (!res.ok) {

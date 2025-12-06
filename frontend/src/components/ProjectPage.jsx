@@ -143,6 +143,13 @@ export default function ProjectPage() {
     }
   };
 
+  const handleOpenProjectRoute = useCallback((db) => {
+    const slugFromFile = db.file_name?.replace(/\.db$/i, '');
+    const nameForRoute = slugFromFile || db.display_name || 'project';
+    const route = `/project/${encodeURIComponent(nameForRoute)}`;
+    window.open(route, '_blank');
+  }, []);
+
   const handleDelete = async (fileName, displayName) => {
     const trimmedKey = adminKey.trim();
     if (trimmedKey !== ADMIN_KEY) {
@@ -248,6 +255,13 @@ export default function ProjectPage() {
                   onClick={() => handleDelete(db.file_name, db.display_name)}
                 >
                   삭제
+                </button>
+                <button
+                  style={{ border: 'none', borderRadius: 6, padding: '4px 8px', background: '#eef2ff', color: '#1d4ed8', cursor: actionPending ? 'not-allowed' : 'pointer', fontSize: 12 }}
+                  disabled={actionPending}
+                  onClick={() => handleOpenProjectRoute(db)}
+                >
+                  프로젝트 편집
                 </button>
               </div>
               {renameTarget === db.file_name && (

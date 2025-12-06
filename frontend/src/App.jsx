@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { id: 'workmaster', label: '워크마스터 매니저', icon: '🧰' },
   { id: 'matching', label: 'Team Standard Matching', icon: '🧩' },
 ];
+const PROJECT_ROUTE_PREFIX = '/project';
 
 function App() {
   const [selectedNode, setSelectedNode] = useState(null);
@@ -34,11 +35,40 @@ function App() {
   const SIDEBAR_OPEN_WIDTH = 180;
   const SIDEBAR_COLLAPSED_WIDTH = 64;
   const PANEL_LEFT_WIDTH = 560;
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const routeSuffix = pathname.startsWith(`${PROJECT_ROUTE_PREFIX}/`)
+    ? pathname.slice(PROJECT_ROUTE_PREFIX.length + 1)
+    : '';
+  const [rawProjectIdentifier] = routeSuffix.split('/').filter(Boolean);
+  const projectRouteIdentifier = rawProjectIdentifier ? decodeURIComponent(rawProjectIdentifier) : '';
+  const isProjectEditorRoute = Boolean(projectRouteIdentifier);
+  const projectApiBase = isProjectEditorRoute
+    ? `${API_BASE_URL}/project/${encodeURIComponent(projectRouteIdentifier)}`
+    : API_BASE_URL;
+  const navLabelOverrides = {
+    workmaster: isProjectEditorRoute ? '프로젝트 워크마스터 매니저' : '워크마스터 매니저',
+    matching: isProjectEditorRoute ? '프로젝트 Standard Matching' : 'Team Standard Matching',
+  };
+  const activeNavItems = NAV_ITEMS.map((item) => ({
+    ...item,
+    label: navLabelOverrides[item.id] ?? item.label,
+  }));
+  const adminLabel = isProjectEditorRoute ? '프로젝트 BIM Admin' : '팀BIM Admin';
+  const commonButtonLabel = isProjectEditorRoute ? '프로젝트 Common Input' : 'Common Input Setting';
+  const calcButtonLabel = isProjectEditorRoute ? '프로젝트 전체 Calc Dictionary' : '전체 Calc Dictionary';
+  const familyButtonLabel = isProjectEditorRoute ? '프로젝트 Standard Family List' : 'Team Standard Family List';
+  const headerStyle = {
+    background: isProjectEditorRoute ? '#d6c7ff' : '#f6d975',
+    borderBottom: isProjectEditorRoute ? '1px solid #b59ae9' : '#e0c34d',
+  };
+  const commonAriaLabel = commonButtonLabel;
+  const calcAriaLabel = calcButtonLabel;
+  const familyAriaLabel = familyButtonLabel;
   const fetchCalcDictionaryIndex = useCallback(async () => {
     setCalcDictionaryLoading(true);
     setCalcDictionaryError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/calc-dictionary`);
+      const response = await fetch(`${projectApiBase}/calc-dictionary`);
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         const message =
@@ -55,14 +85,14 @@ function App() {
     } finally {
       setCalcDictionaryLoading(false);
     }
-  }, []);
+  }, [projectApiBase]);
 
   const syncCalcDictionaryWithCommonInput = useCallback(async () => {
     setCalcDictionarySyncLoading(true);
     setCalcDictionarySyncStatus(null);
     setCalcDictionaryError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/calc-dictionary/sync-with-common-input`, {
+      const response = await fetch(`${projectApiBase}/calc-dictionary/sync-with-common-input`, {
         method: 'POST',
       });
       if (!response.ok) {
@@ -87,11 +117,12 @@ function App() {
     } finally {
       setCalcDictionarySyncLoading(false);
     }
-  }, [fetchCalcDictionaryIndex]);
+  }, [fetchCalcDictionaryIndex, projectApiBase]);
 
   const openCalcDictionaryPage = useCallback(() => {
     setActivePage('calcDictionary');
   }, []);
+
 
   const startEditingCalcEntry = useCallback((entry) => {
     setEditingCalcEntryId(entry.id);
@@ -117,7 +148,7 @@ function App() {
     setSavingCalcEntryId(editingCalcEntryId);
     setCalcDictionaryError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/calc-dictionary/${editingCalcEntryId}`, {
+      const response = await fetch(`${projectApiBase}/calc-dictionary/${editingCalcEntryId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingCalcEntryValues),
@@ -136,7 +167,7 @@ function App() {
     } finally {
       setSavingCalcEntryId(null);
     }
-  }, [editingCalcEntryId, editingCalcEntryValues, fetchCalcDictionaryIndex]);
+  }, [editingCalcEntryId, editingCalcEntryValues, fetchCalcDictionaryIndex, projectApiBase]);
 
   useEffect(() => {
     if (activePage !== 'calcDictionary') return;
@@ -157,7 +188,7 @@ function App() {
 
   return (
     <div className="App" style={{ height: 'calc(100vh - 1.5rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
-      <header className="App-header-fixed">
+      <header className="App-header-fixed" style={headerStyle}>
         <div className="app-title">B-note+</div>
       </header>
   <div style={{ height: 32 }} />
@@ -208,8 +239,8 @@ function App() {
           </button>
           {sidebarOpen ? (
             <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#555', textAlign: 'center' }}>팀BIM Admin</div>
-              {NAV_ITEMS.map(item => (
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#555', textAlign: 'center' }}>{adminLabel}</div>
+              {activeNavItems.map(item => (
                 <button
                   key={item.id}
                   className={`nav-btn${activePage === item.id ? ' active' : ''}`}
@@ -254,7 +285,7 @@ function App() {
                     cursor: 'pointer',
                   }}
                 >
-                  Common Input Setting
+                    {commonButtonLabel}
                 </button>
               </div>
               <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -276,7 +307,7 @@ function App() {
                     textAlign: 'center',
                   }}
                 >
-                  전체 Calc Dictionary
+                      {calcButtonLabel}
                 </button>
               </div>
               <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -297,7 +328,7 @@ function App() {
                     cursor: 'pointer',
                   }}
                 >
-                  Team Standard Family List
+                      {familyButtonLabel}
                 </button>
               </div>
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -327,8 +358,8 @@ function App() {
             <div style={{ marginTop: 56, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                 <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>BIM Admin</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {NAV_ITEMS.map(item => (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {activeNavItems.map(item => (
                     <button
                       key={item.id}
                       className={`nav-btn icon${activePage === item.id ? ' active' : ''}`}
@@ -377,7 +408,7 @@ function App() {
                     justifyContent: 'center',
                     color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
                   }}
-                  aria-label="Common Input Setting"
+                  aria-label={commonAriaLabel}
                 >
                   C
                 </button>
@@ -403,7 +434,7 @@ function App() {
                     justifyContent: 'center',
                     color: '#1d4ed8',
                   }}
-                  aria-label="Calc Dictionary"
+                  aria-label={calcAriaLabel}
                 >
                   Σ
                 </button>
@@ -429,7 +460,7 @@ function App() {
                     justifyContent: 'center',
                     color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
                   }}
-                  aria-label="Team Standard Family List"
+                  aria-label={familyAriaLabel}
                 >
                   F
                 </button>
@@ -710,11 +741,11 @@ function App() {
           </div>
         ) : activePage === 'common' ? (
           <div className="panel pick" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
-            <CommonInputPage />
+            <CommonInputPage title={commonButtonLabel} apiBaseUrl={projectApiBase} />
           </div>
         ) : activePage === 'family' ? (
           <div className="panel family" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
-            <TeamStandardFamilyList />
+            <TeamStandardFamilyList apiBaseUrl={projectApiBase} />
           </div>
         ) : (
           <>
@@ -744,9 +775,9 @@ function App() {
             >
               <div style={{ flex: 1, overflow: 'auto', padding: '0 0 0 8px', minWidth: 0 }}>
                 {activePage === 'matching' ? (
-                  <StandardTreeManager onNodeSelect={setSelectedNode} refreshSignal={treeRefreshKey} />
+                  <StandardTreeManager onNodeSelect={setSelectedNode} refreshSignal={treeRefreshKey} apiBaseUrl={projectApiBase} />
                 ) : (
-                  <WorkMasterManager />
+                  <WorkMasterManager apiBaseUrl={projectApiBase} />
                 )}
               </div>
             </div>
