@@ -21,6 +21,8 @@ function App() {
   const [calcDictionaryEntries, setCalcDictionaryEntries] = useState([]);
   const [calcDictionaryLoading, setCalcDictionaryLoading] = useState(false);
   const [calcDictionaryError, setCalcDictionaryError] = useState(null);
+  const [calcDictionarySyncStatus, setCalcDictionarySyncStatus] = useState(null);
+  const [calcDictionarySyncLoading, setCalcDictionarySyncLoading] = useState(false);
   const [editingCalcEntryId, setEditingCalcEntryId] = useState(null);
   const [editingCalcEntryValues, setEditingCalcEntryValues] = useState({
     calc_code: '',
@@ -54,6 +56,38 @@ function App() {
       setCalcDictionaryLoading(false);
     }
   }, []);
+
+  const syncCalcDictionaryWithCommonInput = useCallback(async () => {
+    setCalcDictionarySyncLoading(true);
+    setCalcDictionarySyncStatus(null);
+    setCalcDictionaryError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/calc-dictionary/sync-with-common-input`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.detail || body?.message || 'Common Info 데이터를 가져오지 못했습니다.';
+        throw new Error(message);
+      }
+      const payload = await response.json().catch(() => null);
+      const updated = typeof payload?.updated_entries === 'number' ? payload.updated_entries : 0;
+      setCalcDictionarySyncStatus({
+        type: 'success',
+        message:
+          updated > 0
+            ? `${updated}개 항목을 Common Input 값으로 업데이트했습니다.`
+            : '동기화할 항목이 없습니다.',
+      });
+      await fetchCalcDictionaryIndex();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Common Info와 동기화하는 중 오류가 발생했습니다.';
+      setCalcDictionarySyncStatus({ type: 'error', message });
+    } finally {
+      setCalcDictionarySyncLoading(false);
+    }
+  }, [fetchCalcDictionaryIndex]);
 
   const openCalcDictionaryPage = useCallback(() => {
     setActivePage('calcDictionary');
@@ -114,6 +148,12 @@ function App() {
       cancelEditingCalcEntry();
     }
   }, [activePage, editingCalcEntryId, cancelEditingCalcEntry]);
+
+  useEffect(() => {
+    if (activePage !== 'calcDictionary') {
+      setCalcDictionarySyncStatus(null);
+    }
+  }, [activePage]);
 
   return (
     <div className="App" style={{ height: 'calc(100vh - 1.5rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
@@ -438,25 +478,36 @@ function App() {
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 18, fontWeight: 600 }}>전체 Calc Dictionary</span>
                     <button
                       type="button"
-                      disabled
+                      onClick={syncCalcDictionaryWithCommonInput}
+                      disabled={calcDictionarySyncLoading}
                       style={{
-                        border: '1px solid #cbd5f5',
-                        background: '#f8fafc',
-                        color: '#64748b',
+                        border: '1px solid #2563eb',
+                        background: calcDictionarySyncLoading ? '#93c5fd' : '#2563eb',
+                        color: '#fff',
                         fontWeight: 600,
                         padding: '4px 12px',
                         borderRadius: 8,
-                        cursor: 'not-allowed',
+                        cursor: calcDictionarySyncLoading ? 'not-allowed' : 'pointer',
                         fontSize: 12,
                       }}
                     >
-                      Common Info 로부터 업데이트
+                      {calcDictionarySyncLoading ? '동기화 중...' : 'Common Info 로부터 업데이트'}
                     </button>
                   </div>
+                  {calcDictionarySyncStatus && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: calcDictionarySyncStatus.type === 'error' ? '#b91c1c' : '#047857',
+                      }}
+                    >
+                      {calcDictionarySyncStatus.message}
+                    </div>
+                  )}
                   <div style={{ fontSize: 13, color: '#475467' }}>
                     Family 항목과 심벌 키/값을 한번에 확인합니다.
                   </div>

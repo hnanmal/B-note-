@@ -159,6 +159,12 @@ class CalcDictionaryEntry(CalcDictionaryEntryBase):
     family_item: Optional[_FamilyListWithoutRelations] = None
 
 
+class CalcDictionarySyncResult(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    updated_entries: int
+
+
 class GwmFamilyAssignmentPayload(BaseModel):
     standard_item_ids: List[int] = Field(default_factory=list)
 

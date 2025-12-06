@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
-from typing import Optional, List
+from typing import Optional, List, Dict
 from . import models, schemas
 from . import security
 
@@ -256,6 +256,53 @@ def list_all_calc_dictionary_entries(db: Session):
         .order_by(models.CalcDictionaryEntry.created_at.desc())
         .all()
     )
+
+
+def _normalize_sync_key(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    trimmed = str(value).strip()
+    return trimmed.lower() if trimmed else None
+
+
+def sync_calc_dictionary_with_common_inputs(db: Session) -> int:
+    common_inputs = list_common_inputs(db)
+    key_to_value: Dict[str, Optional[str]] = {}
+
+    for input_item in common_inputs:
+        abbreviation_key = _normalize_sync_key(input_item.abbreviation)
+        classification_key = _normalize_sync_key(input_item.classification)
+        selected_key = abbreviation_key or classification_key
+        if not selected_key:
+            continue
+        key_to_value[selected_key] = input_item.input_value
+
+    if not key_to_value:
+        return 0
+
+    entries = (
+        db.query(models.CalcDictionaryEntry)
+        .filter(models.CalcDictionaryEntry.symbol_key.isnot(None))
+        .all()
+    )
+    updated = 0
+    for entry in entries:
+        entry_key = _normalize_sync_key(entry.symbol_key)
+        if not entry_key:
+            continue
+        if entry_key not in key_to_value:
+            continue
+        new_value = key_to_value[entry_key]
+        normalized_value = str(new_value).strip() if new_value is not None else None
+        if entry.symbol_value == normalized_value:
+            continue
+        entry.symbol_value = normalized_value
+        updated += 1
+        db.add(entry)
+
+    if updated:
+        db.commit()
+    return updated
 
 
 def create_calc_dictionary_entry(

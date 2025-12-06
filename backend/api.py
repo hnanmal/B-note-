@@ -400,6 +400,16 @@ def update_calc_dictionary_entry(entry_id: int, payload: schemas.CalcDictionaryE
     return updated
 
 
+@router.post(
+    "/calc-dictionary/sync-with-common-input",
+    response_model=schemas.CalcDictionarySyncResult,
+    tags=["Calc Dictionary"],
+)
+def sync_calc_dictionary_with_common_input(db: Session = Depends(get_db)):
+    updated_entries = crud.sync_calc_dictionary_with_common_inputs(db)
+    return schemas.CalcDictionarySyncResult(updated_entries=updated_entries)
+
+
 @router.get(
     "/family-list/{item_id}/assignments",
     response_model=List[schemas.GwmFamilyAssign],
