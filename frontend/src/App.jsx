@@ -239,6 +239,27 @@ function App() {
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <button
                   type="button"
+                  onClick={() => setActivePage('common')}
+                  className={`nav-btn${activePage === 'common' ? ' active' : ''}`}
+                  style={{
+                    width: '100%',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    padding: '6px 0',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    border: 'none',
+                    background: activePage === 'common' ? '#f7c748' : '#f1f1f1',
+                    color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Common Input Setting
+                </button>
+              </div>
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <button
+                  type="button"
                   onClick={openCalcDictionaryPage}
                   style={{
                     width: '100%',
@@ -258,26 +279,7 @@ function App() {
                   전체 Calc Dictionary
                 </button>
               </div>
-              <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <button
-                  type="button"
-                  onClick={() => setActivePage('common')}
-                  className={`nav-btn${activePage === 'common' ? ' active' : ''}`}
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    padding: '6px 0',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    border: 'none',
-                    background: activePage === 'common' ? '#f7c748' : '#f1f1f1',
-                    color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Common Input Setting
-                </button>
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <button
                   type="button"
                   onClick={() => setActivePage('family')}
@@ -355,6 +357,32 @@ function App() {
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Common</div>
+                <button
+                  type="button"
+                  onClick={() => setActivePage('common')}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: '1px solid #f7c748',
+                    background: activePage === 'common' ? '#f7c748' : '#fff',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    textAlign: 'center',
+                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
+                  }}
+                  aria-label="Common Input Setting"
+                >
+                  C
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                 <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Calc</div>
                 <button
                   type="button"
@@ -378,6 +406,32 @@ function App() {
                   aria-label="Calc Dictionary"
                 >
                   Σ
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Family</div>
+                <button
+                  type="button"
+                  onClick={() => setActivePage('family')}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: '1px solid #f7c748',
+                    background: activePage === 'family' ? '#f7c748' : '#fff',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    textAlign: 'center',
+                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
+                  }}
+                  aria-label="Team Standard Family List"
+                >
+                  F
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
@@ -405,58 +459,6 @@ function App() {
                   P
                 </button>
               </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                  <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Common</div>
-                  <button
-                    type="button"
-                    onClick={() => setActivePage('common')}
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      border: '1px solid #f7c748',
-                      background: activePage === 'common' ? '#f7c748' : '#fff',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'background 0.2s',
-                      textAlign: 'center',
-                      fontSize: 12,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
-                    }}
-                    aria-label="Common Input Setting"
-                  >
-                    C
-                  </button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                  <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Family</div>
-                  <button
-                    type="button"
-                    onClick={() => setActivePage('family')}
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      border: '1px solid #f7c748',
-                      background: activePage === 'family' ? '#f7c748' : '#fff',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'background 0.2s',
-                      textAlign: 'center',
-                      fontSize: 12,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
-                    }}
-                    aria-label="Team Standard Family List"
-                  >
-                    F
-                  </button>
-                </div>
             </div>
           )}
         </div>
