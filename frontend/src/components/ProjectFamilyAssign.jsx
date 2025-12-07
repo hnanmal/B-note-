@@ -11,6 +11,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [revitTypeInput, setRevitTypeInput] = useState('');
   const [activeRevitIndex, setActiveRevitIndex] = useState(0);
   const [savedRevitTypeEntries, setSavedRevitTypeEntries] = useState([]);
+  const [selectedRevitIndexes, setSelectedRevitIndexes] = useState([]);
+  const [selectionAnchor, setSelectionAnchor] = useState(null);
   const [revitTypesLoading, setRevitTypesLoading] = useState(false);
   const [revitTypesError, setRevitTypesError] = useState(null);
   const [revitTypesSaving, setRevitTypesSaving] = useState(false);
@@ -173,12 +175,31 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     ? Math.min(activeRevitIndex, displayedRevitEntries.length - 1)
     : 0;
   const activeRevitType = displayedRevitEntries[activeRevitIndexClamped]?.type_name;
+  const selectedRevitIndexSet = useMemo(() => new Set(selectedRevitIndexes), [
+    selectedRevitIndexes,
+  ]);
 
 
   useEffect(() => {
     setActiveRevitIndex((prev) => {
-      if (!displayedRevitEntries.length) return 0;
-      if (prev >= displayedRevitEntries.length) return displayedRevitEntries.length - 1;
+      if (!displayedRevitEntries.length) {
+        return prev === 0 ? prev : 0;
+      }
+      if (prev >= displayedRevitEntries.length) {
+        return displayedRevitEntries.length - 1;
+      }
+      return prev;
+    });
+    setSelectedRevitIndexes((prev) => {
+      const filtered = prev.filter((index) => index >= 0 && index < displayedRevitEntries.length);
+      const unchanged = filtered.length === prev.length && filtered.every((value, idx) => value === prev[idx]);
+      return unchanged ? prev : filtered;
+    });
+    setSelectionAnchor((prev) => {
+      if (prev === null) return prev;
+      if (prev >= displayedRevitEntries.length) {
+        return null;
+      }
       return prev;
     });
   }, [displayedRevitEntries.length]);
@@ -186,11 +207,38 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const handleMoveActiveRevit = (delta) => {
     if (!displayedRevitEntries.length) return;
     setActiveRevitIndex((prev) => {
-      const next = prev + delta;
-      if (next < 0) return 0;
-      if (next >= displayedRevitEntries.length) return displayedRevitEntries.length - 1;
+      const next = Math.max(0, Math.min(displayedRevitEntries.length - 1, prev + delta));
+      setSelectedRevitIndexes([next]);
+      setSelectionAnchor(next);
       return next;
     });
+  };
+
+  const handleRevitEntryClick = (index, event) => {
+    if (!displayedRevitEntries.length) return;
+    const shiftHeld = event.shiftKey;
+    const ctrlHeld = event.ctrlKey || event.metaKey;
+    setActiveRevitIndex(index);
+    if (shiftHeld) {
+      const anchorIndex = selectionAnchor ?? activeRevitIndexClamped;
+      const start = Math.min(anchorIndex, index);
+      const end = Math.max(anchorIndex, index);
+      const range = [];
+      for (let i = start; i <= end; i += 1) {
+        range.push(i);
+      }
+      setSelectedRevitIndexes(range);
+    } else if (ctrlHeld) {
+      setSelectedRevitIndexes((prev) => {
+        if (prev.includes(index)) {
+          return prev.filter((value) => value !== index);
+        }
+        return [...prev, index].sort((a, b) => a - b);
+      });
+    } else {
+      setSelectedRevitIndexes([index]);
+    }
+    setSelectionAnchor(index);
   };
 
   const handleSaveRevitTypes = () => {
@@ -224,6 +272,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         const entries = Array.isArray(payload) ? payload.filter(Boolean) : [];
         setSavedRevitTypeEntries(entries);
         setActiveRevitIndex(0);
+        setSelectedRevitIndexes([]);
+        setSelectionAnchor(null);
         setRevitTypeInput('');
       })
       .catch((error) => {
@@ -236,15 +286,25 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
 
   const handleRemoveActiveRevit = () => {
     if (!apiBaseUrl || !selectedFamily?.id) return;
-    if (!savedRevitTypeEntries.length) {
+    if (!displayedRevitEntries.length) {
       return;
     }
-    const removalIndex = Math.min(activeRevitIndexClamped, savedRevitTypeEntries.length - 1);
-    const entryToRemove = savedRevitTypeEntries[removalIndex];
-    if (!entryToRemove) return;
+    const normalizedIndexes = selectedRevitIndexes.length
+      ? Array.from(new Set(selectedRevitIndexes))
+          .sort((a, b) => a - b)
+          .filter((index) => index >= 0 && index < displayedRevitEntries.length)
+      : [];
+    const targetIndexes = normalizedIndexes.length
+      ? normalizedIndexes
+      : [activeRevitIndexClamped].filter((index) => index >= 0);
+    if (!targetIndexes.length) return;
+    const removalSet = new Set(targetIndexes);
     const remainingTypeNames = savedRevitTypeEntries
-      .filter((_, index) => index !== removalIndex)
+      .filter((_, index) => !removalSet.has(index))
       .map((entry) => entry.type_name);
+    const removedEntries = targetIndexes
+      .map((index) => displayedRevitEntries[index])
+      .filter(Boolean);
     setRevitTypesSaving(true);
     setRevitTypesSaveError(null);
     fetch(`${apiBaseUrl}/family-list/${selectedFamily.id}/revit-types`, {
@@ -261,10 +321,21 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       .then((payload) => {
         const entries = Array.isArray(payload) ? payload.filter(Boolean) : [];
         setSavedRevitTypeEntries(entries);
-        setActiveRevitIndex(entries.length ? Math.min(removalIndex, entries.length - 1) : 0);
-        setRevitTypeInput((prev) =>
-          prev ? `${entryToRemove.type_name}\n${prev}` : entryToRemove.type_name
-        );
+        const nextFocusIndex = entries.length
+          ? Math.min(targetIndexes[0], entries.length - 1)
+          : 0;
+        setActiveRevitIndex(entries.length ? nextFocusIndex : 0);
+        setSelectionAnchor(entries.length ? nextFocusIndex : null);
+        setSelectedRevitIndexes([]);
+        if (removedEntries.length) {
+          const removedText = removedEntries
+            .map((entry) => entry.type_name)
+            .filter(Boolean)
+            .join('\n');
+          if (removedText) {
+            setRevitTypeInput((prev) => (prev ? `${removedText}\n${prev}` : removedText));
+          }
+        }
       })
       .catch((error) => {
         setRevitTypesSaveError(
@@ -676,24 +747,32 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             ) : revitTypesError ? (
               <div style={{ fontSize: 12, color: '#dc2626' }}>{revitTypesError}</div>
             ) : displayedRevitEntries.length ? (
-              displayedRevitEntries.map((entry, index) => (
-                <div
-                  key={entry.id ?? `${entry.type_name}-${index}`}
-                  onClick={() => setActiveRevitIndex(index)}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '2fr 1fr 1fr',
-                    padding: '6px 8px',
-                    borderRadius: 10,
-                    background: index === activeRevitIndexClamped ? '#eef2ff' : 'transparent',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span style={{ fontSize: 12, color: '#0f172a' }}>{entry.type_name}</span>
-                  <span style={{ fontSize: 12 }}>{buildingLabel}</span>
-                  <span style={{ fontSize: 12 }}>{familySequence}</span>
-                </div>
-              ))
+              displayedRevitEntries.map((entry, index) => {
+                const isActive = index === activeRevitIndexClamped;
+                const isSelected = selectedRevitIndexSet.has(index);
+                return (
+                  <div
+                    key={entry.id ?? `${entry.type_name}-${index}`}
+                    onClick={(event) => handleRevitEntryClick(index, event)}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '2fr 1fr 1fr',
+                      padding: '6px 8px',
+                      borderRadius: 10,
+                      background: isActive
+                        ? '#dbeafe'
+                        : isSelected
+                          ? '#eff6ff'
+                          : 'transparent',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: '#0f172a' }}>{entry.type_name}</span>
+                    <span style={{ fontSize: 12 }}>{buildingLabel}</span>
+                    <span style={{ fontSize: 12 }}>{familySequence}</span>
+                  </div>
+                );
+              })
             ) : (
               <div style={{ fontSize: 12, color: '#94a3b8' }}>입력된 Revit 타입이 없습니다.</div>
             )}
