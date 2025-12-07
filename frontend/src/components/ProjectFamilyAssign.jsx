@@ -14,6 +14,9 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [selectedFamily, setSelectedFamily] = useState(null);
   const [revitTypeInput, setRevitTypeInput] = useState('');
   const [activeRevitIndex, setActiveRevitIndex] = useState(0);
+  const [calcDictEntries, setCalcDictEntries] = useState([]);
+  const [calcDictLoading, setCalcDictLoading] = useState(false);
+  const [calcDictError, setCalcDictError] = useState(null);
 
   useEffect(() => {
     if (!apiBaseUrl) return;
@@ -40,14 +43,49 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     };
   }, [apiBaseUrl]);
 
+  useEffect(() => {
+    if (!apiBaseUrl || !selectedFamily?.id) {
+      setCalcDictEntries([]);
+      setCalcDictError(null);
+      setCalcDictLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setCalcDictLoading(true);
+    setCalcDictError(null);
+    fetch(`${apiBaseUrl}/family-list/${selectedFamily.id}/calc-dictionary`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('Calc Dictionary를 불러오지 못했습니다.');
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setCalcDictEntries(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setCalcDictError(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
+        setCalcDictEntries([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCalcDictLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, selectedFamily?.id]);
+
   const revitTypeRows = useMemo(
-    () => revitTypeInput
-      .split(/\r?\n/)
-      .map((row) => row.trim())
-      .filter((row) => row),
+    () =>
+      revitTypeInput
+        .split(/\r?\n/)
+        .map((row) => row.trim())
+        .filter((row) => row),
     [revitTypeInput]
   );
-  
+
   useEffect(() => {
     setActiveRevitIndex((prev) => {
       if (!revitTypeRows.length) return 0;
@@ -66,11 +104,14 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     });
   };
 
-  const activeRevitIndexClamped = revitTypeRows.length ? Math.min(activeRevitIndex, revitTypeRows.length - 1) : 0;
+  const activeRevitIndexClamped = revitTypeRows.length
+    ? Math.min(activeRevitIndex, revitTypeRows.length - 1)
+    : 0;
   const activeRevitType = revitTypeRows[activeRevitIndexClamped];
   const familyLabel = selectedFamily?.name ?? '패밀리를 선택하세요';
   const familySequence = selectedFamily?.sequence_number ?? '–';
   const buildingLabel = selectedBuilding?.name ?? '건물을 선택하세요';
+
   return (
     <div
       style={{
@@ -152,6 +193,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             ))}
           </select>
         </div>
+
         <div
           style={{
             border: '1px solid #e5e7eb',
@@ -249,14 +291,12 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
               revitTypeRows.map((type, index) => (
                 <div
                   key={`${type}-${index}`}
-                  onClick={() => setActiveRevitIndex(index)}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '2fr 1fr 1fr',
                     padding: '6px 8px',
                     borderRadius: 10,
                     background: index === activeRevitIndexClamped ? '#eef2ff' : 'transparent',
-                    cursor: 'pointer',
                   }}
                 >
                   <span style={{ fontSize: 12, color: '#0f172a' }}>{type}</span>
@@ -269,40 +309,54 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             )}
           </div>
         </div>
-        <div
-          style={{
-            background: '#e0f2fe',
-            borderRadius: 12,
-            padding: 12,
-            color: '#0c4a6e',
-            fontWeight: 600,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <span>Current Building</span>
-          <span style={{ fontSize: 12, color: '#2563eb' }}>{selectedBuilding?.name || '건물을 선택하세요'}</span>
-        </div>
+
         <div
           style={{
             borderRadius: 12,
             border: '1px solid #e5e7eb',
             minHeight: 160,
             padding: 12,
-            background: '#f8fafc',
+            background: '#fff',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            color: '#475467',
-            fontSize: 13,
+            flexDirection: 'column',
+            gap: 10,
           }}
         >
-          좌측에서 건물을 선택하고, 중단의 방향 버튼(↑/↓)으로
-          <br />
-          순서(순번)를 조정할 수 있습니다.
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Calc Dictionary</div>
+          {calcDictLoading ? (
+            <div style={{ fontSize: 12, color: '#475467' }}>Calc Dictionary를 불러오는 중입니다...</div>
+          ) : calcDictError ? (
+            <div style={{ fontSize: 12, color: '#dc2626' }}>{calcDictError}</div>
+          ) : !calcDictEntries.length ? (
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>
+              {selectedFamily
+                ? '이 패밀리에 대응하는 Calc Dictionary 항목이 없습니다.'
+                : '패밀리를 선택하면 Calc Dictionary 항목이 나타납니다.'}
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 2fr 2fr',
+                gap: 8,
+                fontSize: 11,
+                color: '#475467',
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>Calc Code</span>
+              <span style={{ fontWeight: 600 }}>Symbol</span>
+              <span style={{ fontWeight: 600 }}>Value</span>
+              {calcDictEntries.map((entry) => (
+                <React.Fragment key={entry.id}>
+                  <span style={{ fontSize: 12, color: '#0f172a' }}>{entry.calc_code ?? '—'}</span>
+                  <span style={{ fontSize: 12 }}>{entry.symbol_key}</span>
+                  <span style={{ fontSize: 12 }}>{entry.symbol_value}</span>
+                </React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
+
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button
             type="button"
@@ -354,9 +408,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         >
           Update from common-input
         </button>
-        <div style={{ fontSize: 12, color: '#475467' }}>
-          Matched WMs for Selected Standard Types
-        </div>
+        <div style={{ fontSize: 12, color: '#475467' }}>Matched WMs for Selected Standard Types</div>
         <div
           style={{
             flex: 1,
