@@ -53,10 +53,11 @@ function App() {
     ...item,
     label: navLabelOverrides[item.id] ?? item.label,
   }));
-  const adminLabel = isProjectEditorRoute ? '프로젝트 BIM Admin' : '팀BIM Admin';
+  const adminLabel = isProjectEditorRoute ? 'Project Standard' : '팀BIM Admin';
   const commonButtonLabel = isProjectEditorRoute ? '프로젝트 Common Input' : 'Common Input Setting';
   const calcButtonLabel = isProjectEditorRoute ? '프로젝트 전체 Calc Dictionary' : '전체 Calc Dictionary';
   const familyButtonLabel = isProjectEditorRoute ? '프로젝트 Standard Family List' : 'Team Standard Family List';
+  const groupLabelStyle = { fontSize: 10, letterSpacing: 1, color: '#555', textAlign: 'center' };
   const headerStyle = {
     background: isProjectEditorRoute ? '#d6c7ff' : '#f6d975',
     borderBottom: isProjectEditorRoute ? '1px solid #b59ae9' : '#e0c34d',
@@ -64,6 +65,7 @@ function App() {
   const commonAriaLabel = commonButtonLabel;
   const calcAriaLabel = calcButtonLabel;
   const familyAriaLabel = familyButtonLabel;
+  const standardGroupLabel = isProjectEditorRoute ? 'Project Standard' : 'Team Standard';
   const fetchCalcDictionaryIndex = useCallback(async () => {
     setCalcDictionaryLoading(true);
     setCalcDictionaryError(null);
@@ -238,8 +240,8 @@ function App() {
             <span style={{ lineHeight: 1 }}>☰</span>
           </button>
           {sidebarOpen ? (
-            <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#555', textAlign: 'center' }}>{adminLabel}</div>
+            <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+              <div style={groupLabelStyle}>{standardGroupLabel} &gt;</div>
               {activeNavItems.map(item => (
                 <button
                   key={item.id}
@@ -267,7 +269,7 @@ function App() {
                   {item.label}
                 </button>
               ))}
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ marginTop: 0, display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 12 }}>
                 <button
                   type="button"
                   onClick={() => setActivePage('common')}
@@ -285,10 +287,8 @@ function App() {
                     cursor: 'pointer',
                   }}
                 >
-                    {commonButtonLabel}
+                  {commonButtonLabel}
                 </button>
-              </div>
-              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <button
                   type="button"
                   onClick={openCalcDictionaryPage}
@@ -307,10 +307,8 @@ function App() {
                     textAlign: 'center',
                   }}
                 >
-                      {calcButtonLabel}
+                  {calcButtonLabel}
                 </button>
-              </div>
-              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <button
                   type="button"
                   onClick={() => setActivePage('family')}
@@ -328,11 +326,17 @@ function App() {
                     cursor: 'pointer',
                   }}
                 >
-                      {familyButtonLabel}
+                  {familyButtonLabel}
                 </button>
               </div>
+              {isProjectEditorRoute && (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', ...groupLabelStyle }}>
+                  <span>Project Input &gt;</span>
+                  <span style={{ color: '#999', fontSize: 9 }}>coming soon</span>
+                </div>
+              )}
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>Project User</div>
+                <div style={{ ...groupLabelStyle, fontWeight: 600 }}>Project User &gt;</div>
                 <button
                   type="button"
                   onClick={() => setActivePage('project')}
@@ -350,14 +354,14 @@ function App() {
                     color: activePage === 'project' ? '#2c1b00' : '#1d4ed8',
                   }}
                 >
-                  Project Main
+                  Project Select
                 </button>
               </div>
             </nav>
           ) : (
             <div style={{ marginTop: 56, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>BIM Admin</div>
+                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>{adminLabel}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {activeNavItems.map(item => (
                     <button
