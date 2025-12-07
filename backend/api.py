@@ -171,6 +171,21 @@ async def upload_work_masters(
         )
 
 
+@router.get(
+    "/project/{project_identifier}/work-masters/",
+    response_model=List[schemas.WorkMaster],
+    tags=["Project Data"],
+)
+def read_project_work_masters(
+    project_identifier: str,
+    skip: int = 0,
+    limit: int = None,
+    search: Optional[str] = None,
+    db: Session = Depends(get_project_db_session),
+):
+    return crud.get_work_masters(db, skip=skip, limit=limit, search=search)
+
+
 @router.post(
     "/project/{project_identifier}/work-masters/",
     response_model=schemas.WorkMaster,
@@ -190,21 +205,6 @@ def create_project_work_master(
             detail=f"WorkMaster with code '{work_master.work_master_code}' already exists",
         )
     return crud.create_work_master(db=db, work_master=work_master)
-
-
-@router.get(
-    "/project/{project_identifier}/work-masters/",
-    response_model=List[schemas.WorkMaster],
-    tags=["Project Data"],
-)
-def read_project_work_masters(
-    project_identifier: str,
-    skip: int = 0,
-    limit: int = None,
-    search: Optional[str] = None,
-    db: Session = Depends(get_project_db_session),
-):
-    return crud.get_work_masters(db, skip=skip, limit=limit, search=search)
 
 
 @router.post(
@@ -993,6 +993,39 @@ def delete_project_family_calc_dictionary_entry(
     if not deleted:
         raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
     return {"message": "deleted", "id": entry_id}
+
+
+@router.get(
+    "/project/{project_identifier}/family-list/{item_id}/revit-types",
+    response_model=List[schemas.FamilyRevitType],
+    tags=["Project Data"],
+)
+def read_project_family_revit_types(
+    project_identifier: str,
+    item_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.list_family_revit_types(db, family_item_id=item_id)
+
+
+@router.post(
+    "/project/{project_identifier}/family-list/{item_id}/revit-types",
+    response_model=List[schemas.FamilyRevitType],
+    tags=["Project Data"],
+)
+def replace_project_family_revit_types(
+    project_identifier: str,
+    item_id: int,
+    payload: schemas.FamilyRevitTypeListPayload,
+    db: Session = Depends(get_project_db_session),
+):
+    family_item = crud.get_family_item(db, item_id)
+    if not family_item:
+        raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.replace_family_revit_types(db, family_item_id=item_id, type_names=payload.type_names)
 
 
 @router.get(

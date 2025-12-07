@@ -873,7 +873,7 @@ function App() {
                 {activePage === 'matching' ? (
                   <StandardTreeManager onNodeSelect={setSelectedNode} refreshSignal={treeRefreshKey} apiBaseUrl={projectApiBase} />
                 ) : (
-                  <WorkMasterManager apiBaseUrl={projectApiBase} />
+                  <WorkMasterManager apiBaseUrl={projectApiBase} selectedFamilyNode={selectedNode?.node} />
                 )}
               </div>
             </div>

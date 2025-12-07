@@ -10,7 +10,12 @@ from .database import (
 )
 
 # 데이터베이스 테이블 생성
-Base.metadata.create_all(bind=engine)
+tables_to_create = [
+    table
+    for name, table in Base.metadata.tables.items()
+    if name != "family_revit_type"
+]
+Base.metadata.create_all(bind=engine, tables=tables_to_create)
 ensure_family_list_columns(engine)
 ensure_calc_dictionary_columns(engine)
 ensure_gwm_family_assign_columns(engine)

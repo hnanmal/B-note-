@@ -249,6 +249,41 @@ def list_calc_dictionary_entries(db: Session, family_item_id: int):
     )
 
 
+def list_family_revit_types(db: Session, family_item_id: int):
+    return (
+        db.query(models.FamilyRevitType)
+        .filter(models.FamilyRevitType.family_list_id == family_item_id)
+        .order_by(models.FamilyRevitType.id)
+        .all()
+    )
+
+
+def replace_family_revit_types(db: Session, family_item_id: int, type_names: List[str]):
+    normalized_names = [name.strip() for name in type_names if name and name.strip()]
+    (
+        db.query(models.FamilyRevitType)
+        .filter(models.FamilyRevitType.family_list_id == family_item_id)
+        .delete(synchronize_session=False)
+    )
+    created_entries: List[models.FamilyRevitType] = []
+    for name in normalized_names:
+        entry = models.FamilyRevitType(family_list_id=family_item_id, type_name=name)
+        db.add(entry)
+        created_entries.append(entry)
+    if created_entries:
+        db.flush()
+    db.commit()
+    if created_entries:
+        for entry in created_entries:
+            db.refresh(entry)
+    return (
+        db.query(models.FamilyRevitType)
+        .filter(models.FamilyRevitType.family_list_id == family_item_id)
+        .order_by(models.FamilyRevitType.id)
+        .all()
+    )
+
+
 def list_all_calc_dictionary_entries(db: Session):
     return (
         db.query(models.CalcDictionaryEntry)

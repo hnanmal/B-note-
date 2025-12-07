@@ -156,6 +156,12 @@ class FamilyListItem(Base):
         back_populates="family_list_item",
         cascade="all, delete-orphan",
     )
+    revit_types = relationship(
+        "FamilyRevitType",
+        back_populates="family_list_item",
+        cascade="all, delete-orphan",
+        order_by="FamilyRevitType.id",
+    )
 
     parent = relationship("FamilyListItem", remote_side=[id], back_populates="children")
     children = relationship(
@@ -176,6 +182,19 @@ class CalcDictionaryEntry(Base):
 
     family_list_item = relationship(
         "FamilyListItem", back_populates="calc_dictionary_entries"
+    )
+
+
+class FamilyRevitType(Base):
+    __tablename__ = "family_revit_type"
+
+    id = Column(Integer, primary_key=True, index=True)
+    family_list_id = Column(Integer, ForeignKey("family_list.id"), nullable=False)
+    type_name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    family_list_item = relationship(
+        "FamilyListItem", back_populates="revit_types"
     )
 
 

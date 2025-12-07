@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE_URL } from '../apiConfig';
 
-function WorkMasterManager({ apiBaseUrl = API_BASE_URL }) {
+function WorkMasterManager({ apiBaseUrl = API_BASE_URL, selectedFamilyNode = null }) {
     const [workMasters, setWorkMasters] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [file, setFile] = useState(null);
     const [message, setMessage] = useState('');
+    const [assignments, setAssignments] = useState([]);
+    const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+    const [assignmentsError, setAssignmentsError] = useState('');
+    const [standardItems, setStandardItems] = useState([]);
 
     const fetchWorkMasters = async (query = '') => {
         try {
@@ -24,6 +28,75 @@ function WorkMasterManager({ apiBaseUrl = API_BASE_URL }) {
     useEffect(() => {
         fetchWorkMasters();
     }, []);
+
+    useEffect(() => {
+        if (!apiBaseUrl) {
+            setStandardItems([]);
+            return;
+        }
+        let cancelled = false;
+        fetch(`${apiBaseUrl}/standard-items/`)
+            .then((response) => response.json())
+            .then((data) => {
+                if (cancelled) return;
+                setStandardItems(Array.isArray(data) ? data : []);
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setStandardItems([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [apiBaseUrl]);
+
+    useEffect(() => {
+        if (!apiBaseUrl) {
+            setAssignments([]);
+            setAssignmentsError('');
+            setAssignmentsLoading(false);
+            return;
+        }
+        if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') {
+            setAssignments([]);
+            setAssignmentsError('');
+            setAssignmentsLoading(false);
+            return;
+        }
+        const controller = new AbortController();
+        setAssignmentsLoading(true);
+        setAssignmentsError('');
+        fetch(
+            `${apiBaseUrl}/family-list/${selectedFamilyNode.id}/assignments`,
+            { signal: controller.signal }
+        )
+            .then((response) => {
+                if (!response.ok) {
+                    return response.json().catch(() => null).then((body) => {
+                        const message = body?.detail || body?.message || '할당 데이터를 불러오는 데 실패했습니다.';
+                        throw new Error(message);
+                    });
+                }
+                return response.json();
+            })
+            .then((payload) => {
+                if (controller.signal.aborted) return;
+                setAssignments(Array.isArray(payload) ? payload.filter(Boolean) : []);
+            })
+            .catch((error) => {
+                if (error.name === 'AbortError') return;
+                setAssignmentsError(error.message);
+                setAssignments([]);
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) {
+                    setAssignmentsLoading(false);
+                }
+            });
+        return () => {
+            controller.abort();
+        };
+    }, [apiBaseUrl, selectedFamilyNode]);
 
     const handleFileChange = (e) => {
         setFile(e.target.files[0]);
@@ -55,6 +128,33 @@ function WorkMasterManager({ apiBaseUrl = API_BASE_URL }) {
         }
     };
 
+        const standardItemMap = useMemo(() => {
+            const map = new Map();
+            standardItems.forEach((item) => {
+                if (item && Number.isFinite(Number(item.id))) {
+                    map.set(Number(item.id), item);
+                }
+            });
+            return map;
+        }, [standardItems]);
+
+        const assignmentDetails = useMemo(() => {
+            return assignments.map((entry) => {
+                const itemId = Number(entry.standard_item_id);
+                return {
+                    ...entry,
+                    standardItem: standardItemMap.get(itemId),
+                };
+            });
+        }, [assignments, standardItemMap]);
+
+        const gwmAssignments = assignmentDetails.filter(
+            (assignment) => assignment.standardItem?.type === 'GWM'
+        );
+        const swmAssignments = assignmentDetails.filter(
+            (assignment) => assignment.standardItem?.type === 'SWM'
+        );
+
     const handleSearch = (e) => {
         e.preventDefault();
         fetchWorkMasters(searchTerm);
@@ -77,6 +177,73 @@ function WorkMasterManager({ apiBaseUrl = API_BASE_URL }) {
 
             {message && <p><strong>상태:</strong> {message}</p>}
 
+            <div style={{ marginBottom: '16px', fontSize: '13px', color: '#475467' }}>
+                <strong>선택된 패밀리 타입:</strong>
+                {' '}
+                {selectedFamilyNode ? `${selectedFamilyNode.name || '이름 없음'} (${selectedFamilyNode.sequence_number || '번호 없음'})` : '선택된 항목이 없습니다.'}
+            </div>
+            <div
+                style={{
+                    display: 'flex',
+                    gap: '12px',
+                    flexWrap: 'wrap',
+                    marginBottom: '20px',
+                }}
+            >
+                {[['GWM', gwmAssignments], ['SWM', swmAssignments]].map(([listLabel, listItems]) => (
+                    <div
+                        key={listLabel}
+                        style={{
+                            flex: 1,
+                            minWidth: '220px',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '12px',
+                            padding: '12px',
+                            background: '#fff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                        }}
+                    >
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{listLabel}</div>
+                        {assignmentsLoading ? (
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>할당 항목을 불러오는 중입니다...</div>
+                        ) : assignmentsError ? (
+                            <div style={{ fontSize: '11px', color: '#dc2626' }}>{assignmentsError}</div>
+                        ) : selectedFamilyNode?.item_type !== 'FAMILY' ? (
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Family 타입을 선택해야 항목을 확인할 수 있습니다.</div>
+                        ) : listItems.length ? (
+                            listItems.map((assignment) => (
+                                <div
+                                    key={assignment.id}
+                                    style={{
+                                        padding: '6px 8px',
+                                        borderRadius: '8px',
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                    }}
+                                >
+                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>
+                                        {assignment.standardItem?.name || `ID ${assignment.standard_item_id}`}
+                                    </div>
+                                    {assignment.formula && (
+                                        <div style={{ fontSize: '11px', color: '#475467' }}>
+                                            공식: {assignment.formula}
+                                        </div>
+                                    )}
+                                    {assignment.description && (
+                                        <div style={{ fontSize: '11px', color: '#475467' }}>
+                                            설명: {assignment.description}
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>할당된 항목이 없습니다.</div>
+                        )}
+                    </div>
+                ))}
+            </div>
             <h3>WorkMaster 목록</h3>
             <div style={{ marginBottom: '10px' }}>
                 <form onSubmit={handleSearch}>

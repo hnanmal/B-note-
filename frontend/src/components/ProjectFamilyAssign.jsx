@@ -2,10 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import ProjectFamilyListWidget from './ProjectFamilyListWidget';
 
 const WORK_MASTER_COLUMNS = ['Use', 'GWM', 'Item', '상세', '단위'];
-const WORK_MASTER_ROWS = [
-  { id: 1, discipline: 'GWM', item: '표준산출', detail: 'None', unit: 'EA' },
-  { id: 2, discipline: 'SWM', item: '실물간편', detail: 'None', unit: 'EA' },
-];
 
 export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [buildings, setBuildings] = useState([]);
@@ -14,9 +10,17 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [selectedFamily, setSelectedFamily] = useState(null);
   const [revitTypeInput, setRevitTypeInput] = useState('');
   const [activeRevitIndex, setActiveRevitIndex] = useState(0);
+  const [savedRevitTypeEntries, setSavedRevitTypeEntries] = useState([]);
+  const [revitTypesLoading, setRevitTypesLoading] = useState(false);
+  const [revitTypesError, setRevitTypesError] = useState(null);
+  const [revitTypesSaving, setRevitTypesSaving] = useState(false);
+  const [revitTypesSaveError, setRevitTypesSaveError] = useState(null);
   const [calcDictEntries, setCalcDictEntries] = useState([]);
   const [calcDictLoading, setCalcDictLoading] = useState(false);
   const [calcDictError, setCalcDictError] = useState(null);
+  const [familyAssignments, setFamilyAssignments] = useState([]);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const [assignmentsError, setAssignmentsError] = useState(null);
 
   useEffect(() => {
     if (!apiBaseUrl) return;
@@ -77,6 +81,83 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     };
   }, [apiBaseUrl, selectedFamily?.id]);
 
+  useEffect(() => {
+    if (!apiBaseUrl || !selectedFamily?.id) {
+      setFamilyAssignments([]);
+      setAssignmentsLoading(false);
+      setAssignmentsError(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setAssignmentsLoading(true);
+    setAssignmentsError(null);
+    fetch(`${apiBaseUrl}/family-list/${selectedFamily.id}/assignments`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('할당된 Work Master를 불러오지 못했습니다.');
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setFamilyAssignments(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setAssignmentsError(
+          error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+        );
+        setFamilyAssignments([]);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setAssignmentsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, selectedFamily?.id]);
+
+    useEffect(() => {
+      if (!apiBaseUrl || !selectedFamily?.id) {
+        setSavedRevitTypeEntries([]);
+        setRevitTypesLoading(false);
+        setRevitTypesError(null);
+        return undefined;
+      }
+      let cancelled = false;
+      setRevitTypesLoading(true);
+      setRevitTypesError(null);
+      setRevitTypesSaveError(null);
+      fetch(`${apiBaseUrl}/family-list/${selectedFamily.id}/revit-types`)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error('Revit 타입을 불러오지 못했습니다.');
+          }
+          return res.json();
+        })
+        .then((payload) => {
+          if (cancelled) return;
+          if (Array.isArray(payload)) {
+            setSavedRevitTypeEntries(payload.filter(Boolean));
+          } else {
+            setSavedRevitTypeEntries([]);
+          }
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setRevitTypesError(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
+          setSavedRevitTypeEntries([]);
+        })
+        .finally(() => {
+          if (!cancelled) setRevitTypesLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, [apiBaseUrl, selectedFamily?.id]);
+
   const revitTypeRows = useMemo(
     () =>
       revitTypeInput
@@ -86,31 +167,196 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     [revitTypeInput]
   );
 
+  const displayedRevitEntries = savedRevitTypeEntries;
+
+  const activeRevitIndexClamped = displayedRevitEntries.length
+    ? Math.min(activeRevitIndex, displayedRevitEntries.length - 1)
+    : 0;
+  const activeRevitType = displayedRevitEntries[activeRevitIndexClamped]?.type_name;
+
+
   useEffect(() => {
     setActiveRevitIndex((prev) => {
-      if (!revitTypeRows.length) return 0;
-      if (prev >= revitTypeRows.length) return revitTypeRows.length - 1;
+      if (!displayedRevitEntries.length) return 0;
+      if (prev >= displayedRevitEntries.length) return displayedRevitEntries.length - 1;
       return prev;
     });
-  }, [revitTypeRows.length]);
+  }, [displayedRevitEntries.length]);
 
   const handleMoveActiveRevit = (delta) => {
-    if (!revitTypeRows.length) return;
+    if (!displayedRevitEntries.length) return;
     setActiveRevitIndex((prev) => {
       const next = prev + delta;
       if (next < 0) return 0;
-      if (next >= revitTypeRows.length) return revitTypeRows.length - 1;
+      if (next >= displayedRevitEntries.length) return displayedRevitEntries.length - 1;
       return next;
     });
   };
 
-  const activeRevitIndexClamped = revitTypeRows.length
-    ? Math.min(activeRevitIndex, revitTypeRows.length - 1)
-    : 0;
-  const activeRevitType = revitTypeRows[activeRevitIndexClamped];
+  const handleSaveRevitTypes = () => {
+    if (!apiBaseUrl || !selectedFamily?.id) return;
+    const typeNames = revitTypeRows;
+    if (!typeNames.length) {
+      setRevitTypesSaveError('한 줄에 하나씩 Revit 타입을 입력한 후 ↓ 버튼을 눌러 저장하세요.');
+      return;
+    }
+    setRevitTypesSaving(true);
+    setRevitTypesSaveError(null);
+    fetch(`${apiBaseUrl}/family-list/${selectedFamily.id}/revit-types`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type_names: typeNames }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('Revit 타입을 저장하지 못했습니다.');
+        }
+        return res.json();
+      })
+      .then((payload) => {
+        const entries = Array.isArray(payload) ? payload.filter(Boolean) : [];
+        setSavedRevitTypeEntries(entries);
+        setActiveRevitIndex(0);
+        setRevitTypeInput('');
+      })
+      .catch((error) => {
+        setRevitTypesSaveError(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
+      })
+      .finally(() => {
+        setRevitTypesSaving(false);
+      });
+  };
+
+  const handleRemoveActiveRevit = () => {
+    if (!apiBaseUrl || !selectedFamily?.id) return;
+    if (!savedRevitTypeEntries.length) {
+      return;
+    }
+    const removalIndex = Math.min(activeRevitIndexClamped, savedRevitTypeEntries.length - 1);
+    const entryToRemove = savedRevitTypeEntries[removalIndex];
+    if (!entryToRemove) return;
+    const remainingTypeNames = savedRevitTypeEntries
+      .filter((_, index) => index !== removalIndex)
+      .map((entry) => entry.type_name);
+    setRevitTypesSaving(true);
+    setRevitTypesSaveError(null);
+    fetch(`${apiBaseUrl}/family-list/${selectedFamily.id}/revit-types`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type_names: remainingTypeNames }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('Revit 타입을 삭제하지 못했습니다.');
+        }
+        return res.json();
+      })
+      .then((payload) => {
+        const entries = Array.isArray(payload) ? payload.filter(Boolean) : [];
+        setSavedRevitTypeEntries(entries);
+        setActiveRevitIndex(entries.length ? Math.min(removalIndex, entries.length - 1) : 0);
+        setRevitTypeInput((prev) =>
+          prev ? `${entryToRemove.type_name}\n${prev}` : entryToRemove.type_name
+        );
+      })
+      .catch((error) => {
+        setRevitTypesSaveError(
+          error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+        );
+      })
+      .finally(() => {
+        setRevitTypesSaving(false);
+      });
+  };
+
+  const handleRevitTextareaKeyDown = (event) => {
+    if (event.key === 'Enter' && event.shiftKey) {
+      return;
+    }
+    if (event.key === 'Enter' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      handleSaveRevitTypes();
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      handleRemoveActiveRevit();
+    }
+  };
+ 
   const familyLabel = selectedFamily?.name ?? '패밀리를 선택하세요';
   const familySequence = selectedFamily?.sequence_number ?? '–';
   const buildingLabel = selectedBuilding?.name ?? '건물을 선택하세요';
+  const assignmentGroups = useMemo(
+    () => ({
+      GWM: familyAssignments.filter((assignment) => assignment?.standard_item?.type === 'GWM'),
+      SWM: familyAssignments.filter((assignment) => assignment?.standard_item?.type === 'SWM'),
+    }),
+    [familyAssignments]
+  );
+
+  const assignmentTableRows = useMemo(() => {
+    return familyAssignments.map((assignment) => {
+      const detailParts = [];
+      if (assignment.formula) {
+        detailParts.push(`수식: ${assignment.formula}`);
+      }
+      if (assignment.description) {
+        detailParts.push(assignment.description);
+      }
+      return {
+        id: assignment.id,
+        use: '●',
+        discipline: assignment.standard_item?.type ?? '—',
+        item: assignment.standard_item?.name ?? 'Unnamed',
+        detail: detailParts.length ? detailParts.join(' · ') : '—',
+        unit: 'EA',
+      };
+    });
+  }, [familyAssignments]);
+
+  const renderAssignmentCard = (title, typeKey) => {
+    const assignments = assignmentGroups[typeKey];
+    return (
+      <div
+        style={{
+          borderRadius: 12,
+          border: '1px solid #e2e8f0',
+          padding: 12,
+          background: '#fdfdfd',
+          minHeight: 140,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{title}</div>
+        {assignmentsLoading ? (
+          <div style={{ fontSize: 12, color: '#475467' }}>로딩 중...</div>
+        ) : assignmentsError ? (
+          <div style={{ fontSize: 12, color: '#dc2626' }}>{assignmentsError}</div>
+        ) : !assignments.length ? (
+          <div style={{ fontSize: 12, color: '#94a3b8' }}>할당된 항목이 없습니다.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {assignments.map((assignment) => (
+              <div key={assignment.id}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>
+                  {assignment.standard_item?.name ?? 'Unnamed'}
+                </div>
+                {assignment.formula && (
+                  <div style={{ fontSize: 11, color: '#2563eb' }}>수식: {assignment.formula}</div>
+                )}
+                {assignment.description && (
+                  <div style={{ fontSize: 11, color: '#475467' }}>{assignment.description}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -210,7 +456,11 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           <textarea
             rows={3}
             value={revitTypeInput}
-            onChange={(event) => setRevitTypeInput(event.target.value)}
+            onChange={(event) => {
+              setRevitTypeInput(event.target.value);
+              setRevitTypesSaveError(null);
+            }}
+            onKeyDown={handleRevitTextareaKeyDown}
             placeholder="Revit에서 모델링한 타입 이름을 줄 단위로 입력하세요."
             style={{
               borderRadius: 12,
@@ -222,47 +472,106 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             }}
           />
           <div style={{ fontSize: 11, color: '#475467', lineHeight: 1.4 }}>
-            좌측 Family List에서 <strong>{familyLabel}</strong>를 선택한 후 &lt;S&gt; 키를 눌러
-            장바구니를 동일한 항목으로 일괄 지정하세요. 현재 선택 건물: <strong>{buildingLabel}</strong>.
+            &lt;S&gt; 키를 눌러 장바구니를 동일한 항목으로 일괄 지정하세요.
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <button
               type="button"
-              onClick={() => handleMoveActiveRevit(1)}
+              onClick={handleSaveRevitTypes}
               style={{
                 width: 40,
                 height: 38,
                 borderRadius: 12,
-                border: '1px solid #cbd5f5',
-                background: '#fff',
+                border: '1px solid #2563eb',
+                background: '#2563eb',
                 fontWeight: 700,
-                color: '#0f172a',
+                color: '#fff',
                 fontSize: 18,
                 cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
+              title="입력된 Revit 타입을 줄 단위로 분리하여 저장합니다"
             >
               ↓
             </button>
             <button
               type="button"
-              onClick={() => handleMoveActiveRevit(-1)}
+              onClick={handleRemoveActiveRevit}
+              disabled={!savedRevitTypeEntries.length}
               style={{
-                width: 40,
-                height: 38,
-                borderRadius: 12,
+                width: 34,
+                height: 34,
+                borderRadius: 10,
                 border: '1px solid #cbd5f5',
-                background: '#fff',
-                fontWeight: 700,
-                color: '#0f172a',
-                fontSize: 18,
-                cursor: 'pointer',
+                background: savedRevitTypeEntries.length ? '#fff' : '#f1f5f9',
+                fontWeight: 600,
+                color: savedRevitTypeEntries.length ? '#0f172a' : '#94a3b8',
+                fontSize: 14,
+                cursor: savedRevitTypeEntries.length ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
+              title="선택 항목을 제거하고 다시 텍스트 입력창으로 올립니다"
             >
               ↑
             </button>
-            <span style={{ fontSize: 12, color: '#2563eb' }}>
+            <span style={{ fontSize: 12, color: '#2563eb', flex: 1 }}>
               {activeRevitType ? `현재 활성 타입: ${activeRevitType}` : '선택된 Revit 타입이 없습니다.'}
             </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => handleMoveActiveRevit(-1)}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  border: '1px solid #cbd5f5',
+                  background: '#fff',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="이전 항목 선택"
+              >
+                ▲
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMoveActiveRevit(1)}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  border: '1px solid #cbd5f5',
+                  background: '#fff',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="다음 항목 선택"
+              >
+                ▼
+              </button>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: revitTypesSaveError ? '#dc2626' : '#475467' }}>
+            {revitTypesSaving
+              ? 'Revit 타입을 저장하는 중입니다...'
+              : revitTypesSaveError
+                ? revitTypesSaveError
+                : '↓ 버튼으로 입력한 Revit 타입을 줄 단위로 저장합니다.'}
           </div>
           <div
             style={{
@@ -287,19 +596,25 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
               overflowY: 'auto',
             }}
           >
-            {revitTypeRows.length ? (
-              revitTypeRows.map((type, index) => (
+            {revitTypesLoading ? (
+              <div style={{ fontSize: 12, color: '#475467' }}>저장된 Revit 타입을 불러오고 있습니다...</div>
+            ) : revitTypesError ? (
+              <div style={{ fontSize: 12, color: '#dc2626' }}>{revitTypesError}</div>
+            ) : displayedRevitEntries.length ? (
+              displayedRevitEntries.map((entry, index) => (
                 <div
-                  key={`${type}-${index}`}
+                  key={entry.id ?? `${entry.type_name}-${index}`}
+                  onClick={() => setActiveRevitIndex(index)}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '2fr 1fr 1fr',
                     padding: '6px 8px',
                     borderRadius: 10,
                     background: index === activeRevitIndexClamped ? '#eef2ff' : 'transparent',
+                    cursor: 'pointer',
                   }}
                 >
-                  <span style={{ fontSize: 12, color: '#0f172a' }}>{type}</span>
+                  <span style={{ fontSize: 12, color: '#0f172a' }}>{entry.type_name}</span>
                   <span style={{ fontSize: 12 }}>{buildingLabel}</span>
                   <span style={{ fontSize: 12 }}>{familySequence}</span>
                 </div>
@@ -425,6 +740,35 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         >
           자동 매칭 결과가 없습니다.
         </div>
+        <div
+          style={{
+            borderRadius: 16,
+            border: '1px solid #e0f2fe',
+            padding: 16,
+            background: '#fff',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            boxShadow: '0 4px 16px rgba(15,23,42,0.08)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>할당된 Work Master</div>
+            <span style={{ fontSize: 11, color: '#475467' }}>
+              {selectedFamily ? '선택된 패밀리 기준' : '패밀리를 선택하면 목록이 나타납니다.'}
+            </span>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 12,
+            }}
+          >
+            {renderAssignmentCard('GWM', 'GWM')}
+            {renderAssignmentCard('SWM', 'SWM')}
+          </div>
+        </div>
       </div>
 
       <div
@@ -456,18 +800,35 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           ))}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
-          {WORK_MASTER_ROWS.map((row) => (
-            <div
-              key={row.id}
-              style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 80px 40px', padding: '4px 0', borderBottom: '1px solid #e5e7eb' }}
-            >
-              <span style={{ fontSize: 10 }}>{row.discipline}</span>
-              <span style={{ fontSize: 10 }}>{row.item}</span>
-              <span style={{ fontSize: 10 }}>{row.detail}</span>
-              <span style={{ fontSize: 10 }}>{row.unit}</span>
-              <span style={{ fontSize: 10 }}>—</span>
+          {assignmentsLoading ? (
+            <div style={{ fontSize: 12, color: '#475467' }}>할당된 항목을 불러오는 중입니다...</div>
+          ) : assignmentsError ? (
+            <div style={{ fontSize: 12, color: '#dc2626' }}>{assignmentsError}</div>
+          ) : !assignmentTableRows.length ? (
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>
+              {selectedFamily
+                ? '이 패밀리에 할당된 Work Master가 없습니다.'
+                : '패밀리를 선택하면 할당된 Work Master가 여기에 표시됩니다.'}
             </div>
-          ))}
+          ) : (
+            assignmentTableRows.map((row) => (
+              <div
+                key={row.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '60px 1fr 100px 80px 40px',
+                  padding: '4px 0',
+                  borderBottom: '1px solid #e5e7eb',
+                }}
+              >
+                <span style={{ fontSize: 10 }}>{row.use}</span>
+                <span style={{ fontSize: 10 }}>{row.discipline}</span>
+                <span style={{ fontSize: 10 }}>{row.item}</span>
+                <span style={{ fontSize: 10 }}>{row.detail}</span>
+                <span style={{ fontSize: 10 }}>{row.unit}</span>
+              </div>
+            ))
+          )}
         </div>
         <div
           style={{

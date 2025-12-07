@@ -165,8 +165,14 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
               cursor: onFamilySelect ? 'pointer' : 'default',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>{node.sequence_number || '—'}</span>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: node.sequence_number ? 'space-between' : 'flex-start',
+                gap: 8,
+              }}
+            >
+              {node.sequence_number && <span>{node.sequence_number}</span>}
               <strong style={{ fontWeight: 600 }}>{node.name || 'Unnamed'}</strong>
             </div>
           </div>

@@ -37,6 +37,14 @@ EXTRA_TABLE_STATEMENTS = [
         created_at TEXT NOT NULL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS family_revit_type (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        family_list_id INTEGER NOT NULL,
+        type_name TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )
+    """,
 ]
 
 

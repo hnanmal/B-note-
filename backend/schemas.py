@@ -130,6 +130,7 @@ class FamilyListItem(FamilyListBase):
 
     id: int
     children: List[_FamilyListWithoutRelations] = []
+    revit_types: List["FamilyRevitType"] = []
 
 
 class CalcDictionaryEntryBase(BaseModel):
@@ -159,6 +160,28 @@ class CalcDictionaryEntry(CalcDictionaryEntryBase):
     family_item: Optional[_FamilyListWithoutRelations] = None
 
 
+class FamilyRevitTypeBase(BaseModel):
+    type_name: str
+
+
+class FamilyRevitTypeCreate(FamilyRevitTypeBase):
+    pass
+
+
+class FamilyRevitType(FamilyRevitTypeBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    family_list_id: int
+    created_at: datetime.datetime
+
+
+class FamilyRevitTypeListPayload(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    type_names: List[str] = Field(default_factory=list)
+
+
 class CalcDictionarySyncResult(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -183,6 +206,7 @@ class GwmFamilyAssign(GwmFamilyAssignBase):
     assigned_at: datetime.datetime
     formula: Optional[str] = None
     description: Optional[str] = None
+    standard_item: Optional[_StandardItemWithoutRelations] = None
 
 
 class GwmFamilyAssignUpdate(BaseModel):
@@ -310,3 +334,4 @@ Project.model_rebuild()
 User.model_rebuild()
 FamilyListItem.model_rebuild()
 CalcDictionaryEntry.model_rebuild()
+FamilyRevitType.model_rebuild()
