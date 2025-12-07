@@ -200,12 +200,19 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       setRevitTypesSaveError('한 줄에 하나씩 Revit 타입을 입력한 후 ↓ 버튼을 눌러 저장하세요.');
       return;
     }
+    const existingTypeNames = savedRevitTypeEntries.map((entry) => entry.type_name).filter(Boolean);
+    const combinedTypeNames = [...existingTypeNames];
+    typeNames.forEach((name) => {
+      if (!combinedTypeNames.includes(name)) {
+        combinedTypeNames.push(name);
+      }
+    });
     setRevitTypesSaving(true);
     setRevitTypesSaveError(null);
     fetch(`${apiBaseUrl}/family-list/${selectedFamily.id}/revit-types`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type_names: typeNames }),
+      body: JSON.stringify({ type_names: combinedTypeNames }),
     })
       .then((res) => {
         if (!res.ok) {
@@ -295,8 +302,11 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     [familyAssignments]
   );
 
-  const assignmentTableRows = useMemo(() => {
-    return familyAssignments.map((assignment) => {
+  const assignmentRowsByType = useMemo(() => {
+    const accumulator = { GWM: [], SWM: [] };
+    familyAssignments.forEach((assignment) => {
+      const typeKey = assignment?.standard_item?.type;
+      if (!typeKey || !['GWM', 'SWM'].includes(typeKey)) return;
       const detailParts = [];
       if (assignment.formula) {
         detailParts.push(`수식: ${assignment.formula}`);
@@ -304,15 +314,16 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       if (assignment.description) {
         detailParts.push(assignment.description);
       }
-      return {
+      accumulator[typeKey].push({
         id: assignment.id,
         use: '●',
-        discipline: assignment.standard_item?.type ?? '—',
+        discipline: typeKey,
         item: assignment.standard_item?.name ?? 'Unnamed',
         detail: detailParts.length ? detailParts.join(' · ') : '—',
         unit: 'EA',
-      };
+      });
     });
+    return accumulator;
   }, [familyAssignments]);
 
   const renderAssignmentCard = (title, typeKey) => {
@@ -354,6 +365,70 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             ))}
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderWorkMasterColumn = (typeKey, title) => {
+    const rows = assignmentRowsByType[typeKey] ?? [];
+    const emptyMessage = selectedFamily
+      ? `${typeKey} 패밀리에 할당된 Work Master가 없습니다.`
+      : '패밀리를 선택하면 목록이 여기에 표시됩니다.';
+    return (
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          padding: 12,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          background: '#fff',
+        }}
+      >
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{title}</div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '60px 1fr 100px 80px 40px',
+            fontSize: 11,
+            color: '#475467',
+          }}
+        >
+          {WORK_MASTER_COLUMNS.map((col) => (
+            <span key={`${typeKey}-${col}`} style={{ fontWeight: 600 }}>{col}</span>
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+          {assignmentsLoading ? (
+            <div style={{ fontSize: 12, color: '#475467' }}>할당된 항목을 불러오는 중입니다...</div>
+          ) : assignmentsError ? (
+            <div style={{ fontSize: 12, color: '#dc2626' }}>{assignmentsError}</div>
+          ) : !rows.length ? (
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>{emptyMessage}</div>
+          ) : (
+            rows.map((row) => (
+              <div
+                key={row.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '60px 1fr 100px 80px 40px',
+                  fontSize: 10,
+                  borderBottom: '1px solid #e5e7eb',
+                  padding: '4px 0',
+                }}
+              >
+                <span>{row.use}</span>
+                <span>{row.discipline}</span>
+                <span>{row.item}</span>
+                <span>{row.detail}</span>
+                <span>{row.unit}</span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     );
   };
@@ -773,7 +848,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
 
       <div
         style={{
-          flex: '0 0 360px',
+          flex: '0 0 720px',
           background: '#fff',
           borderRadius: 16,
           padding: 16,
@@ -794,41 +869,15 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         >
           Work Master 메뉴
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 80px 40px', fontSize: 11, color: '#475467' }}>
-          {WORK_MASTER_COLUMNS.map((col) => (
-            <span key={col} style={{ fontWeight: 600 }}>{col}</span>
-          ))}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
-          {assignmentsLoading ? (
-            <div style={{ fontSize: 12, color: '#475467' }}>할당된 항목을 불러오는 중입니다...</div>
-          ) : assignmentsError ? (
-            <div style={{ fontSize: 12, color: '#dc2626' }}>{assignmentsError}</div>
-          ) : !assignmentTableRows.length ? (
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>
-              {selectedFamily
-                ? '이 패밀리에 할당된 Work Master가 없습니다.'
-                : '패밀리를 선택하면 할당된 Work Master가 여기에 표시됩니다.'}
-            </div>
-          ) : (
-            assignmentTableRows.map((row) => (
-              <div
-                key={row.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '60px 1fr 100px 80px 40px',
-                  padding: '4px 0',
-                  borderBottom: '1px solid #e5e7eb',
-                }}
-              >
-                <span style={{ fontSize: 10 }}>{row.use}</span>
-                <span style={{ fontSize: 10 }}>{row.discipline}</span>
-                <span style={{ fontSize: 10 }}>{row.item}</span>
-                <span style={{ fontSize: 10 }}>{row.detail}</span>
-                <span style={{ fontSize: 10 }}>{row.unit}</span>
-              </div>
-            ))
-          )}
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            minHeight: 360,
+          }}
+        >
+          {renderWorkMasterColumn('GWM', 'GWM')}
+          {renderWorkMasterColumn('SWM', 'SWM')}
         </div>
         <div
           style={{

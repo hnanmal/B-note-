@@ -42,6 +42,7 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const listContainerRef = React.useRef(null);
 
   useEffect(() => {
     if (!apiBaseUrl) return;
@@ -84,6 +85,10 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
 
   const tree = useMemo(() => buildTree(filteredItems), [filteredItems]);
   const flattened = useMemo(() => flattenTree(tree), [tree]);
+  const selectedIndex = useMemo(
+    () => flattened.findIndex((node) => node.id === selectedFamilyId),
+    [flattened, selectedFamilyId]
+  );
 
   return (
     <div
@@ -97,6 +102,8 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
         flexDirection: 'column',
         gap: 12,
         minHeight: 0,
+        maxHeight: 'calc(100vh - 48px)',
+        overflow: 'hidden',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -135,6 +142,18 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
         </button>
       </div>
       <div
+        ref={listContainerRef}
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (!flattened.length || !onFamilySelect) return;
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+          event.preventDefault();
+          const direction = event.key === 'ArrowDown' ? 1 : -1;
+          const currentIndex = selectedIndex === -1 ? (direction === 1 ? -1 : 0) : selectedIndex;
+          const nextIndex = Math.max(0, Math.min(flattened.length - 1, currentIndex + direction));
+          const nextNode = flattened[nextIndex];
+          if (nextNode) onFamilySelect(nextNode);
+        }}
         style={{
           flex: 1,
           minHeight: 0,
