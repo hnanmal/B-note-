@@ -30,6 +30,13 @@ EXTRA_TABLE_STATEMENTS = [
         occurred_at TEXT NOT NULL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS building_list (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )
+    """,
 ]
 
 

@@ -24,6 +24,7 @@ def get_project_db_session(project_identifier: str):
         db_path = project_db.resolve_project_db_path(project_identifier)
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    project_db.ensure_extra_tables(db_path)
     project_engine = create_engine(
         f"sqlite:///{db_path.as_posix()}",
         connect_args={"check_same_thread": False},
@@ -445,6 +446,53 @@ def create_project_standard_item(
     db: Session = Depends(get_project_db_session),
 ):
     return crud.create_standard_item(db=db, standard_item=item)
+
+
+@router.get(
+    "/project/{project_identifier}/building-list/",
+    response_model=List[schemas.BuildingItem],
+    tags=["Project Data"],
+)
+def read_project_buildings(
+    project_identifier: str,
+    db: Session = Depends(get_project_db_session),
+):
+    return crud.list_buildings(db)
+
+
+@router.post(
+    "/project/{project_identifier}/building-list/",
+    response_model=schemas.BuildingItem,
+    tags=["Project Data"],
+)
+def create_project_building(
+    project_identifier: str,
+    building: schemas.BuildingCreate,
+    db: Session = Depends(get_project_db_session),
+):
+    existing = (
+        db.query(models.BuildingList)
+        .filter(models.BuildingList.name == building.name)
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="Building already exists")
+    return crud.create_building(db=db, building=building)
+
+
+@router.delete(
+    "/project/{project_identifier}/building-list/{building_id}",
+    tags=["Project Data"],
+)
+def delete_project_building(
+    project_identifier: str,
+    building_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    deleted = crud.delete_building(db=db, building_id=building_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Building not found")
+    return {"message": "deleted", "building_id": building_id}
 
 
 # Get single standard item

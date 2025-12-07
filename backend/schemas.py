@@ -289,6 +289,21 @@ class CommonInputItem(CommonInputBase):
     created_at: datetime.datetime
 
 
+class BuildingBase(BaseModel):
+    name: str
+
+
+class BuildingCreate(BuildingBase):
+    pass
+
+
+class BuildingItem(BuildingBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_at: datetime.datetime
+
+
 # Update forward references to resolve circular dependencies
 StandardItem.model_rebuild()
 Project.model_rebuild()

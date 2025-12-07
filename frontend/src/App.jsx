@@ -7,6 +7,8 @@ import StandardTreeManager from './components/StandardTreeManager';
 import ProjectPage from './components/ProjectPage';
 import CommonInputPage from './components/CommonInputPage';
 import TeamStandardFamilyList from './components/TeamStandardFamilyList';
+import ProjectInputMain from './components/ProjectInputMain';
+import ProjectFamilyAssign from './components/ProjectFamilyAssign';
 
 const NAV_ITEMS = [
   { id: 'workmaster', label: '워크마스터 매니저', icon: '🧰' },
@@ -66,6 +68,14 @@ function App() {
   const calcAriaLabel = calcButtonLabel;
   const familyAriaLabel = familyButtonLabel;
   const standardGroupLabel = isProjectEditorRoute ? 'Project Standard' : 'Team Standard';
+  const headerTitle = isProjectEditorRoute && projectRouteIdentifier
+    ? `B-note+ · ${projectRouteIdentifier}`
+    : 'B-note+';
+  const projectInputPages = {
+    'project-input-main': 'Project Input Main',
+    'project-input-family': 'Project Family Assign',
+    'project-input-interior': 'Project Interior Matrix',
+  };
   const fetchCalcDictionaryIndex = useCallback(async () => {
     setCalcDictionaryLoading(true);
     setCalcDictionaryError(null);
@@ -191,7 +201,7 @@ function App() {
   return (
     <div className="App" style={{ height: 'calc(100vh - 1.5rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
       <header className="App-header-fixed" style={headerStyle}>
-        <div className="app-title">B-note+</div>
+        <div className="app-title">{headerTitle}</div>
       </header>
   <div style={{ height: 32 }} />
       <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100% - 64px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
@@ -330,10 +340,70 @@ function App() {
                 </button>
               </div>
               {isProjectEditorRoute && (
-                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', ...groupLabelStyle }}>
-                  <span>Project Input &gt;</span>
-                  <span style={{ color: '#999', fontSize: 9 }}>coming soon</span>
-                </div>
+                <>
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', ...groupLabelStyle }}>
+                    <span>Project Input &gt;</span>
+                  </div>
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => setActivePage('project-input-main')}
+                      className={`nav-btn${activePage === 'project-input-main' ? ' active' : ''}`}
+                      style={{
+                        width: '100%',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        padding: '6px 0',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        border: 'none',
+                        background: activePage === 'project-input-main' ? '#f7c748' : '#f1f1f1',
+                        color: activePage === 'project-input-main' ? '#2c1b00' : '#1d4ed8',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Project Input Main
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActivePage('project-input-family')}
+                      className={`nav-btn${activePage === 'project-input-family' ? ' active' : ''}`}
+                      style={{
+                        width: '100%',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        padding: '6px 0',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        border: 'none',
+                        background: activePage === 'project-input-family' ? '#f7c748' : '#f1f1f1',
+                        color: activePage === 'project-input-family' ? '#2c1b00' : '#1d4ed8',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Project Family Assign
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActivePage('project-input-interior')}
+                      className={`nav-btn${activePage === 'project-input-interior' ? ' active' : ''}`}
+                      style={{
+                        width: '100%',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        padding: '6px 0',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        border: 'none',
+                        background: activePage === 'project-input-interior' ? '#f7c748' : '#f1f1f1',
+                        color: activePage === 'project-input-interior' ? '#2c1b00' : '#1d4ed8',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Project Interior Matrix
+                    </button>
+                  </div>
+                </>
               )}
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 <div style={{ ...groupLabelStyle, fontWeight: 600 }}>Project User &gt;</div>
@@ -739,6 +809,28 @@ function App() {
               </div>
             </div>
           </div>
+        ) : projectInputPages[activePage] ? (
+          activePage === 'project-input-main' ? (
+            <div className="panel project-input" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+              <ProjectInputMain apiBaseUrl={projectApiBase} />
+            </div>
+          ) : activePage === 'project-input-family' ? (
+            <div className="panel project-input" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+              <ProjectFamilyAssign apiBaseUrl={projectApiBase} />
+            </div>
+          ) : (
+            <div className="panel project-input" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+              <div style={{ background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 10px 30px rgba(15,23,42,0.08)', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }}>
+                <h2 style={{ margin: 0, fontSize: 18 }}>{projectInputPages[activePage]}</h2>
+                <p style={{ margin: 0, fontSize: 13, color: '#475467' }}>
+                  작업이 준비 중입니다.
+                </p>
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  세부 구현 전단계이며, 수정 요청 시 이 탭을 기반으로 추가 작업을 진행합니다.
+                </div>
+              </div>
+            </div>
+          )
         ) : activePage === 'project' ? (
           <div className="panel project" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
             <ProjectPage />

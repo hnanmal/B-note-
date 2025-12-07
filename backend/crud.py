@@ -358,6 +358,27 @@ def get_standard_item(db: Session, standard_item_id: int):
     )
 
 
+def list_buildings(db: Session):
+    return db.query(models.BuildingList).order_by(models.BuildingList.name).all()
+
+
+def create_building(db: Session, building: schemas.BuildingCreate):
+    db_building = models.BuildingList(**building.dict())
+    db.add(db_building)
+    db.commit()
+    db.refresh(db_building)
+    return db_building
+
+
+def delete_building(db: Session, building_id: int):
+    building = db.query(models.BuildingList).filter(models.BuildingList.id == building_id).first()
+    if not building:
+        return None
+    db.delete(building)
+    db.commit()
+    return building
+
+
 def _collect_standard_item_tree_ids(db: Session, roots: List[int]):
     collected: set[int] = set()
     stack = [int(r) for r in roots if r is not None]

@@ -45,6 +45,15 @@ class Project(Base):
     # buildings = relationship("Building", back_populates="project", cascade="all, delete-orphan")
 
 
+# Building list for project-specific data
+class BuildingList(Base):
+    __tablename__ = "building_list"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
 # 여기에 Building 등 다른 모델들을 계속해서 추가해나갈 예정입니다.
 
 
