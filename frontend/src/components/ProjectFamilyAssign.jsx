@@ -300,6 +300,13 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       id: `cart-${Date.now()}`,
       revitTypes: currentSelectedRevitTypes,
       assignmentIds: [...selectedAssignmentIds],
+      standardItemIds: Array.from(
+        new Set(
+          selectedAssignmentIds
+            .map((assignmentId) => assignmentRowMap.get(assignmentId)?.standardItemId)
+            .filter(Boolean)
+        )
+      ),
       createdAt: new Date().toISOString(),
     };
     setSavedCartEntries((prev) => [newEntry, ...prev]);
@@ -528,6 +535,18 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       SWM: buildRows(assignmentGroups.SWM),
     };
   }, [assignmentGroups]);
+
+  const assignmentRowMap = useMemo(() => {
+    const map = new Map();
+    Object.values(assignmentRowsByType).forEach((rows) => {
+      rows.forEach((row) => {
+        if (row?.id != null) {
+          map.set(row.id, row);
+        }
+      });
+    });
+    return map;
+  }, [assignmentRowsByType]);
 
   const renderAssignmentCard = (title, typeKey) => {
     const assignments = assignmentGroups[typeKey];
