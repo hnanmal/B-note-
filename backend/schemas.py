@@ -92,6 +92,11 @@ class StandardItem(StandardItemBase):
     parent: Optional[_StandardItemWithoutRelations] = None
     children: List[_StandardItemWithoutRelations] = []
     work_masters: List[WorkMaster] = []
+    selected_work_master_id: Optional[int] = None
+
+
+class StandardItemWorkMasterSelectionRequest(BaseModel):
+    work_master_id: Optional[int] = None
 
 
 class _FamilyListWithoutRelations(BaseModel):

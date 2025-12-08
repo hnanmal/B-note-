@@ -122,7 +122,9 @@ def get_standard_items(
     search: str = None,
     parent_id: int = None,
 ):
-    query = db.query(models.StandardItem)
+    query = db.query(models.StandardItem).options(
+        joinedload(models.StandardItem.selected_work_master_assoc)
+    )
 
     if search:
         search_term = f"%{search}%"
@@ -141,7 +143,17 @@ def get_standard_items(
     if limit is not None:
         query = query.limit(limit)
 
-    return query.all()
+    items = query.all()
+    for item in items:
+        _attach_standard_item_selection(item)
+    return items
+
+def _attach_standard_item_selection(item: Optional[models.StandardItem]):
+    if not item:
+        return item
+    assoc = getattr(item, 'selected_work_master_assoc', None)
+    item.selected_work_master_id = assoc.work_master_id if assoc else None
+    return item
 
 
 def create_standard_item(db: Session, standard_item: schemas.StandardItemCreate):
@@ -386,11 +398,46 @@ def delete_calc_dictionary_entry(db: Session, entry_id: int):
 
 
 def get_standard_item(db: Session, standard_item_id: int):
-    return (
+    item = (
         db.query(models.StandardItem)
+        .options(joinedload(models.StandardItem.selected_work_master_assoc))
         .filter(models.StandardItem.id == standard_item_id)
         .first()
     )
+    _attach_standard_item_selection(item)
+    return item
+
+
+def select_work_master_for_standard_item(
+    db: Session,
+    standard_item_id: int,
+    work_master_id: Optional[int],
+):
+    item = get_standard_item(db, standard_item_id)
+    if not item:
+        return None
+    selection = (
+        db.query(models.StandardItemWorkMasterSelect)
+        .filter(models.StandardItemWorkMasterSelect.standard_item_id == standard_item_id)
+        .first()
+    )
+    if work_master_id is None:
+        if selection:
+            db.delete(selection)
+            db.commit()
+        return None
+    if selection:
+        selection.work_master_id = work_master_id
+        db.add(selection)
+    else:
+        selection = models.StandardItemWorkMasterSelect(
+            standard_item_id=standard_item_id,
+            work_master_id=work_master_id,
+        )
+        db.add(selection)
+    db.commit()
+    db.refresh(selection)
+    return selection
 
 
 def list_buildings(db: Session):

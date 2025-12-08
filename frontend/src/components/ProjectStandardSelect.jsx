@@ -6,6 +6,9 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [dbWorkMasters, setDbWorkMasters] = useState([]);
   const [dbWorkMastersLoading, setDbWorkMastersLoading] = useState(false);
   const [dbWorkMastersError, setDbWorkMastersError] = useState(null);
+  const [selectedWorkMasterId, setSelectedWorkMasterId] = useState(null);
+  const [selectionLoading, setSelectionLoading] = useState(false);
+  const [selectionError, setSelectionError] = useState(null);
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
   const hasSelection = Boolean(selectedGwmNode);
@@ -14,12 +17,14 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     if (!selectedGwmId) {
       setDbWorkMasters([]);
       setDbWorkMastersError(null);
+      setSelectedWorkMasterId(null);
       setDbWorkMastersLoading(false);
       return undefined;
     }
     let cancelled = false;
     setDbWorkMastersLoading(true);
     setDbWorkMastersError(null);
+    setSelectionError(null);
     fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}`)
       .then((res) => {
         if (!res.ok) {
@@ -31,6 +36,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         if (cancelled) return;
         setDbWorkMasters(Array.isArray(data?.work_masters) ? data.work_masters : []);
         setSelectedGwmNode((prev) => ({ ...(prev ?? {}), ...data }));
+        setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
       })
       .catch((error) => {
         if (cancelled) return;
@@ -61,6 +67,32 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       .join(' | ');
   };
 
+  const handleWorkMasterToggle = async (workMasterId) => {
+    if (!selectedGwmId) return;
+    const nextId = selectedWorkMasterId === workMasterId ? null : workMasterId;
+    setSelectionLoading(true);
+    setSelectionError(null);
+    try {
+      const response = await fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ work_master_id: nextId }),
+      });
+      if (!response.ok) {
+        throw new Error('선택 저장에 실패했습니다.');
+      }
+      const payload = await response.json();
+      setSelectedWorkMasterId(payload?.selected_work_master_id ?? null);
+      setSelectedGwmNode((prev) => ({ ...(prev ?? {}), selected_work_master_id: payload?.selected_work_master_id ?? null }));
+    } catch (error) {
+      setSelectionError(
+        error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
+      );
+    } finally {
+      setSelectionLoading(false);
+    }
+  };
+
   const renderWorkMasterDetail = (workMaster) => {
     const headline =
       workMaster.cat_large_desc || workMaster.cat_mid_desc || workMaster.cat_small_desc ||
@@ -79,20 +111,34 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       .filter(Boolean)
       .join(' / ');
 
+    const isSelected = selectedWorkMasterId === workMaster.id;
+    const handleToggle = () => handleWorkMasterToggle(workMaster.id);
+
     return (
-      <div
+      <label
         key={workMaster.id}
         style={{
           borderRadius: 10,
-          background: '#fff',
-          border: '1px solid #e5e7eb',
+          background: isSelected ? '#f5f3ff' : '#fff',
+          border: `1px solid ${isSelected ? '#7c3aed' : '#e5e7eb'}`,
           padding: 12,
           display: 'flex',
           flexDirection: 'column',
           gap: 6,
+          cursor: selectionLoading ? 'not-allowed' : 'pointer',
+          transition: 'border 0.2s ease',
         }}
       >
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{headline}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={handleToggle}
+            disabled={selectionLoading}
+            style={{ width: 18, height: 18 }}
+          />
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{headline}</div>
+        </div>
         {categoryLabel && <div style={{ fontSize: 12, color: '#475467' }}>{categoryLabel}</div>}
         {codeTags && <div style={{ fontSize: 11, color: '#7c3aed' }}>{codeTags}</div>}
         {attrSummary && <div style={{ fontSize: 12, color: '#374151' }}>{attrSummary}</div>}
@@ -111,7 +157,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           <span>Group: {workMaster.work_group_code ?? '—'}</span>
           <span>구분: {workMaster.new_old_code ?? '—'}</span>
         </div>
-      </div>
+      </label>
     );
   };
 
@@ -135,6 +181,12 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           {dbWorkMasters.length ? `${dbWorkMasters.length}개 항목` : '항목 없음'}
         </div>
       </div>
+      {selectionLoading && (
+        <div style={{ fontSize: 11, color: '#475467' }}>선택 저장 중입니다...</div>
+      )}
+      {selectionError && (
+        <div style={{ fontSize: 12, color: '#b91c1c' }}>{selectionError}</div>
+      )}
       <div
         style={{
           display: 'flex',
@@ -188,8 +240,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           flex: 1,
           minHeight: 0,
           display: 'grid',
-          gridTemplateColumns: '3fr 1.2fr',
-          gap: 16,
+          gridTemplateColumns: '2.7fr 1.8fr',
+          gap: 24,
         }}
       >
         <div
@@ -225,6 +277,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             display: 'flex',
             flexDirection: 'column',
             gap: 12,
+            minWidth: 360,
           }}
         >
           <div

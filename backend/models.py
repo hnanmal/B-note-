@@ -93,6 +93,11 @@ class WorkMaster(Base):
         back_populates="work_masters",
     )
 
+    selected_in_standard_items = relationship(
+        "StandardItemWorkMasterSelect",
+        back_populates="work_master",
+    )
+
 
 # Association Table for StandardItem and WorkMaster
 standard_item_work_master_association = Table(
@@ -127,6 +132,26 @@ class StandardItem(Base):
         secondary=standard_item_work_master_association,
         back_populates="standard_items",
     )
+
+    selected_work_master_assoc = relationship(
+        "StandardItemWorkMasterSelect",
+        uselist=False,
+        back_populates="standard_item",
+        cascade="all, delete-orphan",
+    )
+
+
+class StandardItemWorkMasterSelect(Base):
+    __tablename__ = "standard_item_work_master_select"
+
+    id = Column(Integer, primary_key=True, index=True)
+    standard_item_id = Column(Integer, ForeignKey("standard_items.id"), nullable=False, unique=True)
+    work_master_id = Column(Integer, ForeignKey("work_masters.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+
+    standard_item = relationship("StandardItem", back_populates="selected_work_master_assoc")
+    work_master = relationship("WorkMaster", back_populates="selected_in_standard_items")
 
 
 class CommonInput(Base):

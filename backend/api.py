@@ -318,6 +318,24 @@ def remove_work_master(
     return {"message": "removed", "standard_item_id": std.id}
 
 
+@router.post(
+    "/standard-items/{standard_item_id}/select",
+    tags=["Standard Items"],
+)
+def select_standard_item_work_master(
+    standard_item_id: int,
+    selection: schemas.StandardItemWorkMasterSelectionRequest,
+    db: Session = Depends(get_db),
+):
+    std = crud.get_standard_item(db, standard_item_id)
+    if not std:
+        raise HTTPException(status_code=404, detail="StandardItem not found")
+    result = crud.select_work_master_for_standard_item(
+        db, standard_item_id=standard_item_id, work_master_id=selection.work_master_id
+    )
+    return {"selected_work_master_id": result.work_master_id if result else None}
+
+
 # Create standard item
 @router.post(
     "/standard-items/", response_model=schemas.StandardItem, tags=["Standard Items"]
@@ -400,6 +418,25 @@ def remove_project_work_master(
             status_code=404, detail="StandardItem or WorkMaster not found"
         )
     return {"message": "removed", "standard_item_id": std.id}
+
+
+@router.post(
+    "/project/{project_identifier}/standard-items/{standard_item_id}/select",
+    tags=["Project Data"],
+)
+def select_project_standard_item_work_master(
+    project_identifier: str,
+    standard_item_id: int,
+    selection: schemas.StandardItemWorkMasterSelectionRequest,
+    db: Session = Depends(get_project_db_session),
+):
+    std = crud.get_standard_item(db, standard_item_id)
+    if not std:
+        raise HTTPException(status_code=404, detail="StandardItem not found")
+    result = crud.select_work_master_for_standard_item(
+        db, standard_item_id=standard_item_id, work_master_id=selection.work_master_id
+    )
+    return {"selected_work_master_id": result.work_master_id if result else None}
 
 
 @router.delete(
