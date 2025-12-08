@@ -23,6 +23,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [familyAssignments, setFamilyAssignments] = useState([]);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [assignmentsError, setAssignmentsError] = useState(null);
+  const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
 
   useEffect(() => {
     if (!apiBaseUrl) return;
@@ -211,6 +212,15 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       setSelectedRevitIndexes([next]);
       setSelectionAnchor(next);
       return next;
+    });
+  };
+
+  const handleAssignmentCheckboxToggle = (assignmentId) => {
+    setSelectedAssignmentIds((prev) => {
+      if (prev.includes(assignmentId)) {
+        return prev.filter((id) => id !== assignmentId);
+      }
+      return [...prev, assignmentId];
     });
   };
 
@@ -520,51 +530,70 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           ) : !rows.length ? (
             <div style={{ fontSize: 12, color: '#94a3b8' }}>{emptyMessage}</div>
           ) : (
-              rows.map((row) => {
-                const depth = row.depth ?? 0;
-                const isParentLabel = Boolean(row.hasChildren);
-                if (isParentLabel) {
-                  return (
-                    <div
-                      key={`label-${row.id}`}
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: '6px 0',
-                        borderBottom: '1px solid #e5e7eb',
-                        background: '#f1f5f9',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingLeft: depth * 8,
-                      }}
-                    >
-                      <span style={{ flex: 1 }}>{row.item}</span>
-                      <span style={{ fontSize: 10, color: '#475467' }}>{row.discipline}</span>
-                    </div>
-                  );
-                }
+            rows.map((row) => {
+              const depth = row.depth ?? 0;
+              const isParentLabel = Boolean(row.hasChildren);
+              if (isParentLabel) {
                 return (
                   <div
-                    key={row.id}
+                    key={`label-${row.id}`}
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: '60px 1fr 100px 80px 40px',
-                      fontSize: 10,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '6px 0',
                       borderBottom: '1px solid #e5e7eb',
-                      padding: '4px 0',
+                      background: '#f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingLeft: depth * 8,
                     }}
                   >
-                    <span>{row.use}</span>
-                    <span>{row.discipline}</span>
-                    <span style={{ paddingLeft: depth > 0 ? depth * 10 : 0, fontWeight: depth === 0 ? 600 : 400 }}>
-                      {row.item}
-                    </span>
-                    <span>{row.detail}</span>
-                    <span>{row.unit}</span>
+                    <span style={{ flex: 1 }}>{row.item}</span>
+                    <span style={{ fontSize: 10, color: '#475467' }}>{row.discipline}</span>
                   </div>
                 );
-              })
+              }
+              const isSelected = selectedAssignmentIds.includes(row.id);
+              return (
+                <div
+                  key={row.id}
+                  onClick={() => handleAssignmentCheckboxToggle(row.id)}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '60px 1fr 100px 80px 40px',
+                    fontSize: 10,
+                    borderBottom: '1px solid #e5e7eb',
+                    padding: '4px 0',
+                    background: isSelected ? '#e0f2fe' : '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleAssignmentCheckboxToggle(row.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      aria-label={`Use ${row.item}`}
+                      style={{ width: 16, height: 16 }}
+                    />
+                  </span>
+                  <span>{row.discipline}</span>
+                  <span style={{ paddingLeft: depth > 0 ? depth * 10 : 0, fontWeight: depth === 0 ? 600 : 400 }}>
+                    {row.item}
+                  </span>
+                  <span>{row.detail}</span>
+                  <span>{row.unit}</span>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
