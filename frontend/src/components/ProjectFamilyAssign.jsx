@@ -25,6 +25,23 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [assignmentsError, setAssignmentsError] = useState(null);
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
 
+  const collectSubtreeAssignmentIds = (node, includeSelf = true) => {
+    const ids = [];
+    const initialChildren = Array.isArray(node?.children) ? node.children : [];
+    const stack = includeSelf ? [node] : [...initialChildren];
+    while (stack.length) {
+      const current = stack.pop();
+      if (!current) continue;
+      if (current.id != null) {
+        ids.push(current.id);
+      }
+      if (Array.isArray(current.children)) {
+        current.children.forEach((child) => stack.push(child));
+      }
+    }
+    return ids;
+  };
+
   useEffect(() => {
     if (!apiBaseUrl) return;
     let cancelled = false;
@@ -221,6 +238,24 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         return prev.filter((id) => id !== assignmentId);
       }
       return [...prev, assignmentId];
+    });
+  };
+
+  const handleParentLabelCheckboxToggle = (row) => {
+    const uniqueIds = Array.from(new Set(collectSubtreeAssignmentIds(row, false)));
+    if (!uniqueIds.length) return;
+    setSelectedAssignmentIds((prev) => {
+      const allSelected = uniqueIds.every((id) => prev.includes(id));
+      if (allSelected) {
+        return prev.filter((id) => !uniqueIds.includes(id));
+      }
+      const next = [...prev];
+      uniqueIds.forEach((id) => {
+        if (!next.includes(id)) {
+          next.push(id);
+        }
+      });
+      return next;
     });
   };
 
@@ -534,23 +569,60 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
               const depth = row.depth ?? 0;
               const isParentLabel = Boolean(row.hasChildren);
               if (isParentLabel) {
+                const showLabelCheckbox = typeKey === 'GWM';
+                const labelIds = showLabelCheckbox
+                  ? Array.from(new Set(collectSubtreeAssignmentIds(row, false)))
+                  : [];
+                const allLabelSelected = showLabelCheckbox && labelIds.length
+                  ? labelIds.every((id) => selectedAssignmentIds.includes(id))
+                  : false;
                 return (
                   <div
                     key={`label-${row.id}`}
+                    onClick={showLabelCheckbox ? () => handleParentLabelCheckboxToggle(row) : undefined}
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
                       padding: '6px 0',
                       borderBottom: '1px solid #e5e7eb',
                       background: '#f1f5f9',
-                      display: 'flex',
+                      display: 'grid',
+                      gridTemplateColumns: '60px 1fr 100px 80px 40px',
                       alignItems: 'center',
-                      gap: 6,
-                      paddingLeft: depth * 8,
+                      paddingLeft: 0,
+                      cursor: showLabelCheckbox ? 'pointer' : 'default',
                     }}
                   >
-                    <span style={{ flex: 1 }}>{row.item}</span>
+                    <span
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {showLabelCheckbox && (
+                        <input
+                          type="checkbox"
+                          checked={allLabelSelected}
+                          onChange={() => handleParentLabelCheckboxToggle(row)}
+                          onClick={(event) => event.stopPropagation()}
+                          aria-label={`Use ${row.item} group`}
+                          style={{ width: 16, height: 16 }}
+                        />
+                      )}
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        gridColumn: '2 / span 1',
+                        paddingLeft: depth * 10,
+                      }}
+                    >
+                      {row.item}
+                    </span>
                     <span style={{ fontSize: 10, color: '#475467' }}>{row.discipline}</span>
+                    <span />
+                    <span />
                   </div>
                 );
               }
