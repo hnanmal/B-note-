@@ -1,42 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import StandardTreeManager from './StandardTreeManager';
-import { formatCartTimestamp, readWorkMasterCartEntries } from '../utils/workMasterCart';
 
 export default function ProjectStandardSelect({ apiBaseUrl }) {
-  const [savedCartEntries, setSavedCartEntries] = useState(() => readWorkMasterCartEntries());
   const [selectedGwmNode, setSelectedGwmNode] = useState(null);
-  const [selectedCartId, setSelectedCartId] = useState(null);
   const [dbWorkMasters, setDbWorkMasters] = useState([]);
   const [dbWorkMastersLoading, setDbWorkMastersLoading] = useState(false);
   const [dbWorkMastersError, setDbWorkMastersError] = useState(null);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const refresh = () => setSavedCartEntries(readWorkMasterCartEntries());
-    window.addEventListener('workmaster-cart-changed', refresh);
-    return () => window.removeEventListener('workmaster-cart-changed', refresh);
-  }, []);
-
   const selectedGwmId = selectedGwmNode?.id ?? null;
-  const matchedEntries = useMemo(() => {
-    if (!selectedGwmId) return [];
-    return savedCartEntries.filter((entry) => {
-      if (Array.isArray(entry.standardItemIds) && entry.standardItemIds.includes(selectedGwmId)) {
-        return true;
-      }
-      return Array.isArray(entry.assignmentIds) && entry.assignmentIds.includes(selectedGwmId);
-    });
-  }, [savedCartEntries, selectedGwmId]);
-
   const hasSelection = Boolean(selectedGwmNode);
-  const selectedRevitLabel = Array.isArray(selectedGwmNode?.revitTypes) &&
-    selectedGwmNode.revitTypes.length
-    ? selectedGwmNode.revitTypes.join(', ')
-    : '항목';
-
-  useEffect(() => {
-    setSelectedCartId(null);
-  }, [selectedGwmId]);
 
   useEffect(() => {
     if (!selectedGwmId) {
@@ -76,47 +48,74 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     };
   }, [apiBaseUrl, selectedGwmId]);
 
-  const renderEntry = (entry, highlighted) => {
-    const revitLabel = Array.isArray(entry.revitTypes) && entry.revitTypes.length
-      ? entry.revitTypes.join(', ')
-      : '선택된 Revit 타입';
-    const assignmentCount = Array.isArray(entry.assignmentIds) ? entry.assignmentIds.length : 0;
-    const isChecked = selectedCartId === entry.id;
-    const handleToggle = () => setSelectedCartId((prev) => (prev === entry.id ? null : entry.id));
+  const buildAttributeSummary = (workMaster) => {
+    return [
+      workMaster.attr1_spec,
+      workMaster.attr2_spec,
+      workMaster.attr3_spec,
+      workMaster.attr4_spec,
+      workMaster.attr5_spec,
+      workMaster.attr6_spec,
+    ]
+      .filter(Boolean)
+      .join(' | ');
+  };
+
+  const renderWorkMasterDetail = (workMaster) => {
+    const headline =
+      workMaster.cat_large_desc || workMaster.cat_mid_desc || workMaster.cat_small_desc ||
+      `Work Master ${workMaster.id}`;
+    const categoryLabel = [workMaster.cat_mid_desc, workMaster.cat_small_desc]
+      .filter(Boolean)
+      .join(' / ');
+    const attrSummary = buildAttributeSummary(workMaster);
+    const uomLabel = [workMaster.uom1, workMaster.uom2].filter(Boolean).join(' / ');
+    const codeLine = workMaster.work_master_code ? `코드 ${workMaster.work_master_code}` : '코드 정보 없음';
+    const codeTags = [
+      workMaster.cat_large_code,
+      workMaster.cat_mid_code,
+      workMaster.cat_small_code,
+    ]
+      .filter(Boolean)
+      .join(' / ');
+
     return (
-      <label
-        key={entry.id}
+      <div
+        key={workMaster.id}
         style={{
           borderRadius: 10,
-          padding: '10px 12px',
-          border: `1px solid ${highlighted ? '#7c3aed' : '#e5e7eb'}`,
-          background: highlighted ? '#eef2ff' : '#fff',
-          boxShadow: highlighted ? '0 2px 6px rgba(79,70,229,0.18)' : '0 1px 4px rgba(15,23,42,0.08)',
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          padding: 12,
           display: 'flex',
           flexDirection: 'column',
-          gap: 4,
-          fontSize: 12,
-          color: '#0f172a',
-          cursor: 'pointer',
+          gap: 6,
         }}
       >
-        <input
-          type="checkbox"
-          checked={isChecked}
-          onChange={handleToggle}
-          style={{ alignSelf: 'flex-start' }}
-        />
-        <div style={{ fontWeight: 600 }}>{revitLabel}</div>
-        <div style={{ fontSize: 11, color: '#475467', display: 'flex', gap: 6 }}>
-          <span>{assignmentCount}개 Work Master 항목</span>
-          <span>·</span>
-          <span>저장 {formatCartTimestamp(entry.createdAt)}</span>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{headline}</div>
+        {categoryLabel && <div style={{ fontSize: 12, color: '#475467' }}>{categoryLabel}</div>}
+        {codeTags && <div style={{ fontSize: 11, color: '#7c3aed' }}>{codeTags}</div>}
+        {attrSummary && <div style={{ fontSize: 12, color: '#374151' }}>{attrSummary}</div>}
+        {uomLabel && <div style={{ fontSize: 12, color: '#374151' }}>UoM: {uomLabel}</div>}
+        <div style={{ fontSize: 13, color: '#9333ea', fontWeight: 600 }}>{codeLine}</div>
+        <div
+          style={{
+            fontSize: 11,
+            color: '#475467',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 10,
+          }}
+        >
+          <span>Discipline: {workMaster.discipline ?? '—'}</span>
+          <span>Group: {workMaster.work_group_code ?? '—'}</span>
+          <span>구분: {workMaster.new_old_code ?? '—'}</span>
         </div>
-      </label>
+      </div>
     );
   };
 
-  const renderDbWorkMastersSection = () => (
+  const renderWorkMasterDetailsSection = () => (
     <div
       style={{
         borderRadius: 12,
@@ -126,76 +125,34 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
+        minHeight: 0,
+        flex: 1,
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>DB Work Master</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minHeight: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>WorkMaster Matching</div>
+        <div style={{ fontSize: 11, color: '#475467' }}>
+          {dbWorkMasters.length ? `${dbWorkMasters.length}개 항목` : '항목 없음'}
+        </div>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          flex: 1,
+          overflowY: 'auto',
+        }}
+      >
         {dbWorkMastersLoading ? (
           <div style={{ fontSize: 12, color: '#475467' }}>Work Master 정보를 불러오는 중입니다...</div>
         ) : dbWorkMastersError ? (
           <div style={{ fontSize: 12, color: '#b91c1c' }}>{dbWorkMastersError}</div>
         ) : dbWorkMasters.length ? (
-          dbWorkMasters.map((wm) => (
-            <div
-              key={wm.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: 11,
-                color: '#0f172a',
-                padding: '4px 0',
-                borderBottom: '1px solid #e5e7eb',
-              }}
-            >
-              <span>ID {wm.id}</span>
-              <span>{wm.work_master_code ?? '—'}</span>
-            </div>
-          ))
+          dbWorkMasters.map((wm) => renderWorkMasterDetail(wm))
         ) : (
           <div style={{ fontSize: 12, color: '#94a3b8' }}>선택한 GWM에 할당된 Work Master가 없습니다.</div>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderSavedCartSection = () => (
-    <div
-      style={{
-        borderRadius: 12,
-        border: '1px solid #dae1f3',
-        background: '#f8fafc',
-        minHeight: 120,
-        maxHeight: 260,
-        overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-      }}
-    >
-      <div
-        style={{
-          borderRadius: '10px 10px 0 0',
-          background: '#7c3aed',
-          padding: '8px 12px',
-          color: '#fff',
-          fontSize: 12,
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-        }}
-      >
-        <span>
-          선택된 {selectedRevitLabel}을 위한
-        </span>
-        <span style={{ flex: 1 }} />
-        <span>Work Master 장바구니 👜</span>
-      </div>
-      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {matchedEntries.length ? (
-          matchedEntries.map((entry) => renderEntry(entry, true))
-        ) : (
-          <div style={{ fontSize: 12, color: '#94a3b8' }}>저장된 항목이 없습니다.</div>
         )}
       </div>
     </div>
@@ -280,7 +237,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
               alignItems: 'center',
             }}
           >
-            <span>WorkMaster Select</span>
+            <span>WorkMaster Matching</span>
             {hasSelection && (
               <span style={{ fontSize: 11, color: '#475467' }}>
                 선택된 GWM: {selectedGwmNode?.name ?? '—'} (ID: {selectedGwmNode?.id ?? '—'})
@@ -289,8 +246,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           </div>
           <div style={{ fontSize: 11, color: '#475467' }}>
             {hasSelection
-              ? '선택한 GWM에 할당된 Work Master 장바구니를 보여드립니다.'
-              : 'GWM 트리에서 항목을 선택하면 관련 Work Master 저장 항목이 나타납니다.'}
+              ? '선택한 GWM에 할당된 Work Master 상세 정보를 보여드립니다.'
+              : 'GWM 트리에서 항목을 선택하면 관련 Work Master 정보가 나타납니다.'}
           </div>
           <div
             style={{
@@ -302,17 +259,13 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
               minHeight: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: 10,
             }}
           >
             {hasSelection ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {renderDbWorkMastersSection()}
-                {renderSavedCartSection()}
-              </div>
+              renderWorkMasterDetailsSection()
             ) : (
               <div style={{ fontSize: 12, color: '#94a3b8' }}>
-                왼쪽 GWM 트리에서 항목을 선택하면 할당된 Work Master 항목이 이곳에 나타납니다.
+                왼쪽 GWM 트리에서 항목을 선택하면 Work Master 정보가 이곳에 나타납니다.
               </div>
             )}
           </div>
