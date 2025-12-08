@@ -167,6 +167,10 @@ def ensure_extra_tables(db_path: Path) -> None:
         cursor = conn.cursor()
         for stmt in EXTRA_TABLE_STATEMENTS:
             cursor.execute(stmt)
+        cursor.execute("PRAGMA table_info(work_masters)")
+        wm_columns = {row[1] for row in cursor.fetchall()}
+        if 'add_spec' not in wm_columns:
+            cursor.execute("ALTER TABLE work_masters ADD COLUMN add_spec TEXT")
         conn.commit()
     finally:
         conn.close()

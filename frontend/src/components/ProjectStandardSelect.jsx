@@ -9,22 +9,39 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [selectedWorkMasterId, setSelectedWorkMasterId] = useState(null);
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [selectionError, setSelectionError] = useState(null);
+  const [workMasterSpecs, setWorkMasterSpecs] = useState({});
+  const [workMasterSpecSaving, setWorkMasterSpecSaving] = useState({});
+  const [workMasterSpecErrors, setWorkMasterSpecErrors] = useState({});
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
   const hasSelection = Boolean(selectedGwmNode);
+
+  const buildSpecMapFromWorkMasters = (workMasters) => {
+    const map = {};
+    workMasters.forEach((wm) => {
+      if (!wm || typeof wm.id === 'undefined') return;
+      map[wm.id] = wm.add_spec ?? '';
+    });
+    return map;
+  };
 
   useEffect(() => {
     if (!selectedGwmId) {
       setDbWorkMasters([]);
       setDbWorkMastersError(null);
       setSelectedWorkMasterId(null);
+      setWorkMasterSpecs({});
+      setWorkMasterSpecErrors({});
+      setWorkMasterSpecSaving({});
       setDbWorkMastersLoading(false);
       return undefined;
     }
+
     let cancelled = false;
     setDbWorkMastersLoading(true);
     setDbWorkMastersError(null);
     setSelectionError(null);
+
     fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}`)
       .then((res) => {
         if (!res.ok) {
@@ -34,9 +51,11 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       })
       .then((data) => {
         if (cancelled) return;
-        setDbWorkMasters(Array.isArray(data?.work_masters) ? data.work_masters : []);
+        const workMasters = Array.isArray(data?.work_masters) ? data.work_masters : [];
         setSelectedGwmNode((prev) => ({ ...(prev ?? {}), ...data }));
         setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
+        setDbWorkMasters(workMasters);
+        setWorkMasterSpecs(buildSpecMapFromWorkMasters(workMasters));
       })
       .catch((error) => {
         if (cancelled) return;
@@ -49,6 +68,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           setDbWorkMastersLoading(false);
         }
       });
+
     return () => {
       cancelled = true;
     };
@@ -83,13 +103,54 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       }
       const payload = await response.json();
       setSelectedWorkMasterId(payload?.selected_work_master_id ?? null);
-      setSelectedGwmNode((prev) => ({ ...(prev ?? {}), selected_work_master_id: payload?.selected_work_master_id ?? null }));
+      setSelectedGwmNode((prev) => ({
+        ...(prev ?? {}),
+        selected_work_master_id: payload?.selected_work_master_id ?? null,
+      }));
     } catch (error) {
       setSelectionError(
         error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
       );
     } finally {
       setSelectionLoading(false);
+    }
+  };
+
+  const handleWorkMasterSpecChange = (workMasterId, value) => {
+    setWorkMasterSpecs((prev) => ({
+      ...prev,
+      [workMasterId]: value ?? '',
+    }));
+  };
+
+  const handleSaveWorkMasterSpec = async (workMasterId) => {
+    const specValue = workMasterSpecs[workMasterId] ?? '';
+    setWorkMasterSpecSaving((prev) => ({ ...prev, [workMasterId]: true }));
+    setWorkMasterSpecErrors((prev) => ({ ...prev, [workMasterId]: null }));
+    try {
+      const response = await fetch(`${apiBaseUrl}/work-masters/${workMasterId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ add_spec: specValue || null }),
+      });
+      if (!response.ok) {
+        throw new Error('Spec 저장에 실패했습니다.');
+      }
+      const updated = await response.json();
+      setDbWorkMasters((prev) =>
+        prev.map((wm) => (wm.id === workMasterId ? { ...wm, add_spec: updated.add_spec ?? '' } : wm))
+      );
+      setWorkMasterSpecs((prev) => ({
+        ...prev,
+        [workMasterId]: updated.add_spec ?? '',
+      }));
+    } catch (error) {
+      setWorkMasterSpecErrors((prev) => ({
+        ...prev,
+        [workMasterId]: error instanceof Error ? error.message : 'Spec 저장에 실패했습니다.',
+      }));
+    } finally {
+      setWorkMasterSpecSaving((prev) => ({ ...prev, [workMasterId]: false }));
     }
   };
 
@@ -111,6 +172,9 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       .filter(Boolean)
       .join(' / ');
 
+    const specValue = workMasterSpecs[workMaster.id] ?? workMaster.add_spec ?? '';
+    const isSpecSaving = Boolean(workMasterSpecSaving[workMaster.id]);
+    const specError = workMasterSpecErrors[workMaster.id];
     const isSelected = selectedWorkMasterId === workMaster.id;
     const handleToggle = () => handleWorkMasterToggle(workMaster.id);
 
@@ -157,6 +221,53 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           <span>Group: {workMaster.work_group_code ?? '—'}</span>
           <span>구분: {workMaster.new_old_code ?? '—'}</span>
         </div>
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div style={{ fontSize: 11, color: '#475467' }}>추가 Spec</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              value={specValue}
+              onChange={(e) => handleWorkMasterSpecChange(workMaster.id, e.target.value)}
+              disabled={selectionLoading || isSpecSaving}
+              placeholder="WorkMaster spec"
+              style={{
+                flex: 1,
+                padding: '6px 10px',
+                fontSize: 13,
+                borderRadius: 6,
+                border: '1px solid #cbd5f5',
+                background: '#fff',
+                minWidth: 0,
+              }}
+            />
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleSaveWorkMasterSpec(workMaster.id);
+              }}
+              disabled={selectionLoading || isSpecSaving}
+              style={{
+                padding: '6px 14px',
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 6,
+                border: 'none',
+                background: '#7c3aed',
+                color: '#fff',
+                cursor: selectionLoading || isSpecSaving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isSpecSaving ? '저장 중...' : '저장'}
+            </button>
+          </div>
+          {specError && (
+            <div style={{ fontSize: 11, color: '#b91c1c' }}>{specError}</div>
+          )}
+        </div>
       </label>
     );
   };
@@ -195,7 +306,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           minHeight: 0,
           flex: 1,
           overflowY: 'auto',
-          maxHeight: 500,
+          height: '100%',
         }}
       >
         {dbWorkMastersLoading ? (

@@ -171,6 +171,25 @@ async def upload_work_masters(
         )
 
 
+@router.patch(
+    "/work-masters/{work_master_id}",
+    response_model=schemas.WorkMaster,
+    tags=["Work Masters"],
+)
+def update_work_master(
+    work_master_id: int,
+    updates: schemas.WorkMasterUpdate,
+    db: Session = Depends(get_db),
+):
+    db_work_master = crud.get_work_master(db, work_master_id=work_master_id)
+    if not db_work_master:
+        raise HTTPException(status_code=404, detail="WorkMaster not found")
+    payload = updates.dict(exclude_unset=True)
+    if not payload:
+        return db_work_master
+    return crud.update_work_master_fields(db, db_work_master=db_work_master, updates=payload)
+
+
 @router.get(
     "/project/{project_identifier}/work-masters/",
     response_model=List[schemas.WorkMaster],
@@ -258,6 +277,26 @@ async def upload_project_work_masters(
         raise HTTPException(
             status_code=500, detail=f"An error occurred while processing the file: {e}"
         )
+
+
+@router.patch(
+    "/project/{project_identifier}/work-masters/{work_master_id}",
+    response_model=schemas.WorkMaster,
+    tags=["Project Data"],
+)
+def update_project_work_master(
+    project_identifier: str,
+    work_master_id: int,
+    updates: schemas.WorkMasterUpdate,
+    db: Session = Depends(get_project_db_session),
+):
+    db_work_master = crud.get_work_master(db, work_master_id=work_master_id)
+    if not db_work_master:
+        raise HTTPException(status_code=404, detail="WorkMaster not found")
+    payload = updates.dict(exclude_unset=True)
+    if not payload:
+        return db_work_master
+    return crud.update_work_master_fields(db, db_work_master=db_work_master, updates=payload)
 
 
 # ===================

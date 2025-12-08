@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from . import models, schemas
 from . import security
 
@@ -56,6 +56,22 @@ def get_work_master_by_work_master_code(db: Session, code: str):
         .filter(models.WorkMaster.work_master_code == code)
         .first()
     )
+
+def get_work_master(db: Session, work_master_id: int):
+    return db.query(models.WorkMaster).filter(models.WorkMaster.id == work_master_id).first()
+
+def update_work_master_fields(
+    db: Session,
+    db_work_master: models.WorkMaster,
+    updates: Dict[str, Any],
+):
+    for key, value in updates.items():
+        if hasattr(db_work_master, key):
+            setattr(db_work_master, key, value)
+    db.add(db_work_master)
+    db.commit()
+    db.refresh(db_work_master)
+    return db_work_master
 
 
 def create_work_master(db: Session, work_master: schemas.WorkMasterCreate):

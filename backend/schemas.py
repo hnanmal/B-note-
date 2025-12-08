@@ -52,10 +52,15 @@ class WorkMasterBase(BaseModel):
     work_group_code: Optional[str] = None
     work_master_code: str
     new_old_code: Optional[str] = None
+    add_spec: Optional[str] = None
 
 
 class WorkMasterCreate(WorkMasterBase):
     pass
+
+
+class WorkMasterUpdate(BaseModel):
+    add_spec: Optional[str] = None
 
 
 class WorkMaster(WorkMasterBase):

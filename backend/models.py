@@ -85,6 +85,7 @@ class WorkMaster(Base):
     work_group_code = Column(String)
     work_master_code = Column(String, unique=True, index=True)
     new_old_code = Column(String)
+    add_spec = Column(String)
 
     # Many-to-Many relationship with StandardItem
     standard_items = relationship(
