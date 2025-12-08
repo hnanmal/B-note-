@@ -195,7 +195,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           minHeight: 0,
           flex: 1,
           overflowY: 'auto',
-          maxHeight: 460,
+          maxHeight: 500,
         }}
       >
         {dbWorkMastersLoading ? (
@@ -241,7 +241,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           flex: 1,
           minHeight: 0,
           display: 'grid',
-          gridTemplateColumns: '2.7fr 1.8fr',
+          gridTemplateColumns: '2fr 2.3fr',
           gap: 24,
         }}
       >
