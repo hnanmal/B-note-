@@ -24,6 +24,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [assignmentsError, setAssignmentsError] = useState(null);
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
+  const [savedCartEntries, setSavedCartEntries] = useState([]);
+  const [cartStatusMessage, setCartStatusMessage] = useState('');
 
   const collectSubtreeAssignmentIds = (node, includeSelf = true) => {
     const ids = [];
@@ -197,6 +199,26 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     selectedRevitIndexes,
   ]);
 
+  const currentSelectedRevitTypes = useMemo(() => {
+    const names = selectedRevitIndexes.length
+      ? Array.from(new Set(
+          selectedRevitIndexes
+            .map((index) => displayedRevitEntries[index]?.type_name)
+            .filter(Boolean)
+        ))
+      : activeRevitType
+        ? [activeRevitType]
+        : [];
+    return names;
+  }, [selectedRevitIndexes, displayedRevitEntries, activeRevitType]);
+
+  const formatCartTimestamp = (isoValue) => {
+    if (!isoValue) return '—';
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  };
+
 
   useEffect(() => {
     setActiveRevitIndex((prev) => {
@@ -257,6 +279,25 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       });
       return next;
     });
+  };
+
+  const handleSaveAssignmentCart = () => {
+    if (!selectedAssignmentIds.length) {
+      setCartStatusMessage('선택된 Work Master 항목이 없습니다.');
+      return;
+    }
+    if (!currentSelectedRevitTypes.length) {
+      setCartStatusMessage('저장할 Revit 타입을 선택하세요.');
+      return;
+    }
+    const newEntry = {
+      id: `cart-${Date.now()}`,
+      revitTypes: currentSelectedRevitTypes,
+      assignmentIds: [...selectedAssignmentIds],
+      createdAt: new Date().toISOString(),
+    };
+    setSavedCartEntries((prev) => [newEntry, ...prev]);
+    setCartStatusMessage('장바구니에 저장되었습니다.');
   };
 
   const handleRevitEntryClick = (index, event) => {
@@ -1125,6 +1166,96 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         >
           {renderWorkMasterColumn('GWM', 'GWM')}
           {renderWorkMasterColumn('SWM', 'SWM')}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            justifyContent: 'space-between',
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleSaveAssignmentCart}
+            disabled={!selectedAssignmentIds.length || !currentSelectedRevitTypes.length}
+            style={{
+              flex: '0 0 auto',
+              borderRadius: 12,
+              border: '1px solid #2563eb',
+              background: selectedAssignmentIds.length && currentSelectedRevitTypes.length ? '#2563eb' : '#cbd5f5',
+              color: '#fff',
+              fontWeight: 600,
+              padding: '10px 20px',
+              cursor: selectedAssignmentIds.length && currentSelectedRevitTypes.length ? 'pointer' : 'not-allowed',
+            }}
+          >
+            장바구니 저장
+          </button>
+          <span style={{ fontSize: 11, color: '#475467', flex: 1 }}>
+            {cartStatusMessage || '선택한 Revit 타입과 Work Master를 장바구니로 저장합니다.'}
+          </span>
+        </div>
+        <div
+          style={{
+            borderRadius: 12,
+            border: '1px solid #dae1f3',
+            background: '#f8fafc',
+            minHeight: 120,
+            maxHeight: 200,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0,
+          }}
+        >
+          <div
+            style={{
+              borderRadius: '10px 10px 0 0',
+              background: '#7c3aed',
+              padding: '8px 12px',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span>
+              선택된 {currentSelectedRevitTypes.length ? currentSelectedRevitTypes.join(', ') : '항목'}을 위한
+            </span>
+            <span style={{ flex: 1 }} />
+            <span>Work Master 장바구니 👜</span>
+          </div>
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {savedCartEntries.length ? (
+              savedCartEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  style={{
+                    borderRadius: 10,
+                    padding: '8px 10px',
+                    background: '#fff',
+                    boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
+                    fontSize: 11,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{entry.revitTypes.join(', ')}</div>
+                  <div style={{ display: 'flex', gap: 6, fontSize: 11, color: '#475467' }}>
+                    <span>{entry.assignmentIds.length}개 Work Master 항목</span>
+                    <span>·</span>
+                    <span>저장 {formatCartTimestamp(entry.createdAt)}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>저장된 항목이 없습니다.</div>
+            )}
+          </div>
         </div>
         <div
           style={{

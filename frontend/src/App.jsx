@@ -9,10 +9,12 @@ import CommonInputPage from './components/CommonInputPage';
 import TeamStandardFamilyList from './components/TeamStandardFamilyList';
 import ProjectInputMain from './components/ProjectInputMain';
 import ProjectFamilyAssign from './components/ProjectFamilyAssign';
+import ProjectStandardSelect from './components/ProjectStandardSelect';
 
 const NAV_ITEMS = [
   { id: 'workmaster', label: '워크마스터 매니저', icon: '🧰' },
   { id: 'matching', label: 'Team Standard Matching', icon: '🧩' },
+  { id: 'select', label: 'Standard Select', icon: '✨' },
 ];
 const PROJECT_ROUTE_PREFIX = '/project';
 
@@ -50,6 +52,7 @@ function App() {
   const navLabelOverrides = {
     workmaster: isProjectEditorRoute ? '프로젝트 워크마스터 매니저' : '워크마스터 매니저',
     matching: isProjectEditorRoute ? '프로젝트 Standard Matching' : 'Team Standard Matching',
+    select: isProjectEditorRoute ? '프로젝트 Standard Select' : 'Team Standard Select',
   };
   const activeNavItems = NAV_ITEMS.map((item) => ({
     ...item,
@@ -831,6 +834,10 @@ function App() {
               </div>
             </div>
           )
+        ) : activePage === 'select' ? (
+          <div className="panel select" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+            <ProjectStandardSelect apiBaseUrl={projectApiBase} />
+          </div>
         ) : activePage === 'project' ? (
           <div className="panel project" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
             <ProjectPage />
