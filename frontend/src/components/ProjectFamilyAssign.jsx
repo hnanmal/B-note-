@@ -1,5 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import ProjectFamilyListWidget from './ProjectFamilyListWidget';
+import {
+  formatCartTimestamp,
+  persistWorkMasterCartEntries,
+  readWorkMasterCartEntries,
+} from '../utils/workMasterCart';
 
 const WORK_MASTER_COLUMNS = ['Use', 'GWM', 'Item', '상세', '단위'];
 
@@ -26,6 +31,14 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
   const [savedCartEntries, setSavedCartEntries] = useState([]);
   const [cartStatusMessage, setCartStatusMessage] = useState('');
+
+  useEffect(() => {
+    setSavedCartEntries(readWorkMasterCartEntries());
+  }, []);
+
+  useEffect(() => {
+    persistWorkMasterCartEntries(savedCartEntries);
+  }, [savedCartEntries]);
 
   const collectSubtreeAssignmentIds = (node, includeSelf = true) => {
     const ids = [];
@@ -211,13 +224,6 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         : [];
     return names;
   }, [selectedRevitIndexes, displayedRevitEntries, activeRevitType]);
-
-  const formatCartTimestamp = (isoValue) => {
-    if (!isoValue) return '—';
-    const date = new Date(isoValue);
-    if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-  };
 
 
   useEffect(() => {
