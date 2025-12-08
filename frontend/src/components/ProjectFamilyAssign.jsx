@@ -374,28 +374,68 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   );
 
   const assignmentRowsByType = useMemo(() => {
-    const accumulator = { GWM: [], SWM: [] };
-    familyAssignments.forEach((assignment) => {
-      const typeKey = assignment?.standard_item?.type;
-      if (!typeKey || !['GWM', 'SWM'].includes(typeKey)) return;
-      const detailParts = [];
-      if (assignment.formula) {
-        detailParts.push(`수식: ${assignment.formula}`);
-      }
-      if (assignment.description) {
-        detailParts.push(assignment.description);
-      }
-      accumulator[typeKey].push({
-        id: assignment.id,
-        use: '●',
-        discipline: typeKey,
-        item: assignment.standard_item?.name ?? 'Unnamed',
-        detail: detailParts.length ? detailParts.join(' · ') : '—',
-        unit: 'EA',
+    const buildRows = (assignments) => {
+      const rows = [];
+      const rowByItemId = new Map();
+      assignments.forEach((assignment) => {
+        const detailParts = [];
+        if (assignment.formula) {
+          detailParts.push(`수식: ${assignment.formula}`);
+        }
+        if (assignment.description) {
+          detailParts.push(assignment.description);
+        }
+        const row = {
+          id: assignment.id,
+          use: '●',
+          discipline: assignment.standard_item?.type ?? '—',
+          item: assignment.standard_item?.name ?? 'Unnamed',
+          detail: detailParts.length ? detailParts.join(' · ') : '—',
+          unit: 'EA',
+          standardItemId: assignment.standard_item?.id,
+          parentId: assignment.standard_item?.parent_id,
+          children: [],
+        };
+        rows.push(row);
+        if (row.standardItemId) {
+          rowByItemId.set(row.standardItemId, row);
+        }
       });
-    });
-    return accumulator;
-  }, [familyAssignments]);
+
+      rows.forEach((row) => {
+        const parent = row.parentId ? rowByItemId.get(row.parentId) : undefined;
+        if (parent && parent !== row) {
+          parent.children.push(row);
+        }
+      });
+
+      rows.forEach((row) => {
+        row.hasChildren = Boolean(row.children.length);
+      });
+
+      const isRoot = (row) => {
+        if (!row.parentId) return true;
+        const parent = rowByItemId.get(row.parentId);
+        return !parent;
+      };
+
+      const sortByItem = (a, b) => (a.item ?? '').localeCompare(b.item ?? '');
+      const flattenedRows = [];
+
+      const traverseNode = (node, depth = 0) => {
+        flattenedRows.push({ ...node, depth });
+        node.children.sort(sortByItem).forEach((child) => traverseNode(child, depth + 1));
+      };
+
+      rows.filter(isRoot).sort(sortByItem).forEach((root) => traverseNode(root, 0));
+      return flattenedRows;
+    };
+
+    return {
+      GWM: buildRows(assignmentGroups.GWM),
+      SWM: buildRows(assignmentGroups.SWM),
+    };
+  }, [assignmentGroups]);
 
   const renderAssignmentCard = (title, typeKey) => {
     const assignments = assignmentGroups[typeKey];
@@ -480,24 +520,51 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           ) : !rows.length ? (
             <div style={{ fontSize: 12, color: '#94a3b8' }}>{emptyMessage}</div>
           ) : (
-            rows.map((row) => (
-              <div
-                key={row.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '60px 1fr 100px 80px 40px',
-                  fontSize: 10,
-                  borderBottom: '1px solid #e5e7eb',
-                  padding: '4px 0',
-                }}
-              >
-                <span>{row.use}</span>
-                <span>{row.discipline}</span>
-                <span>{row.item}</span>
-                <span>{row.detail}</span>
-                <span>{row.unit}</span>
-              </div>
-            ))
+              rows.map((row) => {
+                const depth = row.depth ?? 0;
+                const isParentLabel = Boolean(row.hasChildren);
+                if (isParentLabel) {
+                  return (
+                    <div
+                      key={`label-${row.id}`}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '6px 0',
+                        borderBottom: '1px solid #e5e7eb',
+                        background: '#f1f5f9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingLeft: depth * 8,
+                      }}
+                    >
+                      <span style={{ flex: 1 }}>{row.item}</span>
+                      <span style={{ fontSize: 10, color: '#475467' }}>{row.discipline}</span>
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={row.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '60px 1fr 100px 80px 40px',
+                      fontSize: 10,
+                      borderBottom: '1px solid #e5e7eb',
+                      padding: '4px 0',
+                    }}
+                  >
+                    <span>{row.use}</span>
+                    <span>{row.discipline}</span>
+                    <span style={{ paddingLeft: depth > 0 ? depth * 10 : 0, fontWeight: depth === 0 ? 600 : 400 }}>
+                      {row.item}
+                    </span>
+                    <span>{row.detail}</span>
+                    <span>{row.unit}</span>
+                  </div>
+                );
+              })
           )}
         </div>
       </div>
