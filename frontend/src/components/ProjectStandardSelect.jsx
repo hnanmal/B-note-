@@ -195,6 +195,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           minHeight: 0,
           flex: 1,
           overflowY: 'auto',
+          maxHeight: 460,
         }}
       >
         {dbWorkMastersLoading ? (
