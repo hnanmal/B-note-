@@ -53,6 +53,7 @@ class WorkMasterBase(BaseModel):
     work_master_code: str
     new_old_code: Optional[str] = None
     add_spec: Optional[str] = None
+    gauge: Optional[str] = None
 
 
 class WorkMasterCreate(WorkMasterBase):
@@ -61,6 +62,7 @@ class WorkMasterCreate(WorkMasterBase):
 
 class WorkMasterUpdate(BaseModel):
     add_spec: Optional[str] = None
+    gauge: Optional[str] = None
 
 
 class WorkMaster(WorkMasterBase):

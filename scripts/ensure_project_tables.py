@@ -10,6 +10,8 @@ for db_file in project_dir.glob('*.db'):
         columns = [row[1] for row in cursor.fetchall()]
         if 'add_spec' not in columns:
             conn.execute('ALTER TABLE work_masters ADD COLUMN add_spec TEXT;')
+        if 'gauge' not in columns:
+            conn.execute('ALTER TABLE work_masters ADD COLUMN gauge TEXT;')
         conn.commit()
     finally:
         conn.close()

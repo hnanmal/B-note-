@@ -171,6 +171,8 @@ def ensure_extra_tables(db_path: Path) -> None:
         wm_columns = {row[1] for row in cursor.fetchall()}
         if 'add_spec' not in wm_columns:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN add_spec TEXT")
+        if 'gauge' not in wm_columns:
+            cursor.execute("ALTER TABLE work_masters ADD COLUMN gauge TEXT")
         conn.commit()
     finally:
         conn.close()
