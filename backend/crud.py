@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
 from typing import Optional, List, Dict, Any
+from string import ascii_uppercase
 from . import models, schemas
 from . import security
 
@@ -60,6 +60,18 @@ def get_work_master_by_work_master_code(db: Session, code: str):
 def get_work_master(db: Session, work_master_id: int):
     return db.query(models.WorkMaster).filter(models.WorkMaster.id == work_master_id).first()
 
+def _next_available_gauge(used: set[str]) -> Optional[str]:
+    for letter in ascii_uppercase:
+        if letter not in used:
+            return letter
+    return None
+
+_WORK_MASTER_COPY_COLUMNS = [
+    column.name
+    for column in models.WorkMaster.__table__.columns
+    if column.name != 'id'
+]
+
 def update_work_master_fields(
     db: Session,
     db_work_master: models.WorkMaster,
@@ -80,6 +92,57 @@ def create_work_master(db: Session, work_master: schemas.WorkMasterCreate):
     db.commit()
     db.refresh(db_work_master)
     return db_work_master
+
+def duplicate_work_master_with_gauge(db: Session, work_master_id: int):
+    work_master = get_work_master(db, work_master_id)
+    if not work_master:
+        return None
+
+    base_code = work_master.work_master_code
+    if not base_code:
+        raise ValueError('유효한 WorkMaster 코드를 찾을 수 없습니다.')
+
+    related = (
+        db.query(models.WorkMaster)
+        .filter(models.WorkMaster.work_master_code == base_code)
+        .all()
+    )
+
+    assigned_letters: set[str] = set()
+    for entry in related:
+        letter = (entry.gauge or '').strip().upper()
+        if len(letter) == 1 and letter in ascii_uppercase:
+            assigned_letters.add(letter)
+
+    if not work_master.gauge or not isinstance(work_master.gauge, str):
+        available = _next_available_gauge(assigned_letters)
+        if not available:
+            raise ValueError('더 이상 게이지를 추가할 수 없습니다.')
+        work_master.gauge = available
+        assigned_letters.add(available)
+    else:
+        assigned_letters.add(work_master.gauge.strip().upper())
+
+    next_letter = _next_available_gauge(assigned_letters)
+    if not next_letter:
+        raise ValueError('더 이상 게이지를 추가할 수 없습니다.')
+
+    copy_attrs = {column: getattr(work_master, column) for column in _WORK_MASTER_COPY_COLUMNS}
+    copy_attrs['work_master_code'] = base_code
+    copy_attrs['gauge'] = next_letter
+    new_work_master = models.WorkMaster(**copy_attrs)
+    db.add(work_master)
+    db.add(new_work_master)
+
+    for standard_item in list(work_master.standard_items):
+        if new_work_master not in standard_item.work_masters:
+            standard_item.work_masters.append(new_work_master)
+            db.add(standard_item)
+
+    db.commit()
+    db.refresh(work_master)
+    db.refresh(new_work_master)
+    return new_work_master
 
 
 def update_work_master(

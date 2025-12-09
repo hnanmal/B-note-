@@ -299,6 +299,28 @@ def update_project_work_master(
     return crud.update_work_master_fields(db, db_work_master=db_work_master, updates=payload)
 
 
+@router.post(
+    "/project/{project_identifier}/work-masters/{work_master_id}/add-gauge",
+    response_model=schemas.WorkMaster,
+    tags=["Project Data"],
+)
+def add_project_work_master_gauge(
+    project_identifier: str,
+    work_master_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    db_work_master = crud.get_work_master(db, work_master_id=work_master_id)
+    if not db_work_master:
+        raise HTTPException(status_code=404, detail="WorkMaster not found")
+    try:
+        new_work_master = crud.duplicate_work_master_with_gauge(db, work_master_id=work_master_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not new_work_master:
+        raise HTTPException(status_code=500, detail="게이지 항목을 생성할 수 없습니다.")
+    return new_work_master
+
+
 # ===================
 #   StandardItem
 # ===================

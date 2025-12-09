@@ -12,6 +12,11 @@ for db_file in project_dir.glob('*.db'):
             conn.execute('ALTER TABLE work_masters ADD COLUMN add_spec TEXT;')
         if 'gauge' not in columns:
             conn.execute('ALTER TABLE work_masters ADD COLUMN gauge TEXT;')
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA index_list('work_masters')")
+        indexes = [row[1] for row in cursor.fetchall()]
+        if 'ix_work_masters_work_master_code' in indexes:
+            conn.execute('DROP INDEX IF EXISTS ix_work_masters_work_master_code;')
         conn.commit()
     finally:
         conn.close()

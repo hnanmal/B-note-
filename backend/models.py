@@ -83,7 +83,7 @@ class WorkMaster(Base):
     uom1 = Column(String)
     uom2 = Column(String)
     work_group_code = Column(String)
-    work_master_code = Column(String, unique=True, index=True)
+    work_master_code = Column(String, index=True)
     new_old_code = Column(String)
     add_spec = Column(String)
     gauge = Column(String)

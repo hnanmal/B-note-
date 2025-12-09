@@ -12,9 +12,30 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [workMasterSpecs, setWorkMasterSpecs] = useState({});
   const [workMasterSpecSaving, setWorkMasterSpecSaving] = useState({});
   const [workMasterSpecErrors, setWorkMasterSpecErrors] = useState({});
+  const [gaugeAdding, setGaugeAdding] = useState({});
+  const [gaugeAddErrors, setGaugeAddErrors] = useState({});
+  const [workMasterReloadKey, setWorkMasterReloadKey] = useState(0);
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
   const hasSelection = Boolean(selectedGwmNode);
+  const isProjectContext = apiBaseUrl.includes('/project/');
+
+  const sortWorkMasters = (workMasters) => {
+    const clones = Array.isArray(workMasters) ? [...workMasters] : [];
+    return clones.sort((a, b) => {
+      const codeA = (a?.work_master_code ?? '').toUpperCase();
+      const codeB = (b?.work_master_code ?? '').toUpperCase();
+      if (codeA < codeB) return -1;
+      if (codeA > codeB) return 1;
+      const gaugeA = (a?.gauge ?? '').trim().toUpperCase();
+      const gaugeB = (b?.gauge ?? '').trim().toUpperCase();
+      if (!gaugeA && gaugeB) return -1;
+      if (gaugeA && !gaugeB) return 1;
+      if (gaugeA < gaugeB) return -1;
+      if (gaugeA > gaugeB) return 1;
+      return (a?.id ?? 0) - (b?.id ?? 0);
+    });
+  };
 
   const buildSpecMapFromWorkMasters = (workMasters) => {
     const map = {};
@@ -34,6 +55,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       setWorkMasterSpecErrors({});
       setWorkMasterSpecSaving({});
       setDbWorkMastersLoading(false);
+      setGaugeAdding({});
+      setGaugeAddErrors({});
       return undefined;
     }
 
@@ -41,6 +64,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     setDbWorkMastersLoading(true);
     setDbWorkMastersError(null);
     setSelectionError(null);
+    setGaugeAdding({});
+    setGaugeAddErrors({});
 
     fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}`)
       .then((res) => {
@@ -54,8 +79,9 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         const workMasters = Array.isArray(data?.work_masters) ? data.work_masters : [];
         setSelectedGwmNode((prev) => ({ ...(prev ?? {}), ...data }));
         setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
-        setDbWorkMasters(workMasters);
-        setWorkMasterSpecs(buildSpecMapFromWorkMasters(workMasters));
+        const sorted = sortWorkMasters(workMasters);
+        setDbWorkMasters(sorted);
+        setWorkMasterSpecs(buildSpecMapFromWorkMasters(sorted));
       })
       .catch((error) => {
         if (cancelled) return;
@@ -72,7 +98,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, selectedGwmId]);
+  }, [apiBaseUrl, selectedGwmId, workMasterReloadKey]);
 
   const buildAttributeSummary = (workMaster) => {
     return [
@@ -154,6 +180,30 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     }
   };
 
+  const handleAddGauge = async (workMasterId) => {
+    if (!isProjectContext) return;
+    setGaugeAdding((prev) => ({ ...prev, [workMasterId]: true }));
+    setGaugeAddErrors((prev) => ({ ...prev, [workMasterId]: null }));
+    try {
+      const response = await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/add-gauge`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('게이지 항목을 생성할 수 없습니다.');
+      }
+      await response.json();
+      setWorkMasterReloadKey((prev) => prev + 1);
+    } catch (error) {
+      setGaugeAddErrors((prev) => ({
+        ...prev,
+        [workMasterId]:
+          error instanceof Error ? error.message : '게이지 저장에 실패했습니다.',
+      }));
+    } finally {
+      setGaugeAdding((prev) => ({ ...prev, [workMasterId]: false }));
+    }
+  };
+
   const renderWorkMasterDetail = (workMaster) => {
     const headline =
       workMaster.cat_large_desc || workMaster.cat_mid_desc || workMaster.cat_small_desc ||
@@ -164,6 +214,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     const attrSummary = buildAttributeSummary(workMaster);
     const uomLabel = [workMaster.uom1, workMaster.uom2].filter(Boolean).join(' / ');
     const codeLine = workMaster.work_master_code ? `코드 ${workMaster.work_master_code}` : '코드 정보 없음';
+    const gaugeValue = (workMaster.gauge ?? '').trim().toUpperCase();
     const codeTags = [
       workMaster.cat_large_code,
       workMaster.cat_mid_code,
@@ -175,6 +226,10 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     const specValue = workMasterSpecs[workMaster.id] ?? workMaster.add_spec ?? '';
     const isSpecSaving = Boolean(workMasterSpecSaving[workMaster.id]);
     const specError = workMasterSpecErrors[workMaster.id];
+    const isGaugeAdding = Boolean(gaugeAdding[workMaster.id]);
+    const gaugeError = gaugeAddErrors[workMaster.id];
+    const gaugeButtonDisabled = !isProjectContext || selectionLoading || isGaugeAdding;
+    const gaugeButtonTitle = !isProjectContext ? '프로젝트에서만 게이지를 추가할 수 있습니다.' : undefined;
     const isSelected = selectedWorkMasterId === workMaster.id;
     const handleToggle = () => handleWorkMasterToggle(workMaster.id);
 
@@ -207,7 +262,32 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         {codeTags && <div style={{ fontSize: 11, color: '#7c3aed' }}>{codeTags}</div>}
         {attrSummary && <div style={{ fontSize: 12, color: '#374151' }}>{attrSummary}</div>}
         {uomLabel && <div style={{ fontSize: 12, color: '#374151' }}>UoM: {uomLabel}</div>}
-        <div style={{ fontSize: 13, color: '#9333ea', fontWeight: 600 }}>{codeLine}</div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#9333ea',
+            }}
+          >
+            <span>{codeLine}</span>
+            <span
+              style={{
+                minWidth: 22,
+                textAlign: 'center',
+                borderRadius: 4,
+                border: '1px solid #e5e7eb',
+                padding: '2px 6px',
+                fontSize: 11,
+                color: '#0f172a',
+                background: '#fff',
+              }}
+            >
+              {gaugeValue || ' '}
+            </span>
+          </div>
         <div
           style={{
             fontSize: 11,
@@ -263,6 +343,32 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             >
               {isSpecSaving ? '저장 중...' : '저장'}
             </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleAddGauge(workMaster.id);
+              }}
+              disabled={gaugeButtonDisabled}
+              title={gaugeButtonTitle}
+              style={{
+                padding: '4px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                borderRadius: 6,
+                border: '1px solid #cbd5f5',
+                background: gaugeButtonDisabled ? '#f1f5f9' : '#fff',
+                color: gaugeButtonDisabled ? '#94a3b8' : '#0f172a',
+                cursor: gaugeButtonDisabled ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isGaugeAdding ? '추가 중...' : '게이지 추가'}
+            </button>
+            {gaugeError && (
+              <div style={{ fontSize: 11, color: '#b91c1c' }}>{gaugeError}</div>
+            )}
           </div>
           {specError && (
             <div style={{ fontSize: 11, color: '#b91c1c' }}>{specError}</div>

@@ -173,6 +173,10 @@ def ensure_extra_tables(db_path: Path) -> None:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN add_spec TEXT")
         if 'gauge' not in wm_columns:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN gauge TEXT")
+        cursor.execute("PRAGMA index_list('work_masters')")
+        indexes = {row[1] for row in cursor.fetchall()}
+        if 'ix_work_masters_work_master_code' in indexes:
+            cursor.execute("DROP INDEX IF EXISTS ix_work_masters_work_master_code")
         conn.commit()
     finally:
         conn.close()
