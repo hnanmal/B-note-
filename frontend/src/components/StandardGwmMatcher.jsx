@@ -13,6 +13,58 @@ const highlightedLabelStyle = {
     lineHeight: 1.3,
 };
 
+const formatWorkMasterCode = (workMaster) => {
+    const baseCode = (workMaster.work_master_code || '').trim();
+    const gauge = (workMaster.gauge || '').trim().toUpperCase();
+    if (!baseCode) {
+        return gauge ? `(${gauge})` : '코드 정보 없음';
+    }
+    return gauge ? `${baseCode}(${gauge})` : baseCode;
+};
+
+const groupWorkMastersByCode = (workMasters) => {
+    const sorted = [...workMasters].sort((a, b) => {
+        const baseA = (a.work_master_code || '').trim().toUpperCase();
+        const baseB = (b.work_master_code || '').trim().toUpperCase();
+        if (baseA && baseB && baseA !== baseB) {
+            return baseA.localeCompare(baseB);
+        }
+        if (baseA && !baseB) return -1;
+        if (!baseA && baseB) return 1;
+        const gaugeA = (a.gauge || '').trim().toUpperCase();
+        const gaugeB = (b.gauge || '').trim().toUpperCase();
+        if (!gaugeA && gaugeB) return -1;
+        if (gaugeA && !gaugeB) return 1;
+        return gaugeA.localeCompare(gaugeB);
+    });
+
+    const groups = [];
+    const keyMap = new Map();
+
+    sorted.forEach((wm) => {
+        const baseKey = (wm.work_master_code || '').trim().toUpperCase() || `__EMPTY__${wm.id}`;
+        if (!keyMap.has(baseKey)) {
+            const meta = wm;
+            const group = { key: baseKey, base: meta, variants: [] };
+            keyMap.set(baseKey, group);
+            groups.push(group);
+        }
+        keyMap.get(baseKey).variants.push(wm);
+    });
+
+    groups.forEach(group => {
+        group.variants.sort((a, b) => {
+            const gaugeA = (a.gauge || '').trim().toUpperCase();
+            const gaugeB = (b.gauge || '').trim().toUpperCase();
+            if (!gaugeA && gaugeB) return -1;
+            if (gaugeA && !gaugeB) return 1;
+            return gaugeA.localeCompare(gaugeB);
+        });
+    });
+
+    return groups;
+};
+
 export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBaseUrl = API_BASE_URL }) {
     const [standardItems, setStandardItems] = useState([]);
     const [workMasters, setWorkMasters] = useState([]);
@@ -110,6 +162,21 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
     const filteredAssigned = useMemo(() => {
         return Array.from(assignedSet).map(id => workMasters.find(w => w.id === id)).filter(Boolean);
     }, [assignedSet, workMasters]);
+
+    const sortedAssignedWorkMasters = useMemo(() => {
+        return [...filteredAssigned].sort((a, b) => {
+            const baseA = (a.work_master_code || '').trim().toUpperCase();
+            const baseB = (b.work_master_code || '').trim().toUpperCase();
+            if (baseA && baseB && baseA !== baseB) return baseA.localeCompare(baseB);
+            if (baseA && !baseB) return -1;
+            if (!baseA && baseB) return 1;
+            const gaugeA = (a.gauge || '').trim().toUpperCase();
+            const gaugeB = (b.gauge || '').trim().toUpperCase();
+            if (!gaugeA && gaugeB) return -1;
+            if (gaugeA && !gaugeB) return 1;
+            return gaugeA.localeCompare(gaugeB);
+        });
+    }, [filteredAssigned]);
 
     const toggleAssignLocal = (wmId) => {
         setAssignedSet(prev => {
@@ -385,20 +452,39 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
                                     </label>
                                 </div>
                                 <div style={{ flex: 1, minHeight: 0, maxHeight: 'calc(100vh - 360px)', overflowY: 'auto', border: '1px solid #f0f0f0', padding: 6, background: '#fff' }}>
-                                    {filteredWorkMasters.map(w => {
-                                        const attrs = [w.attr1_spec, w.attr2_spec, w.attr3_spec, w.attr4_spec, w.attr5_spec, w.attr6_spec].filter(Boolean).join(' | ');
+                                    {groupWorkMastersByCode(filteredWorkMasters).map(group => {
+                                        const gaugeLetters = group.variants
+                                            .map((variant) => (variant.gauge || '').trim().toUpperCase())
+                                            .filter(Boolean);
+                                        const gaugeTags = Array.from(new Set(gaugeLetters));
+                                        const baseCodeLabel = (group.base.work_master_code || '').trim() || '코드 없음';
                                         return (
-                                            <div key={w.id} style={{ display: 'flex', alignItems: 'flex-start', padding: '8px 6px', borderBottom: '1px solid #f5f5f5' }}>
-                                                <div style={{ marginTop: 6 }}>
-                                                    <input type="checkbox" checked={assignedSet.has(w.id)} onChange={() => toggleAssignLocal(w.id)} />
+                                            <div key={group.key} style={{ marginBottom: 6, borderTop: '1px solid #f0f3f5', paddingTop: 6 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: '#475467', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+                                                    <span style={{ fontWeight: 600 }}>{baseCodeLabel}</span>
+                                                    {gaugeTags.length > 0 ? (
+                                                        <span style={{ fontSize: 11, color: '#9333ea' }}>게이지: {gaugeTags.join(', ')}</span>
+                                                    ) : (
+                                                        <span style={{ fontSize: 11, color: '#94a3b8' }}>기본</span>
+                                                    )}
                                                 </div>
-                                                <div style={{ marginLeft: 10, flex: 1 }}>
-                                                    <div style={{ fontWeight: 700 }}>{w.cat_large_desc || w.cat_mid_desc || w.cat_small_desc || w.work_master_code}</div>
-                                                    <div style={{ fontSize: 13, color: '#444', marginTop: 4 }}>{[w.cat_mid_desc, w.cat_small_desc].filter(Boolean).join(' / ')}</div>
-                                                    {attrs && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{attrs}{w.uom1 ? ` | UoM: ${w.uom1}` : ''}</div>}
-                                                    {!attrs && w.uom1 && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>UoM: {w.uom1}</div>}
-                                                    <div style={{ fontSize: 11, color: '#c00', marginTop: 8 }}>{w.work_master_code}</div>
-                                                </div>
+                                                {group.variants.map(w => {
+                                                    const attrs = [w.attr1_spec, w.attr2_spec, w.attr3_spec, w.attr4_spec, w.attr5_spec, w.attr6_spec].filter(Boolean).join(' | ');
+                                                    return (
+                                                        <div key={w.id} style={{ display: 'flex', alignItems: 'flex-start', padding: '8px 6px', borderBottom: '1px solid #f5f5f5' }}>
+                                                            <div style={{ marginTop: 6 }}>
+                                                                <input type="checkbox" checked={assignedSet.has(w.id)} onChange={() => toggleAssignLocal(w.id)} />
+                                                            </div>
+                                                            <div style={{ marginLeft: 10, flex: 1 }}>
+                                                                <div style={{ fontWeight: 700 }}>{formatWorkMasterCode(w)}</div>
+                                                                <div style={{ fontSize: 13, color: '#444', marginTop: 4 }}>{[w.cat_mid_desc, w.cat_small_desc].filter(Boolean).join(' / ')}</div>
+                                                                {attrs && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{attrs}{w.uom1 ? ` | UoM: ${w.uom1}` : ''}</div>}
+                                                                {!attrs && w.uom1 && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>UoM: {w.uom1}</div>}
+                                                                <div style={{ fontSize: 11, color: '#c00', marginTop: 8 }}>{formatWorkMasterCode(w)}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         );
                                     })}
@@ -436,16 +522,17 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
                                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid #f0f0f0', maxHeight: 'calc(100vh - 360px)', background: 'rgba(246, 217, 117, 0.25)' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <tbody>
-                                            {filteredAssigned.map(w => {
+                                            {sortedAssignedWorkMasters.map(w => {
                                                 const attrs = [w.attr1_spec, w.attr2_spec, w.attr3_spec, w.attr4_spec, w.attr5_spec, w.attr6_spec].filter(Boolean).join(' | ');
+                                                const title = w.cat_large_desc || w.cat_mid_desc || w.cat_small_desc || formatWorkMasterCode(w);
                                                 return (
                                                     <tr key={w.id}>
                                                         <td style={{ padding: 8, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                                                            <div style={{ fontWeight: 700 }}>{w.cat_large_desc || w.cat_mid_desc || w.cat_small_desc || w.work_master_code}</div>
+                                                            <div style={{ fontWeight: 700 }}>{title}</div>
                                                             <div style={{ fontSize: 13, color: '#444', marginTop: 4 }}>{[w.cat_mid_desc, w.cat_small_desc].filter(Boolean).join(' / ')}</div>
                                                             {attrs && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{attrs}{w.uom1 ? ` | UoM: ${w.uom1}` : ''}</div>}
                                                             {!attrs && w.uom1 && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>UoM: {w.uom1}</div>}
-                                                            <div style={{ fontSize: 11, color: '#c00', marginTop: 8 }}>{w.work_master_code}</div>
+                                                            <div style={{ fontSize: 11, color: '#c00', marginTop: 8 }}>{formatWorkMasterCode(w)}</div>
                                                         </td>
                                                         <td style={{ padding: 8, borderBottom: '1px solid rgba(0,0,0,0.08)', width: 80, textAlign: 'center' }}>
                                                             <button style={buttonStyle} onClick={() => toggleAssignLocal(w.id)}>제거</button>
