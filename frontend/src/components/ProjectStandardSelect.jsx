@@ -14,6 +14,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [workMasterSpecErrors, setWorkMasterSpecErrors] = useState({});
   const [gaugeAdding, setGaugeAdding] = useState({});
   const [gaugeAddErrors, setGaugeAddErrors] = useState({});
+  const [gaugeRemoveErrors, setGaugeRemoveErrors] = useState({});
+  const [gaugeRemoving, setGaugeRemoving] = useState({});
   const [workMasterReloadKey, setWorkMasterReloadKey] = useState(0);
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
@@ -57,6 +59,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       setDbWorkMastersLoading(false);
       setGaugeAdding({});
       setGaugeAddErrors({});
+      setGaugeRemoving({});
+      setGaugeRemoveErrors({});
       return undefined;
     }
 
@@ -66,6 +70,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     setSelectionError(null);
     setGaugeAdding({});
     setGaugeAddErrors({});
+    setGaugeRemoving({});
+    setGaugeRemoveErrors({});
 
     fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}`)
       .then((res) => {
@@ -204,6 +210,30 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     }
   };
 
+  const handleRemoveGauge = async (workMasterId) => {
+    if (!isProjectContext) return;
+    setGaugeRemoving((prev) => ({ ...prev, [workMasterId]: true }));
+    setGaugeRemoveErrors((prev) => ({ ...prev, [workMasterId]: null }));
+    try {
+      const response = await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/remove-gauge`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('게이지를 삭제할 수 없습니다.');
+      }
+      await response.json();
+      setWorkMasterReloadKey((prev) => prev + 1);
+    } catch (error) {
+      setGaugeRemoveErrors((prev) => ({
+        ...prev,
+        [workMasterId]:
+          error instanceof Error ? error.message : '게이지 삭제에 실패했습니다.',
+      }));
+    } finally {
+      setGaugeRemoving((prev) => ({ ...prev, [workMasterId]: false }));
+    }
+  };
+
   const renderWorkMasterDetail = (workMaster) => {
     const headline =
       workMaster.cat_large_desc || workMaster.cat_mid_desc || workMaster.cat_small_desc ||
@@ -228,6 +258,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     const specError = workMasterSpecErrors[workMaster.id];
     const isGaugeAdding = Boolean(gaugeAdding[workMaster.id]);
     const gaugeError = gaugeAddErrors[workMaster.id];
+    const isGaugeRemoving = Boolean(gaugeRemoving[workMaster.id]);
+    const gaugeRemoveError = gaugeRemoveErrors[workMaster.id];
     const gaugeButtonDisabled = !isProjectContext || selectionLoading || isGaugeAdding;
     const gaugeButtonTitle = !isProjectContext ? '프로젝트에서만 게이지를 추가할 수 있습니다.' : undefined;
     const isSelected = selectedWorkMasterId === workMaster.id;
@@ -366,8 +398,31 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             >
               {isGaugeAdding ? '추가 중...' : '게이지 추가'}
             </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleRemoveGauge(workMaster.id);
+              }}
+              disabled={!gaugeValue || selectionLoading || isGaugeRemoving}
+              style={{
+                padding: '4px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                borderRadius: 6,
+                border: '1px solid #f87171',
+                background: !gaugeValue || selectionLoading || isGaugeRemoving ? '#fee2e2' : '#fff',
+                color: !gaugeValue || selectionLoading || isGaugeRemoving ? '#fca5a5' : '#dc2626',
+                cursor: !gaugeValue || selectionLoading || isGaugeRemoving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isGaugeRemoving ? '삭제 중...' : '게이지 삭제'}
+            </button>
             {gaugeError && (
               <div style={{ fontSize: 11, color: '#b91c1c' }}>{gaugeError}</div>
+            )}
+            {gaugeRemoveError && (
+              <div style={{ fontSize: 11, color: '#b91c1c' }}>{gaugeRemoveError}</div>
             )}
           </div>
           {specError && (

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_, delete
 from typing import Optional, List, Dict, Any
 from string import ascii_uppercase
 from . import models, schemas
@@ -143,6 +144,57 @@ def duplicate_work_master_with_gauge(db: Session, work_master_id: int):
     db.refresh(work_master)
     db.refresh(new_work_master)
     return new_work_master
+
+def remove_work_master_gauge(db: Session, work_master_id: int):
+    work_master = get_work_master(db, work_master_id)
+    if not work_master:
+        return None
+
+    code = work_master.work_master_code
+    if not code:
+        raise ValueError('유효한 WorkMaster 코드를 찾을 수 없습니다.')
+
+    db.execute(
+        delete(models.StandardItemWorkMasterSelect).where(
+            models.StandardItemWorkMasterSelect.work_master_id == work_master_id
+        )
+    )
+    db.execute(
+        models.standard_item_work_master_association.delete().where(
+            models.standard_item_work_master_association.c.work_master_id == work_master_id
+        )
+    )
+    db.delete(work_master)
+
+    remaining = (
+        db.query(models.WorkMaster)
+        .filter(models.WorkMaster.work_master_code == code)
+        .all()
+    )
+    remaining = [entry for entry in remaining if entry.id != work_master_id]
+    if not remaining:
+        db.commit()
+        return []
+
+    def gauge_sort_key(entry: models.WorkMaster):
+        gauge_str = (entry.gauge or '').strip()
+        return (gauge_str == '', gauge_str)
+
+    sorted_remaining = sorted(remaining, key=gauge_sort_key)
+    if len(sorted_remaining) <= 1:
+        for entry in sorted_remaining:
+            entry.gauge = None
+            db.add(entry)
+    else:
+        for idx, entry in enumerate(sorted_remaining):
+            letter = ascii_uppercase[idx] if idx < len(ascii_uppercase) else None
+            entry.gauge = letter
+            db.add(entry)
+
+    db.commit()
+    for entry in sorted_remaining:
+        db.refresh(entry)
+    return sorted_remaining
 
 
 def update_work_master(
