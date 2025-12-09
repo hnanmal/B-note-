@@ -13,7 +13,7 @@ const highlightedLabelStyle = {
     lineHeight: 1.3,
 };
 
-export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
+export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBaseUrl = API_BASE_URL }) {
     const [standardItems, setStandardItems] = useState([]);
     const [workMasters, setWorkMasters] = useState([]);
     const [assignedSet, setAssignedSet] = useState(new Set());
@@ -44,7 +44,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
             return;
         }
         try {
-            const res = await fetch(`${API_BASE_URL}/standard-items/${nodeId}`);
+            const res = await fetch(`${apiBaseUrl}/standard-items/${nodeId}`);
             if (!res.ok) throw new Error('선택 항목 상세를 불러오지 못했습니다');
             const data = await res.json();
             const loaded = new Set((data.work_masters || []).map(w => w.id));
@@ -55,13 +55,13 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
             setAssignedSet(new Set());
             setPersistedAssignedSet(new Set());
         }
-    }, [selectedNode?.id, selectedNode?.depth]);
+    }, [selectedNode?.id, selectedNode?.depth, apiBaseUrl]);
 
     const fetchData = useCallback(async () => {
         try {
             const [stdRes, wmRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/standard-items/`),
-                fetch(`${API_BASE_URL}/work-masters/`),
+                fetch(`${apiBaseUrl}/standard-items/`),
+                fetch(`${apiBaseUrl}/work-masters/`),
             ]);
             if (!stdRes.ok) throw new Error('표준 항목을 가져오는 데 실패했습니다');
             if (!wmRes.ok) throw new Error('워크마스터 데이터를 가져오는 데 실패했습니다');
@@ -71,7 +71,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
         } catch (e) {
             setMessage(e.message || '데이터 로드에 실패했습니다');
         }
-    }, []);
+    }, [apiBaseUrl]);
 
     useEffect(() => {
         fetchData();
@@ -134,7 +134,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
             const toRemove = Array.from(current).filter(id => !next.has(id));
             console.log('save: toAdd', toAdd, 'toRemove', toRemove, 'node', selectedNode?.id);
             for (const id of toAdd) {
-                await fetch(`${API_BASE_URL}/standard-items/${selectedNode.id}/assign`, {
+                await fetch(`${apiBaseUrl}/standard-items/${selectedNode.id}/assign`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ work_master_id: Number(id) }),
@@ -142,7 +142,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
                 console.log('save assign', id);
             }
             for (const id of toRemove) {
-                await fetch(`${API_BASE_URL}/standard-items/${selectedNode.id}/remove`, {
+                await fetch(`${apiBaseUrl}/standard-items/${selectedNode.id}/remove`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ work_master_id: Number(id) }),
@@ -229,7 +229,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh }) {
 
     const duplicateNodes = async (nodes, parentId) => {
         for (const node of nodes) {
-            const res = await fetch(`${API_BASE_URL}/standard-items/`, {
+            const res = await fetch(`${apiBaseUrl}/standard-items/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

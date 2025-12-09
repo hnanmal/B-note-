@@ -7,6 +7,7 @@ from .database import (
     ensure_family_list_columns,
     ensure_calc_dictionary_columns,
     ensure_gwm_family_assign_columns,
+    ensure_work_master_columns,
 )
 
 # 데이터베이스 테이블 생성
@@ -19,6 +20,7 @@ Base.metadata.create_all(bind=engine, tables=tables_to_create)
 ensure_family_list_columns(engine)
 ensure_calc_dictionary_columns(engine)
 ensure_gwm_family_assign_columns(engine)
+ensure_work_master_columns(engine)
 
 app = FastAPI(
     title="B-note API",

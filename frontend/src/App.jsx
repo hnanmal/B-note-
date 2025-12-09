@@ -889,7 +889,7 @@ function App() {
             {activePage === 'matching' && (
               <div className="panel right" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflowX: 'hidden' }}>
                 <div className="right-top" style={{ height: '100%', minWidth: 0 }}>
-                  <StandardGwmMatcher selectedNode={selectedNode} onTreeRefresh={() => setTreeRefreshKey((prev) => prev + 1)} />
+                  <StandardGwmMatcher selectedNode={selectedNode} onTreeRefresh={() => setTreeRefreshKey((prev) => prev + 1)} apiBaseUrl={projectApiBase} />
                 </div>
               </div>
             )}

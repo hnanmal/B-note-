@@ -74,3 +74,19 @@ def ensure_gwm_family_assign_columns(engine):
             conn.execute(
                 text("ALTER TABLE gwm_family_assign ADD COLUMN created_at DATETIME")
             )
+
+
+def ensure_work_master_columns(engine):
+    with engine.connect() as conn:
+        try:
+            columns = conn.execute(text("PRAGMA table_info('work_masters')")).fetchall()
+        except OperationalError:
+            return
+        column_names = [col[1] for col in columns]
+        if "add_spec" not in column_names:
+            conn.execute(text("ALTER TABLE work_masters ADD COLUMN add_spec TEXT"))
+        if "gauge" not in column_names:
+            conn.execute(text("ALTER TABLE work_masters ADD COLUMN gauge TEXT"))
+        indexes = conn.execute(text("PRAGMA index_list('work_masters')")).fetchall()
+        if any(idx[1] == 'ix_work_masters_work_master_code' for idx in indexes):
+            conn.execute(text("DROP INDEX IF EXISTS ix_work_masters_work_master_code"))
