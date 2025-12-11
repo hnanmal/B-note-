@@ -10,8 +10,10 @@ import TeamStandardFamilyList from './components/TeamStandardFamilyList';
 import ProjectInputMain from './components/ProjectInputMain';
 import ProjectFamilyAssign from './components/ProjectFamilyAssign';
 import ProjectStandardSelect from './components/ProjectStandardSelect';
+import ProjectMain from './components/ProjectMain';
 
 const NAV_ITEMS = [
+  { id: 'project-main', label: 'Project Main', icon: '🏠' },
   { id: 'workmaster', label: '워크마스터 매니저', icon: '🧰' },
   { id: 'matching', label: 'Team Standard Matching', icon: '🧩' },
   { id: 'select', label: 'Standard Select', icon: '✨' },
@@ -50,6 +52,7 @@ function App() {
     ? `${API_BASE_URL}/project/${encodeURIComponent(projectRouteIdentifier)}`
     : API_BASE_URL;
   const navLabelOverrides = {
+    'project-main': 'Project Main',
     workmaster: isProjectEditorRoute ? '프로젝트 워크마스터 매니저' : '워크마스터 매니저',
     matching: isProjectEditorRoute ? '프로젝트 Standard Matching' : 'Team Standard Matching',
     select: isProjectEditorRoute ? '프로젝트 Standard Select' : 'Team Standard Select',
@@ -834,6 +837,10 @@ function App() {
               </div>
             </div>
           )
+        ) : activePage === 'project-main' ? (
+          <div className="panel project-main" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+            <ProjectMain apiBaseUrl={projectApiBase} />
+          </div>
         ) : activePage === 'select' ? (
           <div className="panel select" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
             <ProjectStandardSelect apiBaseUrl={projectApiBase} />
