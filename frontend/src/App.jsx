@@ -20,8 +20,16 @@ const NAV_ITEMS = [
 const PROJECT_ROUTE_PREFIX = '/project';
 
 function App() {
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const routeSuffix = pathname.startsWith(`${PROJECT_ROUTE_PREFIX}/`)
+    ? pathname.slice(PROJECT_ROUTE_PREFIX.length + 1)
+    : '';
+  const [rawProjectIdentifier] = routeSuffix.split('/').filter(Boolean);
+  const projectRouteIdentifier = rawProjectIdentifier ? decodeURIComponent(rawProjectIdentifier) : '';
+  const isProjectEditorRoute = Boolean(projectRouteIdentifier);
+
   const [selectedNode, setSelectedNode] = useState(null);
-  const [activePage, setActivePage] = useState('matching'); // 'matching' | 'workmaster' | 'project' | 'common'
+  const [activePage, setActivePage] = useState(isProjectEditorRoute ? 'project-main' : 'matching');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const [calcDictionaryEntries, setCalcDictionaryEntries] = useState([]);
@@ -40,13 +48,6 @@ function App() {
   const SIDEBAR_OPEN_WIDTH = 180;
   const SIDEBAR_COLLAPSED_WIDTH = 64;
   const PANEL_LEFT_WIDTH = 560;
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
-  const routeSuffix = pathname.startsWith(`${PROJECT_ROUTE_PREFIX}/`)
-    ? pathname.slice(PROJECT_ROUTE_PREFIX.length + 1)
-    : '';
-  const [rawProjectIdentifier] = routeSuffix.split('/').filter(Boolean);
-  const projectRouteIdentifier = rawProjectIdentifier ? decodeURIComponent(rawProjectIdentifier) : '';
-  const isProjectEditorRoute = Boolean(projectRouteIdentifier);
   const projectApiBase = isProjectEditorRoute
     ? `${API_BASE_URL}/project/${encodeURIComponent(projectRouteIdentifier)}`
     : API_BASE_URL;
