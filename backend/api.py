@@ -600,35 +600,34 @@ def create_project_building(
     
 @router.get(
     "/project/{project_identifier}/metadata/abbr",
-    response_model=schemas.ProjectAbbreviation,
+    response_model=schemas.ProjectMetadata,
     tags=["Project Data"],
 )
-def read_project_abbreviation(
+def read_project_metadata(
     project_identifier: str,
 ):
     try:
         db_path = project_db.resolve_project_db_path(project_identifier)
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    value = project_db.read_project_abbr(db_path)
-    return {"pjt_abbr": value}
+    return project_db.read_project_metadata(db_path)
 
 
 @router.patch(
     "/project/{project_identifier}/metadata/abbr",
-    response_model=schemas.ProjectAbbreviation,
+    response_model=schemas.ProjectMetadata,
     tags=["Project Data"],
 )
-def update_project_abbreviation(
+def update_project_metadata(
     project_identifier: str,
-    payload: schemas.ProjectAbbreviation,
+    payload: schemas.ProjectMetadata,
 ):
     try:
         db_path = project_db.resolve_project_db_path(project_identifier)
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    project_db.update_project_abbr(db_path, payload.pjt_abbr)
-    return {"pjt_abbr": project_db.read_project_abbr(db_path)}
+    updates = payload.model_dump(exclude_unset=True)
+    return project_db.update_project_metadata(db_path, updates)
 
 
 @router.delete(

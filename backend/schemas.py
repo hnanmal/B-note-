@@ -200,8 +200,11 @@ class CalcDictionarySyncResult(BaseModel):
     updated_entries: int
 
 
-class ProjectAbbreviation(BaseModel):
+class ProjectMetadata(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     pjt_abbr: Optional[str] = None
+    pjt_description: Optional[str] = None
 
 
 class GwmFamilyAssignmentPayload(BaseModel):

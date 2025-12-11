@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 export default function ProjectMain({ apiBaseUrl }) {
   const [abbr, setAbbr] = useState('');
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -19,6 +20,7 @@ export default function ProjectMain({ apiBaseUrl }) {
       }
       const payload = await response.json();
       setAbbr(payload.pjt_abbr ?? '');
+      setDescription(payload.pjt_description ?? '');
     } catch (error) {
       setStatusMessage(
         error instanceof Error
@@ -43,7 +45,10 @@ export default function ProjectMain({ apiBaseUrl }) {
       const response = await fetch(`${apiBaseUrl}/metadata/abbr`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pjt_abbr: abbr.trim() || null }),
+        body: JSON.stringify({
+          pjt_abbr: abbr.trim() || null,
+          pjt_description: description.trim() || null,
+        }),
       });
       if (!response.ok) {
         const errorText = await response.text();
@@ -122,6 +127,22 @@ export default function ProjectMain({ apiBaseUrl }) {
             {saving ? '저장 중...' : '저장'}
           </button>
         </div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>프로젝트 설명</div>
+        <textarea
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="이 프로젝트에 대한 간단한 설명을 입력하세요."
+          disabled={loading || saving}
+          rows={3}
+          style={{
+            width: '100%',
+            padding: '10px',
+            borderRadius: 8,
+            border: '1px solid #cbd5f5',
+            fontSize: 14,
+            resize: 'vertical',
+          }}
+        />
         <div style={{ fontSize: 12, color: '#475467' }}>
           현재 설정된 프로젝트 약호는 입력한 값으로 저장되며, 다른 탭에서도 동일하게 표시됩니다.
         </div>

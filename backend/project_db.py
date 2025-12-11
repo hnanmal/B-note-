@@ -20,7 +20,8 @@ EXTRA_TABLE_STATEMENTS = [
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         key TEXT NOT NULL UNIQUE,
         value TEXT,
-        pjt_abbr TEXT
+        pjt_abbr TEXT,
+        pjt_description TEXT
     )
     """,
     """
@@ -178,6 +179,8 @@ def ensure_extra_tables(db_path: Path) -> None:
         meta_columns = {row[1] for row in cursor.fetchall()}
         if 'pjt_abbr' not in meta_columns:
             cursor.execute("ALTER TABLE project_metadata ADD COLUMN pjt_abbr TEXT")
+        if 'pjt_description' not in meta_columns:
+            cursor.execute("ALTER TABLE project_metadata ADD COLUMN pjt_description TEXT")
         cursor.execute("PRAGMA index_list('work_masters')")
         indexes = {row[1] for row in cursor.fetchall()}
         if 'ix_work_masters_work_master_code' in indexes:
@@ -240,39 +243,52 @@ def delete_project_db(file_name: str) -> None:
 
 def _fetch_metadata_row(conn: sqlite3.Connection):
     cursor = conn.cursor()
-    cursor.execute("SELECT id, key, value, pjt_abbr FROM project_metadata ORDER BY id LIMIT 1")
+    cursor.execute(
+        "SELECT id, key, value, pjt_abbr, pjt_description FROM project_metadata ORDER BY id LIMIT 1"
+    )
     row = cursor.fetchone()
     if not row:
         cursor.execute(
-            "INSERT INTO project_metadata (key, value, pjt_abbr) VALUES (?, ?, ?)",
-            ("default", "", None),
+            "INSERT INTO project_metadata (key, value, pjt_abbr, pjt_description) VALUES (?, ?, ?, ?)",
+            ("default", "", None, None),
         )
         conn.commit()
-        cursor.execute("SELECT id, key, value, pjt_abbr FROM project_metadata ORDER BY id LIMIT 1")
+        cursor.execute(
+            "SELECT id, key, value, pjt_abbr, pjt_description FROM project_metadata ORDER BY id LIMIT 1"
+        )
         row = cursor.fetchone()
     return row
 
 
-def read_project_abbr(db_path: Path) -> Optional[str]:
-    ensure_extra_tables(db_path)
-    conn = sqlite3.connect(db_path.as_posix())
-    try:
-        row = _fetch_metadata_row(conn)
-        return row[3] if row else None
-    finally:
-        conn.close()
-
-
-def update_project_abbr(db_path: Path, abbreviation: Optional[str]) -> Optional[str]:
+def read_project_metadata(db_path: Path) -> Dict[str, Optional[str]]:
     ensure_extra_tables(db_path)
     conn = sqlite3.connect(db_path.as_posix())
     try:
         row = _fetch_metadata_row(conn)
         if not row:
-            return None
+            return {"pjt_abbr": None, "pjt_description": None}
+        return {"pjt_abbr": row[3], "pjt_description": row[4]}
+    finally:
+        conn.close()
+
+
+def update_project_metadata(db_path: Path, updates: Dict[str, Optional[str]]) -> Dict[str, Optional[str]]:
+    ensure_extra_tables(db_path)
+    conn = sqlite3.connect(db_path.as_posix())
+    try:
+        row = _fetch_metadata_row(conn)
+        if not row:
+            return {"pjt_abbr": None, "pjt_description": None}
+        current_abbr = row[3]
+        current_desc = row[4]
+        next_abbr = updates["pjt_abbr"] if "pjt_abbr" in updates else current_abbr
+        next_desc = updates["pjt_description"] if "pjt_description" in updates else current_desc
         cursor = conn.cursor()
-        cursor.execute("UPDATE project_metadata SET pjt_abbr = ? WHERE id = ?", (abbreviation, row[0]))
+        cursor.execute(
+            "UPDATE project_metadata SET pjt_abbr = ?, pjt_description = ? WHERE id = ?",
+            (next_abbr, next_desc, row[0]),
+        )
         conn.commit()
-        return abbreviation
+        return {"pjt_abbr": next_abbr, "pjt_description": next_desc}
     finally:
         conn.close()
