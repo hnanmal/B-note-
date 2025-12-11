@@ -127,6 +127,7 @@ class StandardItem(Base):
     children = relationship(
         "StandardItem", back_populates="parent", cascade="all, delete-orphan"
     )
+    derive_from = Column(Integer, nullable=True)
 
     # Many-to-Many relationship with WorkMaster
     work_masters = relationship(

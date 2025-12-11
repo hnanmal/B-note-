@@ -181,6 +181,10 @@ def ensure_extra_tables(db_path: Path) -> None:
             cursor.execute("ALTER TABLE project_metadata ADD COLUMN pjt_abbr TEXT")
         if 'pjt_description' not in meta_columns:
             cursor.execute("ALTER TABLE project_metadata ADD COLUMN pjt_description TEXT")
+        cursor.execute("PRAGMA table_info(standard_items)")
+        std_columns = {row[1] for row in cursor.fetchall()}
+        if 'derive_from' not in std_columns:
+            cursor.execute("ALTER TABLE standard_items ADD COLUMN derive_from INTEGER")
         cursor.execute("PRAGMA index_list('work_masters')")
         indexes = {row[1] for row in cursor.fetchall()}
         if 'ix_work_masters_work_master_code' in indexes:

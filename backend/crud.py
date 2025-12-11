@@ -254,7 +254,8 @@ def get_standard_items(
     parent_id: int = None,
 ):
     query = db.query(models.StandardItem).options(
-        joinedload(models.StandardItem.selected_work_master_assoc)
+        joinedload(models.StandardItem.selected_work_master_assoc),
+        joinedload(models.StandardItem.parent),
     )
 
     if search:
@@ -293,6 +294,36 @@ def create_standard_item(db: Session, standard_item: schemas.StandardItemCreate)
     db.commit()
     db.refresh(db_item)
     return db_item
+
+
+def create_derived_standard_item(
+    db: Session,
+    parent_id: int,
+    suffix_description: str,
+    work_master_id: int,
+):
+    parent = get_standard_item(db, parent_id)
+    if not parent:
+        return None
+    cleaned_suffix = (suffix_description or '').strip()
+    if not cleaned_suffix:
+        return None
+    derived_item = models.StandardItem(
+        name=cleaned_suffix,
+        type=parent.type,
+        parent_id=parent.parent_id,
+        derive_from=parent_id,
+    )
+    db.add(derived_item)
+    db.commit()
+    db.refresh(derived_item)
+    assign_work_master_to_standard_item(
+        db, derived_item.id, work_master_id
+    )
+    select_work_master_for_standard_item(db, derived_item.id, work_master_id)
+    db.refresh(derived_item)
+    _attach_standard_item_selection(derived_item)
+    return derived_item
 
 
 def delete_standard_item(db: Session, standard_item_id: int):
@@ -531,7 +562,10 @@ def delete_calc_dictionary_entry(db: Session, entry_id: int):
 def get_standard_item(db: Session, standard_item_id: int):
     item = (
         db.query(models.StandardItem)
-        .options(joinedload(models.StandardItem.selected_work_master_assoc))
+        .options(
+            joinedload(models.StandardItem.selected_work_master_assoc),
+            joinedload(models.StandardItem.parent),
+        )
         .filter(models.StandardItem.id == standard_item_id)
         .first()
     )

@@ -37,6 +37,7 @@ export default function StandardTreeManager({
     const [collapsedNodes, setCollapsedNodes] = useState(new Set());
     const [viewLevel, setViewLevel] = useState(3);
     const [checkboxSelection, setCheckboxSelection] = useState(() => new Set());
+    const [projectAbbr, setProjectAbbr] = useState('');
 
     const scrollMatchIntoView = (matchId) => {
         const target = nodeRefs.current.get(matchId);
@@ -63,6 +64,26 @@ export default function StandardTreeManager({
     useEffect(() => { fetchAll(); }, [refreshSignal]);
 
     useEffect(() => {
+        if (!apiBaseUrl.includes('/project/')) {
+            setProjectAbbr('');
+            return undefined;
+        }
+        let cancelled = false;
+        fetch(`${apiBaseUrl}/metadata/abbr`)
+            .then((res) =>
+                res.ok ? res.json() : Promise.reject(new Error('약호 조회 실패'))
+            )
+            .then((payload) => {
+                if (cancelled) return;
+                setProjectAbbr(payload?.pjt_abbr ?? '');
+            })
+            .catch(() => {
+                if (!cancelled) setProjectAbbr('');
+            });
+        return () => { cancelled = true; };
+    }, [apiBaseUrl]);
+
+    useEffect(() => {
         // build tree from filtered items
         const filtered = items.filter(i => filterType === 'ALL' ? true : i.type === filterType);
         const map = {};
@@ -77,6 +98,16 @@ export default function StandardTreeManager({
         });
         setTree(roots);
     }, [items, filterType]);
+
+    const itemById = useMemo(() => {
+        const map = new Map();
+        items.forEach((item) => {
+            if (item && typeof item.id !== 'undefined') {
+                map.set(item.id, item);
+            }
+        });
+        return map;
+    }, [items]);
 
     const refresh = () => fetchAll();
 
@@ -330,8 +361,13 @@ export default function StandardTreeManager({
         if (level >= viewLevel) return null;
         const isCollapsed = collapsedNodes.has(node.id);
         const shouldRenderChildren = hasChildren && level + 1 < viewLevel;
-    const allowCheckbox = level2CheckboxesEnabled && level === checkboxDepth;
-    const isLevel2Checked = checkboxSelection.has(node.id);
+        const allowCheckbox = level2CheckboxesEnabled && level === checkboxDepth;
+        const isLevel2Checked = checkboxSelection.has(node.id);
+        const isDerived = Boolean(node.derive_from);
+        const parentName = isDerived ? itemById.get(node.derive_from)?.name : null;
+        const derivedLabel = isDerived
+            ? `${parentName ?? '부모'}${projectAbbr ? ` [${projectAbbr}]` : ''}::${node.name}`
+            : node.name;
         return (
             <div
                 key={node.id}
@@ -419,7 +455,21 @@ export default function StandardTreeManager({
                                         <span style={{ fontWeight: 600, fontSize: 12 }}>▸</span>
                                     )}
                                     <span style={{ fontSize: 12 }}>
-                                        {node.name} <small style={{ color: '#666', fontSize: 10 }}>({node.type})</small>
+                                        {derivedLabel} <small style={{ color: '#666', fontSize: 10 }}>({node.type})</small>
+                                        {isDerived && (
+                                            <span
+                                                style={{
+                                                    fontSize: 10,
+                                                    marginLeft: 4,
+                                                    padding: '1px 4px',
+                                                    borderRadius: 4,
+                                                    background: '#e0e7ff',
+                                                    color: '#3730a3',
+                                                }}
+                                            >
+                                                파생
+                                            </span>
+                                        )}
                                     </span>
                                 </span>
                             </div>

@@ -521,6 +521,28 @@ def select_project_standard_item_work_master(
     return {"selected_work_master_id": result.work_master_id if result else None}
 
 
+@router.post(
+    "/project/{project_identifier}/standard-items/{standard_item_id}/derive",
+    response_model=schemas.StandardItem,
+    tags=["Project Data"],
+)
+def derive_project_standard_item_work_master(
+    project_identifier: str,
+    standard_item_id: int,
+    payload: schemas.DerivedStandardItemCreate,
+    db: Session = Depends(get_project_db_session),
+):
+    derived = crud.create_derived_standard_item(
+        db,
+        parent_id=standard_item_id,
+        suffix_description=payload.suffix_description,
+        work_master_id=payload.work_master_id,
+    )
+    if not derived:
+        raise HTTPException(status_code=400, detail="Derived item could not be created")
+    return derived
+
+
 @router.delete(
     "/project/{project_identifier}/standard-items/{standard_item_id}",
     tags=["Project Data"],

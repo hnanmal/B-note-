@@ -17,6 +17,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [gaugeRemoveErrors, setGaugeRemoveErrors] = useState({});
   const [gaugeRemoving, setGaugeRemoving] = useState({});
   const [workMasterReloadKey, setWorkMasterReloadKey] = useState(0);
+  const [treeRefreshKey, setTreeRefreshKey] = useState(0);
+  const [projectAbbr, setProjectAbbr] = useState('');
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
   const hasSelection = Boolean(selectedGwmNode);
@@ -37,6 +39,16 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       if (gaugeA > gaugeB) return 1;
       return (a?.id ?? 0) - (b?.id ?? 0);
     });
+  };
+
+  const getSelectedNodeDisplayName = () => {
+    if (!selectedGwmNode) return '—';
+    if (selectedGwmNode.derive_from) {
+      const parentName = selectedGwmNode.parent?.name ?? '부모';
+      const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
+      return `${parentName}${abbrPart}::${selectedGwmNode.name}`;
+    }
+    return selectedGwmNode.name ?? '—';
   };
 
   const buildSpecMapFromWorkMasters = (workMasters) => {
@@ -105,6 +117,31 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       cancelled = true;
     };
   }, [apiBaseUrl, selectedGwmId, workMasterReloadKey]);
+  
+  useEffect(() => {
+    if (!apiBaseUrl.includes('/project/')) {
+      setProjectAbbr('');
+      return undefined;
+    }
+    let cancelled = false;
+    fetch(`${apiBaseUrl}/metadata/abbr`)
+      .then((res) => {
+        if (!res.ok) throw new Error('약호를 불러오지 못했습니다.');
+        return res.json();
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setProjectAbbr(payload?.pjt_abbr ?? '');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProjectAbbr('');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
 
   const buildAttributeSummary = (workMaster) => {
     return [
@@ -121,24 +158,60 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
 
   const handleWorkMasterToggle = async (workMasterId) => {
     if (!selectedGwmId) return;
-    const nextId = selectedWorkMasterId === workMasterId ? null : workMasterId;
+    const isSelecting = selectedWorkMasterId !== workMasterId;
     setSelectionLoading(true);
     setSelectionError(null);
+    if (!isSelecting) {
+      try {
+        const response = await fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}/select`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ work_master_id: null }),
+        });
+        if (!response.ok) {
+          throw new Error('선택 저장에 실패했습니다.');
+        }
+        const payload = await response.json();
+        setSelectedWorkMasterId(payload?.selected_work_master_id ?? null);
+        setSelectedGwmNode((prev) => ({
+          ...(prev ?? {}),
+          selected_work_master_id: payload?.selected_work_master_id ?? null,
+        }));
+      } catch (error) {
+        setSelectionError(
+          error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
+        );
+      } finally {
+        setSelectionLoading(false);
+      }
+      return;
+    }
+
+    const suffix = window.prompt('파생 항목 접미 설명을 입력하세요. 예: 현장데이터');
+    if (!suffix || !suffix.trim()) {
+      setSelectionLoading(false);
+      setSelectionError('접미 설명은 필수입니다.');
+      return;
+    }
+
     try {
-      const response = await fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}/select`, {
+      const response = await fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}/derive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ work_master_id: nextId }),
+        body: JSON.stringify({
+          suffix_description: suffix.trim(),
+          work_master_id: workMasterId,
+        }),
       });
       if (!response.ok) {
-        throw new Error('선택 저장에 실패했습니다.');
+        const errorText = await response.text();
+        throw new Error(errorText || '파생 항목을 생성할 수 없습니다.');
       }
       const payload = await response.json();
+      setSelectedGwmNode(payload);
       setSelectedWorkMasterId(payload?.selected_work_master_id ?? null);
-      setSelectedGwmNode((prev) => ({
-        ...(prev ?? {}),
-        selected_work_master_id: payload?.selected_work_master_id ?? null,
-      }));
+      setTreeRefreshKey((prev) => prev + 1);
+      setSelectionError(null);
     } catch (error) {
       setSelectionError(
         error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
@@ -531,6 +604,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           <div style={{ flex: 1, minHeight: 0 }}>
             <StandardTreeManager
               apiBaseUrl={apiBaseUrl}
+              refreshSignal={treeRefreshKey}
               onNodeSelect={(payload) => {
                 if (payload?.node) {
                   setSelectedGwmNode(payload.node);
@@ -566,7 +640,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             <span>WorkMaster Matching</span>
             {hasSelection && (
               <span style={{ fontSize: 11, color: '#475467' }}>
-                선택된 GWM: {selectedGwmNode?.name ?? '—'} (ID: {selectedGwmNode?.id ?? '—'})
+                선택된 GWM: {getSelectedNodeDisplayName()} (ID: {selectedGwmNode?.id ?? '—'})
               </span>
             )}
           </div>

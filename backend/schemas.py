@@ -13,6 +13,7 @@ class _StandardItemWithoutRelations(BaseModel):
     name: str
     type: StandardItemType
     parent_id: Optional[int] = None
+    derive_from: Optional[int] = None
 
 
 class _ProjectWithoutOwner(BaseModel):
@@ -100,10 +101,16 @@ class StandardItem(StandardItemBase):
     children: List[_StandardItemWithoutRelations] = []
     work_masters: List[WorkMaster] = []
     selected_work_master_id: Optional[int] = None
+    derive_from: Optional[int] = None
 
 
 class StandardItemWorkMasterSelectionRequest(BaseModel):
     work_master_id: Optional[int] = None
+
+class DerivedStandardItemCreate(BaseModel):
+    suffix_description: str
+    work_master_id: int
+
 
 
 class _FamilyListWithoutRelations(BaseModel):
