@@ -19,7 +19,8 @@ EXTRA_TABLE_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS project_metadata (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         key TEXT NOT NULL UNIQUE,
-        value TEXT
+        value TEXT,
+        pjt_abbr TEXT
     )
     """,
     """
@@ -173,6 +174,10 @@ def ensure_extra_tables(db_path: Path) -> None:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN add_spec TEXT")
         if 'gauge' not in wm_columns:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN gauge TEXT")
+        cursor.execute("PRAGMA table_info(project_metadata)")
+        meta_columns = {row[1] for row in cursor.fetchall()}
+        if 'pjt_abbr' not in meta_columns:
+            cursor.execute("ALTER TABLE project_metadata ADD COLUMN pjt_abbr TEXT")
         cursor.execute("PRAGMA index_list('work_masters')")
         indexes = {row[1] for row in cursor.fetchall()}
         if 'ix_work_masters_work_master_code' in indexes:
