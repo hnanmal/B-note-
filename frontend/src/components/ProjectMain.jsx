@@ -95,38 +95,20 @@ export default function ProjectMain({ apiBaseUrl }) {
         }}
       >
         <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>프로젝트 약호</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input
-            type="text"
-            value={abbr}
-            onChange={(event) => setAbbr(event.target.value)}
-            placeholder="예: DQRU"
-            disabled={loading || saving}
-            style={{
-              flex: 1,
-              padding: '8px 10px',
-              borderRadius: 8,
-              border: '1px solid #cbd5f5',
-              fontSize: 14,
-            }}
-          />
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || loading}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 8,
-              border: 'none',
-              background: '#2563eb',
-              color: '#fff',
-              fontWeight: 600,
-              cursor: saving || loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {saving ? '저장 중...' : '저장'}
-          </button>
-        </div>
+        <input
+          type="text"
+          value={abbr}
+          onChange={(event) => setAbbr(event.target.value)}
+          placeholder="예: DQRU"
+          disabled={loading || saving}
+          style={{
+            width: '100%',
+            padding: '8px 10px',
+            borderRadius: 8,
+            border: '1px solid #cbd5f5',
+            fontSize: 14,
+          }}
+        />
         <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>프로젝트 설명</div>
         <textarea
           value={description}
@@ -143,7 +125,24 @@ export default function ProjectMain({ apiBaseUrl }) {
             resize: 'vertical',
           }}
         />
-        <div style={{ fontSize: 12, color: '#475467' }}>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || loading}
+          style={{
+            marginTop: 8,
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: 'none',
+            background: '#2563eb',
+            color: '#fff',
+            fontWeight: 600,
+            cursor: saving || loading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {saving ? '저장 중...' : '저장'}
+        </button>
+        <div style={{ fontSize: 12, color: '#475467', marginTop: 6 }}>
           현재 설정된 프로젝트 약호는 입력한 값으로 저장되며, 다른 탭에서도 동일하게 표시됩니다.
         </div>
         {statusMessage && (
