@@ -597,6 +597,38 @@ def create_project_building(
     if existing:
         raise HTTPException(status_code=409, detail="Building already exists")
     return crud.create_building(db=db, building=building)
+    
+@router.get(
+    "/project/{project_identifier}/metadata/abbr",
+    response_model=schemas.ProjectAbbreviation,
+    tags=["Project Data"],
+)
+def read_project_abbreviation(
+    project_identifier: str,
+):
+    try:
+        db_path = project_db.resolve_project_db_path(project_identifier)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    value = project_db.read_project_abbr(db_path)
+    return {"pjt_abbr": value}
+
+
+@router.patch(
+    "/project/{project_identifier}/metadata/abbr",
+    response_model=schemas.ProjectAbbreviation,
+    tags=["Project Data"],
+)
+def update_project_abbreviation(
+    project_identifier: str,
+    payload: schemas.ProjectAbbreviation,
+):
+    try:
+        db_path = project_db.resolve_project_db_path(project_identifier)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    project_db.update_project_abbr(db_path, payload.pjt_abbr)
+    return {"pjt_abbr": project_db.read_project_abbr(db_path)}
 
 
 @router.delete(

@@ -13,7 +13,6 @@ import ProjectStandardSelect from './components/ProjectStandardSelect';
 import ProjectMain from './components/ProjectMain';
 
 const NAV_ITEMS = [
-  { id: 'project-main', label: 'Project Main', icon: '🏠' },
   { id: 'workmaster', label: '워크마스터 매니저', icon: '🧰' },
   { id: 'matching', label: 'Team Standard Matching', icon: '🧩' },
   { id: 'select', label: 'Standard Select', icon: '✨' },
@@ -52,12 +51,14 @@ function App() {
     ? `${API_BASE_URL}/project/${encodeURIComponent(projectRouteIdentifier)}`
     : API_BASE_URL;
   const navLabelOverrides = {
-    'project-main': 'Project Main',
     workmaster: isProjectEditorRoute ? '프로젝트 워크마스터 매니저' : '워크마스터 매니저',
     matching: isProjectEditorRoute ? '프로젝트 Standard Matching' : 'Team Standard Matching',
     select: isProjectEditorRoute ? '프로젝트 Standard Select' : 'Team Standard Select',
   };
-  const activeNavItems = NAV_ITEMS.map((item) => ({
+  const navItems = isProjectEditorRoute
+    ? [{ id: 'project-main', label: 'Project Main', icon: '🏠' }, ...NAV_ITEMS]
+    : NAV_ITEMS;
+  const activeNavItems = navItems.map((item) => ({
     ...item,
     label: navLabelOverrides[item.id] ?? item.label,
   }));
@@ -203,6 +204,12 @@ function App() {
       setCalcDictionarySyncStatus(null);
     }
   }, [activePage]);
+
+  useEffect(() => {
+    if (!isProjectEditorRoute && activePage === 'project-main') {
+      setActivePage('matching');
+    }
+  }, [isProjectEditorRoute, activePage]);
 
   return (
     <div className="App" style={{ height: 'calc(100vh - 1.5rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>

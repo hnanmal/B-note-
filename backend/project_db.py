@@ -236,3 +236,43 @@ def delete_project_db(file_name: str) -> None:
     target_path = _resolve_path(file_name)
     target_path.unlink()
     _remove_entry(file_name)
+
+
+def _fetch_metadata_row(conn: sqlite3.Connection):
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, key, value, pjt_abbr FROM project_metadata ORDER BY id LIMIT 1")
+    row = cursor.fetchone()
+    if not row:
+        cursor.execute(
+            "INSERT INTO project_metadata (key, value, pjt_abbr) VALUES (?, ?, ?)",
+            ("default", "", None),
+        )
+        conn.commit()
+        cursor.execute("SELECT id, key, value, pjt_abbr FROM project_metadata ORDER BY id LIMIT 1")
+        row = cursor.fetchone()
+    return row
+
+
+def read_project_abbr(db_path: Path) -> Optional[str]:
+    ensure_extra_tables(db_path)
+    conn = sqlite3.connect(db_path.as_posix())
+    try:
+        row = _fetch_metadata_row(conn)
+        return row[3] if row else None
+    finally:
+        conn.close()
+
+
+def update_project_abbr(db_path: Path, abbreviation: Optional[str]) -> Optional[str]:
+    ensure_extra_tables(db_path)
+    conn = sqlite3.connect(db_path.as_posix())
+    try:
+        row = _fetch_metadata_row(conn)
+        if not row:
+            return None
+        cursor = conn.cursor()
+        cursor.execute("UPDATE project_metadata SET pjt_abbr = ? WHERE id = ?", (abbreviation, row[0]))
+        conn.commit()
+        return abbreviation
+    finally:
+        conn.close()

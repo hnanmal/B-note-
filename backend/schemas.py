@@ -200,6 +200,10 @@ class CalcDictionarySyncResult(BaseModel):
     updated_entries: int
 
 
+class ProjectAbbreviation(BaseModel):
+    pjt_abbr: Optional[str] = None
+
+
 class GwmFamilyAssignmentPayload(BaseModel):
     standard_item_ids: List[int] = Field(default_factory=list)
 
