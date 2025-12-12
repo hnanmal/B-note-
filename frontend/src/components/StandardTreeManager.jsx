@@ -39,6 +39,7 @@ export default function StandardTreeManager({
     const [viewLevel, setViewLevel] = useState(3);
     const [checkboxSelection, setCheckboxSelection] = useState(() => new Set());
     const [projectAbbr, setProjectAbbr] = useState('');
+    const isProjectContext = apiBaseUrl.includes('/project/');
 
     const scrollMatchIntoView = (matchId) => {
         const target = nodeRefs.current.get(matchId);
@@ -495,7 +496,7 @@ export default function StandardTreeManager({
         const isDerivedUnselected = isDerived && !node.selected_work_master_id;
         const isLevel2Gwm = level === 2 && (node.type ?? '').toUpperCase() === 'GWM';
         const isLevel2GwmUnselected = isLevel2Gwm && !node.selected_work_master_id;
-        const isUnselectedHighlight = isDerivedUnselected || isLevel2GwmUnselected;
+        const isUnselectedHighlight = isProjectContext && (isDerivedUnselected || isLevel2GwmUnselected);
         return (
             <div
                 key={node.id}
