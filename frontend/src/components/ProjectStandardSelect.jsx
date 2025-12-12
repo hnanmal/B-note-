@@ -21,8 +21,10 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [projectAbbr, setProjectAbbr] = useState('');
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
+  const effectiveStandardItemId = selectedGwmNode?.derive_from ?? selectedGwmId;
   const hasSelection = Boolean(selectedGwmNode);
   const isProjectContext = apiBaseUrl.includes('/project/');
+  const isDerivedSelection = Boolean(selectedGwmNode?.derive_from);
 
   const sortWorkMasters = (workMasters) => {
     const clones = Array.isArray(workMasters) ? [...workMasters] : [];
@@ -61,7 +63,10 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   };
 
   useEffect(() => {
-    if (!selectedGwmId) {
+    const sourceStandardItemId = effectiveStandardItemId;
+    const derivedStandardItemId = isDerivedSelection ? selectedGwmId : null;
+
+    if (!sourceStandardItemId) {
       setDbWorkMasters([]);
       setDbWorkMastersError(null);
       setSelectedWorkMasterId(null);
@@ -85,7 +90,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     setGaugeRemoving({});
     setGaugeRemoveErrors({});
 
-    fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}`)
+    fetch(`${apiBaseUrl}/standard-items/${sourceStandardItemId}`)
       .then((res) => {
         if (!res.ok) {
           throw new Error('Work Master 정보를 불러오지 못했습니다.');
@@ -95,8 +100,14 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       .then((data) => {
         if (cancelled) return;
         const workMasters = Array.isArray(data?.work_masters) ? data.work_masters : [];
-        setSelectedGwmNode((prev) => ({ ...(prev ?? {}), ...data }));
-        setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
+        setSelectedGwmNode((prev) => ({
+          ...(prev ?? {}),
+          ...data,
+          derive_from: prev?.derive_from ?? data?.derive_from ?? null,
+        }));
+        if (!isDerivedSelection) {
+          setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
+        }
         const sorted = sortWorkMasters(workMasters);
         setDbWorkMasters(sorted);
         setWorkMasterSpecs(buildSpecMapFromWorkMasters(sorted));
@@ -113,10 +124,35 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         }
       });
 
+    if (isDerivedSelection && derivedStandardItemId) {
+      fetch(`${apiBaseUrl}/standard-items/${derivedStandardItemId}`)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error('파생 항목 선택 정보를 불러오지 못했습니다.');
+          }
+          return res.json();
+        })
+        .then((data) => {
+          if (cancelled) return;
+          setSelectedGwmNode((prev) => ({
+            ...(prev ?? {}),
+            ...data,
+            derive_from: prev?.derive_from ?? data?.derive_from,
+          }));
+          setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setSelectionError(
+            error instanceof Error ? error.message : '파생 항목 선택 정보를 불러오지 못했습니다.'
+          );
+        });
+    }
+
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, selectedGwmId, workMasterReloadKey]);
+  }, [apiBaseUrl, effectiveStandardItemId, isDerivedSelection, selectedGwmId, workMasterReloadKey]);
   
   useEffect(() => {
     if (!apiBaseUrl.includes('/project/')) {
@@ -157,16 +193,45 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   };
 
   const handleWorkMasterToggle = async (workMasterId) => {
-    if (!selectedGwmId) return;
+    const targetSelectionItemId = isDerivedSelection ? selectedGwmId : effectiveStandardItemId;
+    if (!targetSelectionItemId) return;
+
     const isSelecting = selectedWorkMasterId !== workMasterId;
     setSelectionLoading(true);
     setSelectionError(null);
+
     if (!isSelecting) {
       try {
-        const response = await fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}/select`, {
+        const response = await fetch(`${apiBaseUrl}/standard-items/${targetSelectionItemId}/select`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ work_master_id: null }),
+        });
+        if (!response.ok) {
+          throw new Error('선택 저장에 실패했습니다.');
+        }
+        const payload = await response.json();
+        setSelectedWorkMasterId(payload?.selected_work_master_id ?? null);
+        setSelectedGwmNode((prev) => ({
+          ...(prev ?? {}),
+          selected_work_master_id: payload?.selected_work_master_id ?? null,
+        }));
+      } catch (error) {
+        setSelectionError(
+          error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
+        );
+      } finally {
+        setSelectionLoading(false);
+      }
+      return;
+    }
+
+    if (isDerivedSelection) {
+      try {
+        const response = await fetch(`${apiBaseUrl}/standard-items/${targetSelectionItemId}/select`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ work_master_id: workMasterId }),
         });
         if (!response.ok) {
           throw new Error('선택 저장에 실패했습니다.');
