@@ -523,20 +523,21 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         >
           <div style={{ fontSize: 11, color: '#475467' }}>추가 Spec</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="text"
+            <textarea
               value={specValue}
               onChange={(e) => handleWorkMasterSpecChange(workMaster.id, e.target.value)}
               disabled={selectionLoading || isSpecSaving}
               placeholder="WorkMaster spec"
+              rows={3}
               style={{
                 flex: 1,
-                padding: '6px 10px',
+                padding: '8px 10px',
                 fontSize: 13,
                 borderRadius: 6,
                 border: '1px solid #cbd5f5',
                 background: '#fff',
                 minWidth: 0,
+                resize: 'vertical',
               }}
             />
             <button
@@ -547,7 +548,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
               }}
               disabled={selectionLoading || isSpecSaving}
               style={{
-                padding: '6px 14px',
+                padding: '8px 14px',
                 fontSize: 12,
                 fontWeight: 600,
                 borderRadius: 6,
@@ -555,6 +556,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
                 background: '#7c3aed',
                 color: '#fff',
                 cursor: selectionLoading || isSpecSaving ? 'not-allowed' : 'pointer',
+                height: 'fit-content',
+                alignSelf: 'flex-start',
               }}
             >
               {isSpecSaving ? '저장 중...' : '저장'}
@@ -632,7 +635,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>WorkMaster Matching</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>WorkMaster Selection</div>
         <div style={{ fontSize: 11, color: '#475467' }}>
           {dbWorkMasters.length ? `${dbWorkMasters.length}개 항목` : '항목 없음'}
         </div>
