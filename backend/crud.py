@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, delete
 from typing import Optional, List, Dict, Any
 from string import ascii_uppercase
+from datetime import datetime
 from . import models, schemas
 from . import security
 
@@ -321,9 +322,54 @@ def create_derived_standard_item(
         db, derived_item.id, work_master_id
     )
     select_work_master_for_standard_item(db, derived_item.id, work_master_id)
+    _copy_family_assignments_from_parent(db, parent_id, derived_item.id)
     db.refresh(derived_item)
     _attach_standard_item_selection(derived_item)
     return derived_item
+
+
+def _copy_family_assignments_from_parent(
+    db: Session, parent_standard_item_id: int, derived_standard_item_id: int
+):
+    if not parent_standard_item_id or not derived_standard_item_id:
+        return
+
+    source_assignments = (
+        db.query(models.GwmFamilyAssign)
+        .filter(models.GwmFamilyAssign.standard_item_id == parent_standard_item_id)
+        .all()
+    )
+    if not source_assignments:
+        return
+
+    existing_families = set(
+        db.query(models.GwmFamilyAssign.family_list_id)
+        .filter(models.GwmFamilyAssign.standard_item_id == derived_standard_item_id)
+        .all()
+    )
+    existing_families = {fam_id for (fam_id,) in existing_families}
+
+    now = datetime.utcnow()
+    clones = []
+    for assignment in source_assignments:
+        if assignment.family_list_id in existing_families:
+            continue
+        clones.append(
+            models.GwmFamilyAssign(
+                family_list_id=assignment.family_list_id,
+                standard_item_id=derived_standard_item_id,
+                assigned_at=assignment.assigned_at or now,
+                created_at=now,
+                formula=assignment.formula,
+                description=assignment.description,
+            )
+        )
+
+    if not clones:
+        return
+
+    db.bulk_save_objects(clones)
+    db.commit()
 
 
 def delete_standard_item(db: Session, standard_item_id: int):
