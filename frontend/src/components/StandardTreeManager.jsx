@@ -96,6 +96,36 @@ export default function StandardTreeManager({
                 roots.push(map[i.id]);
             }
         });
+
+        const derivedNodes = filtered.filter(i => i.derive_from && map[i.derive_from] && map[i.id]);
+        derivedNodes.forEach((node) => {
+            const derived = map[node.id];
+            const source = map[node.derive_from];
+            if (!derived || !source) return;
+
+            const removeFromParent = () => {
+                if (derived.parent_id && map[derived.parent_id]) {
+                    map[derived.parent_id].children = map[derived.parent_id].children.filter(
+                        (child) => child.id !== derived.id
+                    );
+                } else {
+                    const index = roots.findIndex((root) => root.id === derived.id);
+                    if (index >= 0) {
+                        roots.splice(index, 1);
+                    }
+                }
+            };
+
+            removeFromParent();
+
+            const siblings = source.parent_id && map[source.parent_id]
+                ? map[source.parent_id].children
+                : roots;
+            const sourceIndex = siblings.findIndex((item) => item.id === source.id);
+            if (sourceIndex < 0) return;
+            siblings.splice(sourceIndex + 1, 0, derived);
+        });
+
         setTree(roots);
     }, [items, filterType]);
 
