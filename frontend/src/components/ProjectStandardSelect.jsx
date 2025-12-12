@@ -748,7 +748,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
               alignItems: 'center',
             }}
           >
-            <span>WorkMaster Matching</span>
+            <span>WorkMaster Selection</span>
             {hasSelection && (
               <span style={{ fontSize: 11, color: '#475467' }}>
                 선택된 GWM: {getSelectedNodeDisplayName()} (ID: {selectedGwmNode?.id ?? '—'})
