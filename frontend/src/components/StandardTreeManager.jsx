@@ -610,7 +610,7 @@ export default function StandardTreeManager({
                             onClick={() => handleDeriveGwmLevel1(node)}
                         >파생생성</button>
                     )}
-                    {level === 2 && (node.type ?? '').toUpperCase() !== 'GWM' && (
+                    {level === 2 && (node.type ?? '').toUpperCase() !== 'GWM' && !isDerived && (
                         <button
                             style={{ marginLeft: 6, ...smallBtn }}
                             onClick={() => handleDerive(node)}
