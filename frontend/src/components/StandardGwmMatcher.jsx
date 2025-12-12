@@ -91,12 +91,13 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
     const loadAssignments = useCallback(async () => {
         const nodeId = selectedNode?.id;
         const nodeDepth = selectedNode?.depth;
-        if (!nodeId || nodeDepth < 2) {
+        const effectiveId = selectedNode?.node?.derive_from ?? nodeId;
+        if (!effectiveId || nodeDepth < 2) {
             setAssignedSet(new Set());
             return;
         }
         try {
-            const res = await fetch(`${apiBaseUrl}/standard-items/${nodeId}`);
+            const res = await fetch(`${apiBaseUrl}/standard-items/${effectiveId}`);
             if (!res.ok) throw new Error('선택 항목 상세를 불러오지 못했습니다');
             const data = await res.json();
             const loaded = new Set((data.work_masters || []).map(w => w.id));
@@ -188,7 +189,8 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
     };
 
     const handleSaveAssignments = async () => {
-        if (!selectedNode || !selectedNode.id || selectedNode.depth < 2) {
+        const effectiveId = selectedNode?.node?.derive_from ?? selectedNode?.id;
+        if (!selectedNode || !effectiveId || selectedNode.depth < 2) {
             setMessage('레벨2 항목을 선택한 후 저장하세요');
             return;
         }
@@ -201,7 +203,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
             const toRemove = Array.from(current).filter(id => !next.has(id));
             console.log('save: toAdd', toAdd, 'toRemove', toRemove, 'node', selectedNode?.id);
             for (const id of toAdd) {
-                await fetch(`${apiBaseUrl}/standard-items/${selectedNode.id}/assign`, {
+                await fetch(`${apiBaseUrl}/standard-items/${effectiveId}/assign`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ work_master_id: Number(id) }),
@@ -209,7 +211,7 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
                 console.log('save assign', id);
             }
             for (const id of toRemove) {
-                await fetch(`${apiBaseUrl}/standard-items/${selectedNode.id}/remove`, {
+                await fetch(`${apiBaseUrl}/standard-items/${effectiveId}/remove`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ work_master_id: Number(id) }),
