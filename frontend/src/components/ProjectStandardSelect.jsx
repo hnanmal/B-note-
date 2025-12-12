@@ -233,6 +233,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           ...(prev ?? {}),
           selected_work_master_id: payload?.selected_work_master_id ?? null,
         }));
+        setTreeRefreshKey((prev) => prev + 1);
       } catch (error) {
         setSelectionError(
           error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
@@ -260,6 +261,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           ...(prev ?? {}),
           selected_work_master_id: payload?.selected_work_master_id ?? null,
         }));
+        setTreeRefreshKey((prev) => prev + 1);
       } catch (error) {
         setSelectionError(
           error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
@@ -323,6 +325,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         ...(prev ?? {}),
         selected_work_master_id: payload?.selected_work_master_id ?? null,
       }));
+      setTreeRefreshKey((prev) => prev + 1);
     } catch (error) {
       setSelectionError(
         error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
