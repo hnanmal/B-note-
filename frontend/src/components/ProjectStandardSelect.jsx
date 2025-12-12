@@ -705,6 +705,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           display: 'grid',
           gridTemplateColumns: '2fr 2.3fr',
           gap: 24,
+          overflow: 'hidden',
         }}
       >
         <div
@@ -716,9 +717,10 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             background: '#fff',
             display: 'flex',
             flexDirection: 'column',
+            overflow: 'hidden',
           }}
         >
-          <div style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
             <StandardTreeManager
               apiBaseUrl={apiBaseUrl}
               refreshSignal={treeRefreshKey}
@@ -742,6 +744,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             flexDirection: 'column',
             gap: 12,
             minWidth: 360,
+            minHeight: 0,
+            overflow: 'hidden',
           }}
         >
           <div
