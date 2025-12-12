@@ -25,6 +25,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const hasSelection = Boolean(selectedGwmNode);
   const isProjectContext = apiBaseUrl.includes('/project/');
   const isDerivedSelection = Boolean(selectedGwmNode?.derive_from);
+  const isSwm = (selectedGwmNode?.type ?? '').toUpperCase() === 'SWM';
 
   const sortWorkMasters = (workMasters) => {
     const clones = Array.isArray(workMasters) ? [...workMasters] : [];
@@ -207,13 +208,15 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   };
 
   const handleWorkMasterToggle = async (workMasterId) => {
+    const baseItemId = selectedGwmId;
     const targetSelectionItemId = isDerivedSelection ? selectedGwmId : effectiveStandardItemId;
-    if (!targetSelectionItemId) return;
+    if (!targetSelectionItemId || !baseItemId) return;
 
     const isSelecting = selectedWorkMasterId !== workMasterId;
     setSelectionLoading(true);
     setSelectionError(null);
 
+    // Unselect
     if (!isSelecting) {
       try {
         const response = await fetch(`${apiBaseUrl}/standard-items/${targetSelectionItemId}/select`, {
@@ -240,6 +243,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       return;
     }
 
+    // Derived nodes: direct select
     if (isDerivedSelection) {
       try {
         const response = await fetch(`${apiBaseUrl}/standard-items/${targetSelectionItemId}/select`, {
@@ -266,31 +270,59 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       return;
     }
 
-    const suffix = window.prompt('파생 항목 접미 설명을 입력하세요. 예: 현장데이터');
-    if (!suffix || !suffix.trim()) {
-      setSelectionLoading(false);
-      setSelectionError('접미 설명은 필수입니다.');
+    // SWM: force derive when selecting
+    if (isSwm) {
+      const suffix = window.prompt('파생 항목 접미 설명을 입력하세요. 예: 현장데이터');
+      if (!suffix || !suffix.trim()) {
+        setSelectionLoading(false);
+        setSelectionError('접미 설명은 필수입니다.');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/standard-items/${baseItemId}/derive`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            suffix_description: suffix.trim(),
+            work_master_id: workMasterId,
+          }),
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || '파생 항목을 생성할 수 없습니다.');
+        }
+        const payload = await response.json();
+        setSelectedGwmNode(payload);
+        setSelectedWorkMasterId(payload?.selected_work_master_id ?? null);
+        setTreeRefreshKey((prev) => prev + 1);
+        setSelectionError(null);
+      } catch (error) {
+        setSelectionError(
+          error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
+        );
+      } finally {
+        setSelectionLoading(false);
+      }
       return;
     }
 
+    // GWM: direct select (no derive)
     try {
-      const response = await fetch(`${apiBaseUrl}/standard-items/${selectedGwmId}/derive`, {
+      const response = await fetch(`${apiBaseUrl}/standard-items/${targetSelectionItemId}/select`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suffix_description: suffix.trim(),
-          work_master_id: workMasterId,
-        }),
+        body: JSON.stringify({ work_master_id: workMasterId }),
       });
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || '파생 항목을 생성할 수 없습니다.');
+        throw new Error('선택 저장에 실패했습니다.');
       }
       const payload = await response.json();
-      setSelectedGwmNode(payload);
       setSelectedWorkMasterId(payload?.selected_work_master_id ?? null);
-      setTreeRefreshKey((prev) => prev + 1);
-      setSelectionError(null);
+      setSelectedGwmNode((prev) => ({
+        ...(prev ?? {}),
+        selected_work_master_id: payload?.selected_work_master_id ?? null,
+      }));
     } catch (error) {
       setSelectionError(
         error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
