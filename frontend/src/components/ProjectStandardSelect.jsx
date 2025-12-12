@@ -100,11 +100,18 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       .then((data) => {
         if (cancelled) return;
         const workMasters = Array.isArray(data?.work_masters) ? data.work_masters : [];
-        setSelectedGwmNode((prev) => ({
-          ...(prev ?? {}),
-          ...data,
-          derive_from: prev?.derive_from ?? data?.derive_from ?? null,
-        }));
+        setSelectedGwmNode((prev) => {
+          const isDerived = Boolean(prev?.derive_from ?? data?.derive_from);
+          const derivedId = isDerived ? prev?.id : null;
+          const derivedName = isDerived ? prev?.name : null;
+          return {
+            ...(prev ?? {}),
+            ...data,
+            derive_from: prev?.derive_from ?? data?.derive_from ?? null,
+            id: derivedId ?? data?.id,
+            name: derivedName ?? data?.name,
+          };
+        });
         if (!isDerivedSelection) {
           setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
         }
@@ -134,11 +141,18 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         })
         .then((data) => {
           if (cancelled) return;
-          setSelectedGwmNode((prev) => ({
-            ...(prev ?? {}),
-            ...data,
-            derive_from: prev?.derive_from ?? data?.derive_from,
-          }));
+          setSelectedGwmNode((prev) => {
+            const isDerived = Boolean(prev?.derive_from ?? data?.derive_from);
+            const derivedId = isDerived ? prev?.id ?? data?.id : data?.id;
+            const derivedName = isDerived ? prev?.name ?? data?.name : data?.name;
+            return {
+              ...(prev ?? {}),
+              ...data,
+              derive_from: prev?.derive_from ?? data?.derive_from,
+              id: derivedId,
+              name: derivedName,
+            };
+          });
           setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
         })
         .catch((error) => {
