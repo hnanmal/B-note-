@@ -492,6 +492,7 @@ export default function StandardTreeManager({
         const derivedLabel = isDerived
             ? `${parentName ?? '부모'}${projectAbbr ? ` [${projectAbbr}]` : ''}::${childName}`
             : node.name;
+        const isDerivedUnselected = isDerived && !node.selected_work_master_id;
         return (
             <div
                 key={node.id}
@@ -555,6 +556,7 @@ export default function StandardTreeManager({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 6,
+                                    color: isDerivedUnselected ? '#b91c1c' : undefined,
                                 }}
                             >
                                 {allowCheckbox && (
@@ -592,6 +594,20 @@ export default function StandardTreeManager({
                                                 }}
                                             >
                                                 파생
+                                            </span>
+                                        )}
+                                        {isDerivedUnselected && (
+                                            <span
+                                                style={{
+                                                    fontSize: 10,
+                                                    marginLeft: 4,
+                                                    padding: '1px 4px',
+                                                    borderRadius: 4,
+                                                    background: '#fee2e2',
+                                                    color: '#b91c1c',
+                                                }}
+                                            >
+                                                미선택
                                             </span>
                                         )}
                                     </span>
