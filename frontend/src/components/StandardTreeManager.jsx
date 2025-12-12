@@ -484,8 +484,11 @@ export default function StandardTreeManager({
         const isLevel2Checked = checkboxSelection.has(node.id);
         const isDerived = Boolean(node.derive_from);
         const parentName = isDerived ? itemById.get(node.derive_from)?.name : null;
+        const childName = isDerived
+            ? (node.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || node.name
+            : node.name;
         const derivedLabel = isDerived
-            ? `${parentName ?? '부모'}${projectAbbr ? ` [${projectAbbr}]` : ''}::${node.name}`
+            ? `${parentName ?? '부모'}${projectAbbr ? ` [${projectAbbr}]` : ''}::${childName}`
             : node.name;
         return (
             <div

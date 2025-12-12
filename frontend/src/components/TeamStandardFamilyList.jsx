@@ -252,6 +252,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
   const [standardItems, setStandardItems] = useState([]);
   const [standardTree, setStandardTree] = useState([]);
   const [standardTreeError, setStandardTreeError] = useState(null);
+  const [projectAbbr, setProjectAbbr] = useState('');
   const [checkboxAncestorMap, setCheckboxAncestorMap] = useState(() => new Map());
   const [assignmentMetadata, setAssignmentMetadata] = useState(() => new Map());
   const [isStdTreeOpen, setIsStdTreeOpen] = useState(true);
@@ -690,9 +691,39 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
   }, []);
 
   useEffect(() => {
+    if (!apiBaseUrl.includes('/project/')) {
+      setProjectAbbr('');
+      return undefined;
+    }
+    let cancelled = false;
+    fetch(`${apiBaseUrl}/metadata/abbr`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('프로젝트 약호 조회 실패'))))
+      .then((payload) => {
+        if (cancelled) return;
+        setProjectAbbr(payload?.pjt_abbr ?? '');
+      })
+      .catch(() => {
+        if (!cancelled) setProjectAbbr('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
     const { roots, ancestorMap } = buildStandardTreeWithDepth(standardItems);
     setStandardTree(roots);
     setCheckboxAncestorMap(ancestorMap);
+  }, [standardItems]);
+
+  const standardItemById = useMemo(() => {
+    const map = new Map();
+    standardItems.forEach((item) => {
+      if (item && typeof item.id !== 'undefined') {
+        map.set(item.id, item);
+      }
+    });
+    return map;
   }, [standardItems]);
 
   useEffect(() => {
@@ -889,6 +920,19 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
       assignmentMetadata
     );
   }, [standardTree, normalizedAssignedStandardIds, checkboxAncestorMap, assignmentMetadata]);
+
+  const deriveLabel = useCallback(
+    (node) => {
+      if (!node) return '';
+      const isDerived = Boolean(node.derive_from);
+      if (!isDerived) return node.name;
+      const parentName = standardItemById.get(node.derive_from)?.name;
+      const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
+      const childName = (node.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || node.name;
+      return `${parentName ?? '부모'}${abbrPart}::${childName}`;
+    },
+    [projectAbbr, standardItemById]
+  );
 
   const clearPendingSave = useCallback(() => {
     pendingSave.current = { ids: [], key: '' };
@@ -1508,6 +1552,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
       const descriptionText = metadata?.description ?? '';
       const isEditing = Boolean(metadata?.id && editingAssignmentId === metadata.id);
       const hasChildren = node.children && node.children.length > 0;
+      const label = deriveLabel(node);
       return (
         <div
           key={`assigned-${node.id}-${level}`}
@@ -1519,7 +1564,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{node.name}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{label}</span>
             <span style={{ fontSize: 11, color: '#475467' }}>({node.type || '표준'})</span>
             <div style={{ flex: 1, fontSize: 11, color: '#1f2937' }}>
               {formulaText || descriptionText ? (
