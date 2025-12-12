@@ -600,9 +600,9 @@ export default function StandardTreeManager({
                                     <span
                                         style={{
                                             fontSize: 12,
-                                            background: isBaseSwmNotDerived ? '#fef9c3' : undefined,
-                                            padding: isBaseSwmNotDerived ? '2px 6px' : undefined,
-                                            borderRadius: isBaseSwmNotDerived ? 6 : undefined,
+                                            background: isDerived ? '#ede9fe' : undefined,
+                                            padding: isDerived ? '2px 6px' : undefined,
+                                            borderRadius: isDerived ? 6 : undefined,
                                         }}
                                     >
                                         {derivedLabel} <small style={{ color: '#666', fontSize: 10 }}>({node.type})</small>
