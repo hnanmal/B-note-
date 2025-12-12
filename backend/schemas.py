@@ -78,6 +78,7 @@ class StandardItemBase(BaseModel):
     name: str
     type: StandardItemType
     parent_id: Optional[int] = None
+    derive_from: Optional[int] = None
 
 
 class StandardItemCreate(StandardItemBase):

@@ -103,6 +103,11 @@ export default function StandardTreeManager({
             const source = map[node.derive_from];
             if (!derived || !source) return;
 
+            // Only reposition when derived shares the same parent as source.
+            // If derived was intentionally attached elsewhere (e.g., copied under a derived root), keep it where it is.
+            const sameParent = (derived.parent_id ?? null) === (source.parent_id ?? null);
+            if (!sameParent) return;
+
             const removeFromParent = () => {
                 if (derived.parent_id && map[derived.parent_id]) {
                     map[derived.parent_id].children = map[derived.parent_id].children.filter(
@@ -165,6 +170,60 @@ export default function StandardTreeManager({
                 throw new Error(text || '파생 항목을 생성할 수 없습니다.');
             }
             setMessage('파생 항목이 생성되었습니다.');
+            refresh();
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : '파생 항목 생성에 실패했습니다.');
+        }
+    };
+
+    const handleDeriveGwmLevel1 = async (node) => {
+        if (!apiBaseUrl.includes('/project/')) {
+            setMessage('파생 생성은 프로젝트 화면에서만 가능합니다.');
+            return;
+        }
+
+        const suffix = window.prompt('레벨1 파생 항목 이름을 입력하세요. 예: 현장데이터');
+        const trimmed = (suffix || '').trim();
+        if (!trimmed) {
+            setMessage('이름 입력은 필수입니다.');
+            return;
+        }
+
+        const derivedName = projectAbbr ? `${trimmed} [${projectAbbr}]` : trimmed;
+
+        try {
+            const deriveRes = await fetch(`${apiBaseUrl}/standard-items/${node.id}/derive`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ suffix_description: derivedName, work_master_id: null }),
+            });
+            if (!deriveRes.ok) {
+                const text = await deriveRes.text();
+                throw new Error(text || '파생 항목을 생성할 수 없습니다.');
+            }
+            const derivedRoot = await deriveRes.json();
+
+            const children = items.filter((item) => item.parent_id === node.id);
+            if (children.length) {
+                for (const child of children) {
+                    const res = await fetch(`${apiBaseUrl}/standard-items/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: child.name,
+                            type: child.type,
+                            parent_id: derivedRoot.id,
+                            derive_from: child.id,
+                        }),
+                    });
+                    if (!res.ok) {
+                        const text = await res.text();
+                        throw new Error(text || '하위 항목 복제에 실패했습니다.');
+                    }
+                }
+            }
+
+            setMessage('레벨1 파생 항목이 생성되었습니다.');
             refresh();
         } catch (error) {
             setMessage(error instanceof Error ? error.message : '파생 항목 생성에 실패했습니다.');
@@ -539,6 +598,12 @@ export default function StandardTreeManager({
                 <div>
                     {level < 2 && (
                         <button style={{ marginLeft: 8, ...smallBtn }} onClick={() => handleAdd(node.id)}>추가</button>
+                    )}
+                    {level === 1 && (node.type ?? '').toUpperCase() === 'GWM' && (
+                        <button
+                            style={{ marginLeft: 6, ...smallBtn }}
+                            onClick={() => handleDeriveGwmLevel1(node)}
+                        >파생생성</button>
                     )}
                     {level === 2 && (node.type ?? '').toUpperCase() !== 'GWM' && (
                         <button
