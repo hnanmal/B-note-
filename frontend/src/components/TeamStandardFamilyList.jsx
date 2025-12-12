@@ -2010,6 +2010,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
               onCheckboxSelectionChange={handleCheckboxSelectionChange}
               externalCheckboxSelection={Array.from(selectedStdItems)}
               apiBaseUrl={apiBaseUrl}
+              onItemsChange={setStandardItems}
             />
           </div>
           {!isStdTreeOpen && (

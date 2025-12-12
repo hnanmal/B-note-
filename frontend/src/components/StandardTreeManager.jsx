@@ -17,6 +17,7 @@ export default function StandardTreeManager({
     onCheckboxSelectionChange,
     externalCheckboxSelection = [],
     apiBaseUrl = API_BASE_URL,
+    onItemsChange = () => {},
 }) {
     const [items, setItems] = useState([]);
     const [tree, setTree] = useState([]);
@@ -56,6 +57,7 @@ export default function StandardTreeManager({
             if (!res.ok) throw new Error('표준 항목 조회 실패');
             const data = await res.json();
             setItems(data);
+            onItemsChange(Array.isArray(data) ? data : []);
         } catch (e) {
             setMessage(e.message);
         }
