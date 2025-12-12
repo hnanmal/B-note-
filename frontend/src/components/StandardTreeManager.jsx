@@ -147,6 +147,16 @@ export default function StandardTreeManager({
         return map;
     }, [items]);
 
+    const derivedChildrenSet = useMemo(() => {
+        const set = new Set();
+        items.forEach((item) => {
+            if (item?.derive_from) {
+                set.add(item.derive_from);
+            }
+        });
+        return set;
+    }, [items]);
+
     const refresh = () => fetchAll();
 
     const handleDerive = async (node) => {
@@ -497,6 +507,9 @@ export default function StandardTreeManager({
         const isLevel2Gwm = level === 2 && (node.type ?? '').toUpperCase() === 'GWM';
         const isLevel2GwmUnselected = isLevel2Gwm && !node.selected_work_master_id;
         const isUnselectedHighlight = isProjectContext && (isDerivedUnselected || isLevel2GwmUnselected);
+        const isSwm = (node.type ?? '').toUpperCase() === 'SWM';
+        const hasDerivedChild = derivedChildrenSet.has(node.id);
+        const isBaseSwmNotDerived = isProjectContext && isSwm && !isDerived && level === 2 && !hasDerivedChild;
         return (
             <div
                 key={node.id}
@@ -584,7 +597,14 @@ export default function StandardTreeManager({
                                     {level === 2 && (
                                         <span style={{ fontWeight: 600, fontSize: 12 }}>▸</span>
                                     )}
-                                    <span style={{ fontSize: 12 }}>
+                                    <span
+                                        style={{
+                                            fontSize: 12,
+                                            background: isBaseSwmNotDerived ? '#fef9c3' : undefined,
+                                            padding: isBaseSwmNotDerived ? '2px 6px' : undefined,
+                                            borderRadius: isBaseSwmNotDerived ? 6 : undefined,
+                                        }}
+                                    >
                                         {derivedLabel} <small style={{ color: '#666', fontSize: 10 }}>({node.type})</small>
                                         {isDerived && (
                                             <span
@@ -612,6 +632,20 @@ export default function StandardTreeManager({
                                                 }}
                                             >
                                                 미선택
+                                            </span>
+                                        )}
+                                        {isBaseSwmNotDerived && (
+                                            <span
+                                                style={{
+                                                    fontSize: 10,
+                                                    marginLeft: 4,
+                                                    padding: '1px 4px',
+                                                    borderRadius: 4,
+                                                    background: '#fef08a',
+                                                    color: '#854d0e',
+                                                }}
+                                            >
+                                                미파생
                                             </span>
                                         )}
                                     </span>
