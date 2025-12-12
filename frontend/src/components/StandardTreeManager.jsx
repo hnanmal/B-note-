@@ -493,6 +493,9 @@ export default function StandardTreeManager({
             ? `${parentName ?? '부모'}${projectAbbr ? ` [${projectAbbr}]` : ''}::${childName}`
             : node.name;
         const isDerivedUnselected = isDerived && !node.selected_work_master_id;
+        const isLevel2Gwm = level === 2 && (node.type ?? '').toUpperCase() === 'GWM';
+        const isLevel2GwmUnselected = isLevel2Gwm && !node.selected_work_master_id;
+        const isUnselectedHighlight = isDerivedUnselected || isLevel2GwmUnselected;
         return (
             <div
                 key={node.id}
@@ -556,7 +559,7 @@ export default function StandardTreeManager({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 6,
-                                    color: isDerivedUnselected ? '#b91c1c' : undefined,
+                                    color: isUnselectedHighlight ? '#b91c1c' : undefined,
                                 }}
                             >
                                 {allowCheckbox && (
@@ -596,7 +599,7 @@ export default function StandardTreeManager({
                                                 파생
                                             </span>
                                         )}
-                                        {isDerivedUnselected && (
+                                        {isUnselectedHighlight && (
                                             <span
                                                 style={{
                                                     fontSize: 10,
