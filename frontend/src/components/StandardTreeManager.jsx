@@ -141,6 +141,36 @@ export default function StandardTreeManager({
 
     const refresh = () => fetchAll();
 
+    const handleDerive = async (node) => {
+        if (!apiBaseUrl.includes('/project/')) {
+            setMessage('파생 생성은 프로젝트 화면에서만 가능합니다.');
+            return;
+        }
+
+        const suffix = window.prompt('파생 항목 접미 설명을 입력하세요. 예: 현장데이터');
+        const trimmed = (suffix || '').trim();
+        if (!trimmed) {
+            setMessage('접미 설명은 필수입니다.');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${apiBaseUrl}/standard-items/${node.id}/derive`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ suffix_description: trimmed, work_master_id: node?.selected_work_master_id ?? null }),
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || '파생 항목을 생성할 수 없습니다.');
+            }
+            setMessage('파생 항목이 생성되었습니다.');
+            refresh();
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : '파생 항목 생성에 실패했습니다.');
+        }
+    };
+
     // select a node (no separate children fetch needed since tree is built client-side)
     const selectNode = (id, depth, node) => {
         setSelected(id);
@@ -509,6 +539,12 @@ export default function StandardTreeManager({
                 <div>
                     {level < 2 && (
                         <button style={{ marginLeft: 8, ...smallBtn }} onClick={() => handleAdd(node.id)}>추가</button>
+                    )}
+                    {level === 2 && (
+                        <button
+                            style={{ marginLeft: 6, ...smallBtn }}
+                            onClick={() => handleDerive(node)}
+                        >파생생성</button>
                     )}
                     <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => startEdit(node)}>수정</button>
                     <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => handleDelete(node.id)}>삭제</button>

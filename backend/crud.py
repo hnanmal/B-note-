@@ -301,7 +301,7 @@ def create_derived_standard_item(
     db: Session,
     parent_id: int,
     suffix_description: str,
-    work_master_id: int,
+    work_master_id: Optional[int],
 ):
     parent = get_standard_item(db, parent_id)
     if not parent:
@@ -318,10 +318,11 @@ def create_derived_standard_item(
     db.add(derived_item)
     db.commit()
     db.refresh(derived_item)
-    assign_work_master_to_standard_item(
-        db, derived_item.id, work_master_id
-    )
-    select_work_master_for_standard_item(db, derived_item.id, work_master_id)
+    if work_master_id is not None:
+        assign_work_master_to_standard_item(
+            db, derived_item.id, work_master_id
+        )
+        select_work_master_for_standard_item(db, derived_item.id, work_master_id)
     _copy_family_assignments_from_parent(db, parent_id, derived_item.id)
     db.refresh(derived_item)
     _attach_standard_item_selection(derived_item)

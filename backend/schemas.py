@@ -109,7 +109,7 @@ class StandardItemWorkMasterSelectionRequest(BaseModel):
 
 class DerivedStandardItemCreate(BaseModel):
     suffix_description: str
-    work_master_id: int
+    work_master_id: Optional[int] = None
 
 
 
