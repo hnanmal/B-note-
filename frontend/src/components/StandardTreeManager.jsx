@@ -540,7 +540,7 @@ export default function StandardTreeManager({
                     {level < 2 && (
                         <button style={{ marginLeft: 8, ...smallBtn }} onClick={() => handleAdd(node.id)}>추가</button>
                     )}
-                    {level === 2 && (
+                    {level === 2 && (node.type ?? '').toUpperCase() !== 'GWM' && (
                         <button
                             style={{ marginLeft: 6, ...smallBtn }}
                             onClick={() => handleDerive(node)}
