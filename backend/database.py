@@ -90,3 +90,15 @@ def ensure_work_master_columns(engine):
         indexes = conn.execute(text("PRAGMA index_list('work_masters')")).fetchall()
         if any(idx[1] == 'ix_work_masters_work_master_code' for idx in indexes):
             conn.execute(text("DROP INDEX IF EXISTS ix_work_masters_work_master_code"))
+
+
+def ensure_standard_item_columns(engine):
+    """Ensure legacy standard_items tables have the derive_from column."""
+    with engine.connect() as conn:
+        try:
+            columns = conn.execute(text("PRAGMA table_info('standard_items')")).fetchall()
+        except OperationalError:
+            return
+        column_names = [col[1] for col in columns]
+        if 'derive_from' not in column_names:
+            conn.execute(text("ALTER TABLE standard_items ADD COLUMN derive_from INTEGER"))
