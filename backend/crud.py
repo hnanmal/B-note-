@@ -294,6 +294,13 @@ def create_standard_item(db: Session, standard_item: schemas.StandardItemCreate)
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
+    if standard_item.derive_from:
+        _copy_family_assignments_from_parent(
+            db,
+            parent_standard_item_id=standard_item.derive_from,
+            derived_standard_item_id=db_item.id,
+        )
+        db.refresh(db_item)
     return db_item
 
 
