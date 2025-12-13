@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import StandardTreeManager from './StandardTreeManager';
 
 export default function ProjectStandardSelect({ apiBaseUrl }) {
@@ -21,6 +21,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [projectAbbr, setProjectAbbr] = useState('');
   const [copiedSelection, setCopiedSelection] = useState(null);
   const [workMasterSearch, setWorkMasterSearch] = useState('');
+  const [workMasterMatchIndex, setWorkMasterMatchIndex] = useState(0);
+  const workMasterRefs = useRef(new Map());
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
   const effectiveStandardItemId = selectedGwmNode?.derive_from ?? selectedGwmId;
@@ -55,10 +57,11 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     return ids.join(',');
   };
 
-  const filteredWorkMasters = useMemo(() => {
+  const workMasterMatches = useMemo(() => {
     const term = (workMasterSearch || '').trim().toLowerCase();
-    if (!term) return dbWorkMasters;
-    const matches = (wm) => {
+    if (!term) return [];
+    const collect = [];
+    dbWorkMasters.forEach((wm) => {
       const haystack = [
         wm?.work_master_code,
         wm?.gauge,
@@ -71,10 +74,25 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       ]
         .filter(Boolean)
         .map((v) => String(v).toLowerCase());
-      return haystack.some((text) => text.includes(term));
-    };
-    return dbWorkMasters.filter(matches);
+      if (haystack.some((text) => text.includes(term))) {
+        collect.push(wm.id);
+      }
+    });
+    return collect;
   }, [dbWorkMasters, workMasterSearch]);
+
+  useEffect(() => {
+    setWorkMasterMatchIndex(0);
+  }, [workMasterSearch]);
+
+  useEffect(() => {
+    if (!workMasterMatches.length) return;
+    const targetId = workMasterMatches[Math.min(workMasterMatchIndex, workMasterMatches.length - 1)];
+    const el = workMasterRefs.current.get(targetId);
+    if (el && el.scrollIntoView) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [workMasterMatchIndex, workMasterMatches]);
 
   const getSelectedNodeDisplayName = () => {
     if (!selectedGwmNode) return '—';
@@ -566,6 +584,10 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     return (
       <label
         key={workMaster.id}
+        ref={(el) => {
+          if (el) workMasterRefs.current.set(workMaster.id, el);
+          else workMasterRefs.current.delete(workMaster.id);
+        }}
         style={{
           borderRadius: 10,
           background: isSelected ? '#f5f3ff' : '#fff',
@@ -576,6 +598,9 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           gap: 6,
           cursor: selectionLoading ? 'not-allowed' : 'pointer',
           transition: 'border 0.2s ease',
+          outline: workMasterMatches.includes(workMaster.id) && workMasterSearch.trim()
+            ? '1px solid #a855f7'
+            : 'none',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -750,7 +775,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>WorkMaster Selection</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <input
             type="text"
             value={workMasterSearch}
@@ -764,8 +789,49 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
               minWidth: 140,
             }}
           />
-          <div style={{ fontSize: 11, color: '#475467' }}>
-            {filteredWorkMasters.length} / {dbWorkMasters.length || 0}개
+          <div style={{ fontSize: 11, color: '#475467', display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span>{workMasterMatches.length || 0} / {dbWorkMasters.length || 0}개</span>
+            <button
+              type="button"
+              onClick={() => setWorkMasterMatchIndex((prev) => Math.max(prev - 1, 0))}
+              disabled={!workMasterMatches.length || workMasterMatchIndex <= 0}
+              style={{
+                padding: '2px 6px',
+                borderRadius: 4,
+                border: '1px solid #cbd5f5',
+                background: '#fff',
+                fontSize: 11,
+                cursor: !workMasterMatches.length || workMasterMatchIndex <= 0 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!workMasterMatches.length) return;
+                setWorkMasterMatchIndex((prev) => Math.min(prev + 1, workMasterMatches.length - 1));
+              }}
+              disabled={!workMasterMatches.length || workMasterMatchIndex >= workMasterMatches.length - 1}
+              style={{
+                padding: '2px 6px',
+                borderRadius: 4,
+                border: '1px solid #cbd5f5',
+                background: '#fff',
+                fontSize: 11,
+                cursor:
+                  !workMasterMatches.length || workMasterMatchIndex >= workMasterMatches.length - 1
+                    ? 'not-allowed'
+                    : 'pointer',
+              }}
+            >
+              ↓
+            </button>
+            {workMasterMatches.length > 0 && (
+              <span>
+                {Math.min(workMasterMatchIndex + 1, workMasterMatches.length)} / {workMasterMatches.length}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -790,14 +856,10 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           <div style={{ fontSize: 12, color: '#475467' }}>Work Master 정보를 불러오는 중입니다...</div>
         ) : dbWorkMastersError ? (
           <div style={{ fontSize: 12, color: '#b91c1c' }}>{dbWorkMastersError}</div>
-        ) : filteredWorkMasters.length ? (
-          filteredWorkMasters.map((wm) => renderWorkMasterDetail(wm))
+        ) : dbWorkMasters.length ? (
+          dbWorkMasters.map((wm) => renderWorkMasterDetail(wm))
         ) : (
-          <div style={{ fontSize: 12, color: '#94a3b8' }}>
-            {dbWorkMasters.length
-              ? '검색 조건에 맞는 Work Master가 없습니다.'
-              : '선택한 GWM에 할당된 Work Master가 없습니다.'}
-          </div>
+          <div style={{ fontSize: 12, color: '#94a3b8' }}>선택한 GWM에 할당된 Work Master가 없습니다.</div>
         )}
       </div>
     </div>
