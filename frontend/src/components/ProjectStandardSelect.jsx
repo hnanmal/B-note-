@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import StandardTreeManager from './StandardTreeManager';
 
 export default function ProjectStandardSelect({ apiBaseUrl }) {
@@ -20,6 +20,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const [projectAbbr, setProjectAbbr] = useState('');
   const [copiedSelection, setCopiedSelection] = useState(null);
+  const [workMasterSearch, setWorkMasterSearch] = useState('');
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
   const effectiveStandardItemId = selectedGwmNode?.derive_from ?? selectedGwmId;
@@ -53,6 +54,27 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       .sort((a, b) => a - b);
     return ids.join(',');
   };
+
+  const filteredWorkMasters = useMemo(() => {
+    const term = (workMasterSearch || '').trim().toLowerCase();
+    if (!term) return dbWorkMasters;
+    const matches = (wm) => {
+      const haystack = [
+        wm?.work_master_code,
+        wm?.gauge,
+        wm?.add_spec,
+        wm?.cat_large_desc,
+        wm?.cat_mid_desc,
+        wm?.cat_small_desc,
+        wm?.work_group_code,
+        wm?.discipline,
+      ]
+        .filter(Boolean)
+        .map((v) => String(v).toLowerCase());
+      return haystack.some((text) => text.includes(term));
+    };
+    return dbWorkMasters.filter(matches);
+  }, [dbWorkMasters, workMasterSearch]);
 
   const getSelectedNodeDisplayName = () => {
     if (!selectedGwmNode) return '—';
@@ -728,8 +750,23 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>WorkMaster Selection</div>
-        <div style={{ fontSize: 11, color: '#475467' }}>
-          {dbWorkMasters.length ? `${dbWorkMasters.length}개 항목` : '항목 없음'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="text"
+            value={workMasterSearch}
+            onChange={(e) => setWorkMasterSearch(e.target.value)}
+            placeholder="WorkMaster 검색"
+            style={{
+              padding: '4px 8px',
+              fontSize: 11,
+              borderRadius: 6,
+              border: '1px solid #cbd5f5',
+              minWidth: 140,
+            }}
+          />
+          <div style={{ fontSize: 11, color: '#475467' }}>
+            {filteredWorkMasters.length} / {dbWorkMasters.length || 0}개
+          </div>
         </div>
       </div>
       {selectionLoading && (
@@ -753,10 +790,14 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           <div style={{ fontSize: 12, color: '#475467' }}>Work Master 정보를 불러오는 중입니다...</div>
         ) : dbWorkMastersError ? (
           <div style={{ fontSize: 12, color: '#b91c1c' }}>{dbWorkMastersError}</div>
-        ) : dbWorkMasters.length ? (
-          dbWorkMasters.map((wm) => renderWorkMasterDetail(wm))
+        ) : filteredWorkMasters.length ? (
+          filteredWorkMasters.map((wm) => renderWorkMasterDetail(wm))
         ) : (
-          <div style={{ fontSize: 12, color: '#94a3b8' }}>선택한 GWM에 할당된 Work Master가 없습니다.</div>
+          <div style={{ fontSize: 12, color: '#94a3b8' }}>
+            {dbWorkMasters.length
+              ? '검색 조건에 맞는 Work Master가 없습니다.'
+              : '선택한 GWM에 할당된 Work Master가 없습니다.'}
+          </div>
         )}
       </div>
     </div>
