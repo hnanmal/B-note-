@@ -94,6 +94,14 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     }
   }, [workMasterMatchIndex, workMasterMatches]);
 
+  useEffect(() => {
+    if (!selectedWorkMasterId) return;
+    const el = workMasterRefs.current.get(selectedWorkMasterId);
+    if (el && el.scrollIntoView) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedWorkMasterId, dbWorkMasters]);
+
   const getSelectedNodeDisplayName = () => {
     if (!selectedGwmNode) return '—';
     if (selectedGwmNode.derive_from) {
