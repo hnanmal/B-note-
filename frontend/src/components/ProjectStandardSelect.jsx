@@ -19,6 +19,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [workMasterReloadKey, setWorkMasterReloadKey] = useState(0);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const [projectAbbr, setProjectAbbr] = useState('');
+  const [copiedSelection, setCopiedSelection] = useState(null);
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
   const effectiveStandardItemId = selectedGwmNode?.derive_from ?? selectedGwmId;
@@ -42,6 +43,15 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       if (gaugeA > gaugeB) return 1;
       return (a?.id ?? 0) - (b?.id ?? 0);
     });
+  };
+
+  const buildWorkMasterSignature = (workMasters) => {
+    if (!Array.isArray(workMasters) || !workMasters.length) return '';
+    const ids = workMasters
+      .map((wm) => Number(wm?.id))
+      .filter((id) => Number.isFinite(id))
+      .sort((a, b) => a - b);
+    return ids.join(',');
   };
 
   const getSelectedNodeDisplayName = () => {
@@ -118,6 +128,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         }
         const sorted = sortWorkMasters(workMasters);
         setDbWorkMasters(sorted);
+        setSelectionError(null);
         setWorkMasterSpecs(buildSpecMapFromWorkMasters(sorted));
       })
       .catch((error) => {
@@ -155,6 +166,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             };
           });
           setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
+          setSelectionError(null);
         })
         .catch((error) => {
           if (cancelled) return;
@@ -326,6 +338,44 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
         selected_work_master_id: payload?.selected_work_master_id ?? null,
       }));
       setTreeRefreshKey((prev) => prev + 1);
+      setSelectionError(null);
+    } catch (error) {
+      setSelectionError(
+        error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
+      );
+    } finally {
+      setSelectionLoading(false);
+    }
+  };
+
+  const applyWorkMasterSelection = async (workMasterId) => {
+    const baseItemId = selectedGwmId;
+    const targetSelectionItemId = isDerivedSelection ? selectedGwmId : effectiveStandardItemId;
+    if (!targetSelectionItemId || !baseItemId) return;
+
+    if (isSwm && !isDerivedSelection) {
+      setSelectionError('SWM 파생이 필요한 항목에는 붙여넣기를 먼저 적용할 수 없습니다. 먼저 파생 생성 후 다시 시도하세요.');
+      return;
+    }
+
+    try {
+      setSelectionLoading(true);
+      setSelectionError(null);
+      const response = await fetch(`${apiBaseUrl}/standard-items/${targetSelectionItemId}/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ work_master_id: workMasterId }),
+      });
+      if (!response.ok) {
+        throw new Error('선택 저장에 실패했습니다.');
+      }
+      const payload = await response.json();
+      setSelectedWorkMasterId(payload?.selected_work_master_id ?? null);
+      setSelectedGwmNode((prev) => ({
+        ...(prev ?? {}),
+        selected_work_master_id: payload?.selected_work_master_id ?? null,
+      }));
+      setTreeRefreshKey((prev) => prev + 1);
     } catch (error) {
       setSelectionError(
         error instanceof Error ? error.message : '선택 저장에 실패했습니다.'
@@ -340,6 +390,45 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
       ...prev,
       [workMasterId]: value ?? '',
     }));
+  };
+
+  const handleCopySelection = () => {
+    if (!hasSelection) {
+      setSelectionError('GWM/SWM 항목을 먼저 선택하세요.');
+      return;
+    }
+    if (!selectedWorkMasterId) {
+      setSelectionError('복사할 WorkMaster 선택이 없습니다.');
+      return;
+    }
+    const signature = buildWorkMasterSignature(dbWorkMasters);
+    if (!signature) {
+      setSelectionError('WorkMaster 목록이 비어 복사할 수 없습니다.');
+      return;
+    }
+    setCopiedSelection({ workMasterId: selectedWorkMasterId, signature });
+    setSelectionError(null);
+  };
+
+  const handlePasteSelection = async () => {
+    if (!hasSelection) {
+      setSelectionError('붙여넣을 대상 GWM/SWM을 먼저 선택하세요.');
+      return;
+    }
+    if (!copiedSelection) {
+      setSelectionError('복사된 WorkMaster 선택이 없습니다.');
+      return;
+    }
+    const signature = buildWorkMasterSignature(dbWorkMasters);
+    if (signature !== copiedSelection.signature) {
+      setSelectionError('WorkMaster 선택지가 달라 붙여넣을 수 없습니다.');
+      return;
+    }
+    if (selectedWorkMasterId === copiedSelection.workMasterId) {
+      setSelectionError(null);
+      return;
+    }
+    await applyWorkMasterSelection(copiedSelection.workMasterId);
   };
 
   const handleSaveWorkMasterSpec = async (workMasterId) => {
@@ -769,6 +858,43 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             {hasSelection
               ? '선택한 GWM에 할당된 Work Master 상세 정보를 보여드립니다.'
               : 'GWM 트리에서 항목을 선택하면 관련 Work Master 정보가 나타납니다.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleCopySelection}
+              disabled={!hasSelection || !selectedWorkMasterId}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                border: '1px solid #cbd5f5',
+                background: '#fff',
+                fontSize: 12,
+                cursor: !hasSelection || !selectedWorkMasterId ? 'not-allowed' : 'pointer',
+              }}
+            >
+              선택 복사
+            </button>
+            <button
+              type="button"
+              onClick={handlePasteSelection}
+              disabled={!hasSelection || !copiedSelection}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                border: '1px solid #cbd5f5',
+                background: '#fff',
+                fontSize: 12,
+                cursor: !hasSelection || !copiedSelection ? 'not-allowed' : 'pointer',
+              }}
+            >
+              붙여넣기
+            </button>
+            {copiedSelection && (
+              <span style={{ fontSize: 11, color: '#475467' }}>
+                복사된 WorkMaster ID: {copiedSelection.workMasterId}
+              </span>
+            )}
           </div>
           <div
             style={{
