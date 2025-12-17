@@ -18,6 +18,7 @@ export default function StandardTreeManager({
     externalCheckboxSelection = [],
     apiBaseUrl = API_BASE_URL,
     onItemsChange = () => {},
+    externalSelectedId = null,
 }) {
     const [items, setItems] = useState([]);
     const [tree, setTree] = useState([]);
@@ -159,7 +160,7 @@ export default function StandardTreeManager({
 
     const refresh = () => fetchAll();
 
-    const handleDerive = async (node) => {
+    const handleDerive = async (node, level = 0) => {
         if (!apiBaseUrl.includes('/project/')) {
             setMessage('파생 생성은 프로젝트 화면에서만 가능합니다.');
             return;
@@ -182,7 +183,13 @@ export default function StandardTreeManager({
                 const text = await res.text();
                 throw new Error(text || '파생 항목을 생성할 수 없습니다.');
             }
+            const derived = await res.json();
+            setItems((prev) => {
+                const list = Array.isArray(prev) ? prev : [];
+                return [...list, derived];
+            });
             setMessage('파생 항목이 생성되었습니다.');
+            selectNode(derived.id, level, derived);
             refresh();
         } catch (error) {
             setMessage(error instanceof Error ? error.message : '파생 항목 생성에 실패했습니다.');
@@ -236,7 +243,12 @@ export default function StandardTreeManager({
                 }
             }
 
+            setItems((prev) => {
+                const list = Array.isArray(prev) ? prev : [];
+                return [...list, derivedRoot];
+            });
             setMessage('레벨1 파생 항목이 생성되었습니다.');
+            selectNode(derivedRoot.id, 1, derivedRoot);
             refresh();
         } catch (error) {
             setMessage(error instanceof Error ? error.message : '파생 항목 생성에 실패했습니다.');
@@ -420,6 +432,15 @@ export default function StandardTreeManager({
         });
         return map;
     }, [flattenNodes]);
+
+    useEffect(() => {
+        if (externalSelectedId == null) return;
+        if (selected === externalSelectedId) return;
+        const entry = nodeRegistry.get(externalSelectedId);
+        if (!entry) return;
+        selectNode(externalSelectedId, entry.depth, entry.node);
+        scrollMatchIntoView(externalSelectedId);
+    }, [externalSelectedId, nodeRegistry, selected]);
 
     const toggleCollapse = (nodeId) => {
         setCollapsedNodes(prev => {
@@ -667,7 +688,7 @@ export default function StandardTreeManager({
                     {level === 2 && (node.type ?? '').toUpperCase() !== 'GWM' && !isDerived && (
                         <button
                             style={{ marginLeft: 6, ...smallBtn }}
-                            onClick={() => handleDerive(node)}
+                            onClick={() => handleDerive(node, level)}
                         >파생생성</button>
                     )}
                     <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => startEdit(node)}>수정</button>

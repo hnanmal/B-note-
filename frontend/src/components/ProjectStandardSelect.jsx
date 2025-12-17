@@ -924,6 +924,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             <StandardTreeManager
               apiBaseUrl={apiBaseUrl}
               refreshSignal={treeRefreshKey}
+              externalSelectedId={selectedGwmNode?.id ?? null}
               onNodeSelect={(payload) => {
                 if (payload?.node) {
                   setSelectedGwmNode(payload.node);
