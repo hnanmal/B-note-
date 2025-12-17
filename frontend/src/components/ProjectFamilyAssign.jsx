@@ -1523,7 +1523,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 140px 120px 80px 90px 120px',
+                    gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 150px 140px 80px 90px 120px',
                     gap: 6,
                     fontSize: 11,
                     fontWeight: 700,
@@ -1549,22 +1549,51 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                       key={row.id}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 140px 120px 80px 90px 120px',
+                        gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 150px 140px 80px 90px 120px',
                         gap: 6,
                         fontSize: 11,
                         color: '#0f172a',
                         background: index % 2 === 0 ? '#f8fafc' : '#fff',
                         padding: '6px 4px',
                         borderRadius: 8,
+                        alignItems: 'center',
                       }}
                     >
-                      <span style={{ fontWeight: 600 }}>{row.revitTypesLabel}</span>
+                      <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.revitTypesLabel}>
+                        {row.revitTypesLabel}
+                      </span>
                       <span>{row.type}</span>
-                      <span>{row.itemPath}</span>
-                      <span>{row.workMasterSummary}</span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.itemPath}>
+                        {row.itemPath}
+                      </span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.workMasterSummary}>
+                        {row.workMasterSummary}
+                      </span>
                       <span>{row.gauge}</span>
-                      <span style={{ whiteSpace: 'pre-wrap' }}>{row.spec}</span>
-                      <span style={{ whiteSpace: 'pre-wrap' }}>{row.formula}</span>
+                      <span
+                        style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          whiteSpace: 'pre-wrap',
+                        }}
+                        title={row.spec}
+                      >
+                        {row.spec}
+                      </span>
+                      <span
+                        style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          whiteSpace: 'pre-wrap',
+                        }}
+                        title={row.formula}
+                      >
+                        {row.formula}
+                      </span>
                       <span>{row.unit}</span>
                       <span>{row.outputType}</span>
                       <span>{formatCartTimestamp(row.createdAt)}</span>
