@@ -749,9 +749,8 @@ export default function StandardTreeManager({
                                     onClick={() => {
                                         setFilterType('ALL');
                                         setSwmMode((prev) => {
-                                            if (prev === 'off') return 'all';
                                             if (prev === 'all') return 'derived';
-                                            return 'off';
+                                            return 'all';
                                         });
                                     }}
                                     style={{
