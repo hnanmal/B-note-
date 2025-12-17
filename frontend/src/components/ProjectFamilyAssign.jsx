@@ -767,6 +767,49 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     );
   }, [currentSelectedRevitTypes, savedCartEntries]);
 
+  const cartTableRows = useMemo(() => {
+    const rows = [];
+    visibleCartEntries.forEach((entry) => {
+      const assignments = (entry.assignmentIds || [])
+        .map((id) => assignmentById.get(id))
+        .filter(Boolean);
+      if (!assignments.length) {
+        rows.push({
+          id: `${entry.id}-empty`,
+          revitTypesLabel: entry.revitTypes.join(', '),
+          createdAt: entry.createdAt,
+          type: '—',
+          itemPath: 'Work Master 정보를 불러올 수 없습니다.',
+          workMasterSummary: '—',
+          gauge: '—',
+          spec: '—',
+          formula: '—',
+          unit: '—',
+          outputType: selectedFamily?.sequence_number ?? '—',
+        });
+        return;
+      }
+      assignments.forEach((assignment) => {
+        const standardItem = assignment?.standard_item;
+        const workMaster = resolveWorkMaster(assignment);
+        rows.push({
+          id: `${entry.id}-${assignment.id}`,
+          revitTypesLabel: entry.revitTypes.join(', '),
+          createdAt: entry.createdAt,
+          type: standardItem?.type ?? '—',
+          itemPath: buildItemPath(standardItem),
+          workMasterSummary: buildWorkMasterSummary(workMaster),
+          gauge: (workMaster?.gauge ?? '').toUpperCase() || '—',
+          spec: workMaster?.add_spec ?? '—',
+          formula: assignment.formula ?? '—',
+          unit: buildUnitLabel(workMaster),
+          outputType: selectedFamily?.sequence_number ?? '—',
+        });
+      });
+    });
+    return rows;
+  }, [visibleCartEntries, assignmentById, selectedFamily?.sequence_number, standardItemWorkMasters]);
+
   const renderAssignmentCard = (title, typeKey) => {
     const assignments = assignmentGroups[typeKey];
     return (
@@ -1445,8 +1488,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             borderRadius: 12,
             border: '1px solid #dae1f3',
             background: '#f8fafc',
-            minHeight: 120,
-            maxHeight: 200,
+            minHeight: 160,
+            maxHeight: 260,
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
@@ -1466,103 +1509,69 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
               gap: 6,
             }}
           >
-            <span>
-              선택된 {currentSelectedRevitTypes.length ? currentSelectedRevitTypes.join(', ') : '항목'}을 위한
-            </span>
-            <span style={{ flex: 1 }} />
             <span>Work Master 장바구니 👜</span>
+            <span style={{ flex: 1 }} />
+            <span>
+              {currentSelectedRevitTypes.length
+                ? `${currentSelectedRevitTypes.join(', ')} 기준`
+                : 'Revit 타입을 선택하세요'}
+            </span>
           </div>
           <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {visibleCartEntries.length ? (
-              visibleCartEntries.map((entry) => {
-                const rows = (entry.assignmentIds || [])
-                  .map((id) => assignmentById.get(id))
-                  .filter(Boolean)
-                  .map((assignment) => {
-                    const standardItem = assignment?.standard_item;
-                    const workMaster = resolveWorkMaster(assignment);
-                    return {
-                      id: assignment.id,
-                      type: standardItem?.type ?? '—',
-                      itemPath: buildItemPath(standardItem),
-                      workMasterSummary: buildWorkMasterSummary(workMaster),
-                      gauge: (workMaster?.gauge ?? '').toUpperCase() || '—',
-                      spec: workMaster?.add_spec ?? '—',
-                      formula: assignment.formula ?? '—',
-                      unit: buildUnitLabel(workMaster),
-                      outputType: selectedFamily?.sequence_number ?? '—',
-                    };
-                  });
-
-                return (
-                  <div
-                    key={entry.id}
-                    style={{
-                      borderRadius: 10,
-                      padding: '10px 12px',
-                      background: '#fff',
-                      boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
-                      fontSize: 11,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 8,
-                    }}
-                  >
-                    <div style={{ fontWeight: 600 }}>{entry.revitTypes.join(', ')}</div>
-                    <div style={{ display: 'flex', gap: 6, fontSize: 11, color: '#475467' }}>
-                      <span>{rows.length}개 Work Master 항목</span>
-                      <span>·</span>
-                      <span>저장 {formatCartTimestamp(entry.createdAt)}</span>
-                    </div>
+            {cartTableRows.length ? (
+              <>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 140px 120px 80px 90px 120px',
+                    gap: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    borderBottom: '1px solid #e5e7eb',
+                    paddingBottom: 6,
+                  }}
+                >
+                  <span>Revit Type</span>
+                  <span>분류</span>
+                  <span>Item</span>
+                  <span>Work Master</span>
+                  <span>Gauge</span>
+                  <span>Spec</span>
+                  <span>수식</span>
+                  <span>단위</span>
+                  <span>산출유형</span>
+                  <span>저장시각</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {cartTableRows.map((row, index) => (
                     <div
+                      key={row.id}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '70px 1.2fr 1.6fr 70px 140px 120px 80px 90px',
+                        gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 140px 120px 80px 90px 120px',
                         gap: 6,
-                        fontWeight: 700,
+                        fontSize: 11,
                         color: '#0f172a',
+                        background: index % 2 === 0 ? '#f8fafc' : '#fff',
+                        padding: '6px 4px',
+                        borderRadius: 8,
                       }}
                     >
-                      <span>분류</span>
-                      <span>Item</span>
-                      <span>Work Master</span>
-                      <span>Gauge</span>
-                      <span>Spec</span>
-                      <span>수식</span>
-                      <span>단위</span>
-                      <span>산출유형</span>
+                      <span style={{ fontWeight: 600 }}>{row.revitTypesLabel}</span>
+                      <span>{row.type}</span>
+                      <span>{row.itemPath}</span>
+                      <span>{row.workMasterSummary}</span>
+                      <span>{row.gauge}</span>
+                      <span style={{ whiteSpace: 'pre-wrap' }}>{row.spec}</span>
+                      <span style={{ whiteSpace: 'pre-wrap' }}>{row.formula}</span>
+                      <span>{row.unit}</span>
+                      <span>{row.outputType}</span>
+                      <span>{formatCartTimestamp(row.createdAt)}</span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {rows.length ? (
-                        rows.map((row) => (
-                          <div
-                            key={row.id}
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: '70px 1.2fr 1.6fr 70px 140px 120px 80px 90px',
-                              gap: 6,
-                              color: '#0f172a',
-                            }}
-                          >
-                            <span>{row.type}</span>
-                            <span>{row.itemPath}</span>
-                            <span>{row.workMasterSummary}</span>
-                            <span>{row.gauge}</span>
-                            <span style={{ whiteSpace: 'pre-wrap' }}>{row.spec}</span>
-                            <span style={{ whiteSpace: 'pre-wrap' }}>{row.formula}</span>
-                            <span>{row.unit}</span>
-                            <span>{row.outputType}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                          저장된 Work Master 상세를 불러올 수 없습니다.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
+                  ))}
+                </div>
+              </>
             ) : (
               <div style={{ fontSize: 11, color: '#94a3b8' }}>
                 {currentSelectedRevitTypes.length
