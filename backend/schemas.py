@@ -73,6 +73,24 @@ class WorkMaster(WorkMasterBase):
     standard_items: List[_StandardItemWithoutRelations] = []
 
 
+# WorkMaster cart schemas
+class WorkMasterCartEntryBase(BaseModel):
+    revit_types: List[str]
+    assignment_ids: List[int]
+    standard_item_ids: List[int]
+
+
+class WorkMasterCartEntryCreate(WorkMasterCartEntryBase):
+    pass
+
+
+class WorkMasterCartEntry(WorkMasterCartEntryBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_at: datetime.datetime
+
+
 # StandardItem Schemas
 class StandardItemBase(BaseModel):
     name: str

@@ -8,6 +8,14 @@ import {
 
 const WORK_MASTER_COLUMNS = ['Use', 'GWM', 'Item', '상세', '단위'];
 
+const normalizeCartEntry = (entry) => ({
+  id: entry?.id ?? `cart-${Date.now()}`,
+  revitTypes: entry?.revitTypes ?? entry?.revit_types ?? [],
+  assignmentIds: entry?.assignmentIds ?? entry?.assignment_ids ?? [],
+  standardItemIds: entry?.standardItemIds ?? entry?.standard_item_ids ?? [],
+  createdAt: entry?.createdAt ?? entry?.created_at ?? new Date().toISOString(),
+});
+
 export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [buildings, setBuildings] = useState([]);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
@@ -36,6 +44,39 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   useEffect(() => {
     setSavedCartEntries(readWorkMasterCartEntries());
   }, []);
+
+  useEffect(() => {
+    if (!apiBaseUrl) return undefined;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/workmaster-cart`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const normalized = Array.isArray(data) ? data.map(normalizeCartEntry) : [];
+        setSavedCartEntries((prev) => {
+          if (!normalized.length) return prev;
+          const seen = new Set();
+          const merged = [...normalized, ...prev];
+          const unique = [];
+          merged.forEach((entry) => {
+            const key = entry?.id;
+            if (key == null || seen.has(key)) return;
+            seen.add(key);
+            unique.push(entry);
+          });
+          return unique;
+        });
+      } catch (error) {
+        // ignore fetch failure; keep local cart
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
 
   useEffect(() => {
     persistWorkMasterCartEntries(savedCartEntries);
@@ -351,7 +392,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     });
   };
 
-  const handleSaveAssignmentCart = () => {
+  const handleSaveAssignmentCart = async () => {
     if (!selectedAssignmentIds.length) {
       setCartStatusMessage('선택된 Work Master 항목이 없습니다.');
       return;
@@ -360,8 +401,9 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       setCartStatusMessage('저장할 Revit 타입을 선택하세요.');
       return;
     }
+    const optimisticId = `cart-${Date.now()}`;
     const newEntry = {
-      id: `cart-${Date.now()}`,
+      id: optimisticId,
       revitTypes: currentSelectedRevitTypes,
       assignmentIds: [...selectedAssignmentIds],
       standardItemIds: Array.from(
@@ -374,7 +416,31 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       createdAt: new Date().toISOString(),
     };
     setSavedCartEntries((prev) => [newEntry, ...prev]);
-    setCartStatusMessage('장바구니에 저장되었습니다.');
+    setCartStatusMessage('장바구니 저장 중...');
+
+    if (!apiBaseUrl) {
+      setCartStatusMessage('장바구니를 로컬에 저장했습니다.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/workmaster-cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          revit_types: newEntry.revitTypes,
+          assignment_ids: newEntry.assignmentIds,
+          standard_item_ids: newEntry.standardItemIds,
+        }),
+      });
+      if (!res.ok) throw new Error('save failed');
+      const payload = await res.json();
+      const saved = normalizeCartEntry(payload);
+      setSavedCartEntries((prev) => [saved, ...prev.filter((entry) => entry.id !== optimisticId)]);
+      setCartStatusMessage('장바구니에 저장되었습니다.');
+    } catch (error) {
+      setCartStatusMessage('장바구니를 로컬에만 저장했습니다. 다시 시도하세요.');
+    }
   };
 
   const handleRevitEntryClick = (index, event) => {

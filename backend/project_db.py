@@ -56,6 +56,13 @@ EXTRA_TABLE_STATEMENTS = [
         updated_at TEXT NOT NULL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS workmaster_cart_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payload TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )
+    """,
 ]
 
 
