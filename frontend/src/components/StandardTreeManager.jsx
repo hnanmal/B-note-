@@ -90,7 +90,7 @@ export default function StandardTreeManager({
 
     useEffect(() => {
         // build tree from filtered items
-        const effectiveFilterType = swmMode === 'all' ? 'SWM' : filterType;
+        const effectiveFilterType = swmMode === 'off' ? filterType : 'SWM';
 
         const filtered = items.filter((i) => {
             if (effectiveFilterType === 'ALL') return true;
