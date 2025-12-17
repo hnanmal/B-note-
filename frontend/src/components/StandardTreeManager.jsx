@@ -27,7 +27,8 @@ export default function StandardTreeManager({
     const [newName, setNewName] = useState('');
     const [newType, setNewType] = useState('GWM');
     const inputRef = useRef(null);
-    const [filterType, setFilterType] = useState('ALL'); // ALL | GWM | SWM
+    const [filterType, setFilterType] = useState('ALL'); // ALL | GWM
+    const [swmMode, setSwmMode] = useState('off'); // off | all | derived
     const [message, setMessage] = useState('');
     const [editingId, setEditingId] = useState(null);
     const [editingName, setEditingName] = useState('');
@@ -89,7 +90,14 @@ export default function StandardTreeManager({
 
     useEffect(() => {
         // build tree from filtered items
-        const filtered = items.filter(i => filterType === 'ALL' ? true : i.type === filterType);
+        const effectiveFilterType = swmMode === 'all' ? 'SWM' : filterType;
+
+        const filtered = items.filter((i) => {
+            if (effectiveFilterType === 'ALL') return true;
+            if (effectiveFilterType === 'GWM') return (i.type ?? '').toUpperCase() === 'GWM';
+            if (effectiveFilterType === 'SWM') return (i.type ?? '').toUpperCase() === 'SWM';
+            return true;
+        });
         const map = {};
         filtered.forEach(i => { map[i.id] = { ...i, children: [] }; });
         const roots = [];
@@ -136,7 +144,7 @@ export default function StandardTreeManager({
         });
 
         setTree(roots);
-    }, [items, filterType]);
+    }, [items, filterType, swmMode]);
 
     const itemById = useMemo(() => {
         const map = new Map();
@@ -489,7 +497,7 @@ export default function StandardTreeManager({
     };
 
     const smallBtn = { padding: '4px 6px', fontSize: 12 };
-    const headerButtonStyle = { padding: '4px 10px', fontSize: 12 };
+    const headerButtonStyle = { padding: '4px 10px', fontSize: 12, border: '1px solid #ccc', background: '#fff' };
     const collapseButtonStyle = {
         width: 24,
         height: 24,
@@ -508,6 +516,9 @@ export default function StandardTreeManager({
     };
 
     const renderNode = (node, level = 0) => {
+        if (swmMode === 'derived' && level >= 2 && !node.derive_from) {
+            return null;
+        }
         const isMatch = matchSet.has(node.id);
         const indent = level * 12;
         const hasChildren = node.children && node.children.length > 0;
@@ -732,9 +743,26 @@ export default function StandardTreeManager({
                                 </div>
                                 <div>
                                 <span style={{ marginRight: 8, color: '#555', fontSize: 11 }}>필터:</span>
-                                <button onClick={() => setFilterType('ALL')} style={{ ...headerButtonStyle, fontSize: 11, fontWeight: filterType === 'ALL' ? '700' : '400' }}>All</button>
-                                <button onClick={() => setFilterType('GWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontSize: 11, fontWeight: filterType === 'GWM' ? '700' : '400' }}>GWM</button>
-                                <button onClick={() => setFilterType('SWM')} style={{ ...headerButtonStyle, marginLeft: 6, fontSize: 11, fontWeight: filterType === 'SWM' ? '700' : '400' }}>SWM</button>
+                                <button onClick={() => { setFilterType('ALL'); setSwmMode('off'); }} style={{ ...headerButtonStyle, fontSize: 11, fontWeight: filterType === 'ALL' && swmMode === 'off' ? '700' : '400' }}>All</button>
+                                <button onClick={() => { setFilterType('GWM'); setSwmMode('off'); }} style={{ ...headerButtonStyle, marginLeft: 6, fontSize: 11, fontWeight: filterType === 'GWM' ? '700' : '400' }}>GWM</button>
+                                <button
+                                    onClick={() => {
+                                        setFilterType('ALL');
+                                        setSwmMode((prev) => {
+                                            if (prev === 'off') return 'all';
+                                            if (prev === 'all') return 'derived';
+                                            return 'off';
+                                        });
+                                    }}
+                                    style={{
+                                        ...headerButtonStyle,
+                                        marginLeft: 6,
+                                        fontSize: 11,
+                                        fontWeight: swmMode !== 'off' ? '700' : '400',
+                                        background: swmMode === 'derived' ? '#ede9fe' : '#fff',
+                                        borderColor: swmMode === 'derived' ? '#c4b5fd' : headerButtonStyle.border,
+                                    }}
+                                >SWM</button>
                             </div>
                         </div>
                         </div>
