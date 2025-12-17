@@ -40,6 +40,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [savedCartEntries, setSavedCartEntries] = useState([]);
   const [cartStatusMessage, setCartStatusMessage] = useState('');
   const [standardItemWorkMasters, setStandardItemWorkMasters] = useState({});
+  const [expandedCartRows, setExpandedCartRows] = useState(new Set());
 
   useEffect(() => {
     setSavedCartEntries(readWorkMasterCartEntries());
@@ -766,6 +767,18 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       Array.isArray(entry?.revitTypes) && entry.revitTypes.some((name) => selectedSet.has(name))
     );
   }, [currentSelectedRevitTypes, savedCartEntries]);
+
+  const toggleCartRowExpand = (rowId) => {
+    setExpandedCartRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) {
+        next.delete(rowId);
+      } else {
+        next.add(rowId);
+      }
+      return next;
+    });
+  };
 
   const cartTableRows = useMemo(() => {
     const rows = [];
@@ -1523,7 +1536,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 150px 140px 80px 90px 120px',
+                    gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 150px 140px 80px 90px 120px 70px',
                     gap: 6,
                     fontSize: 11,
                     fontWeight: 700,
@@ -1542,63 +1555,129 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                   <span>단위</span>
                   <span>산출유형</span>
                   <span>저장시각</span>
+                  <span>자세히</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {cartTableRows.map((row, index) => (
-                    <div
-                      key={row.id}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 150px 140px 80px 90px 120px',
-                        gap: 6,
-                        fontSize: 11,
-                        color: '#0f172a',
-                        background: index % 2 === 0 ? '#f8fafc' : '#fff',
-                        padding: '6px 4px',
-                        borderRadius: 8,
-                        alignItems: 'center',
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.revitTypesLabel}>
-                        {row.revitTypesLabel}
-                      </span>
-                      <span>{row.type}</span>
-                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.itemPath}>
-                        {row.itemPath}
-                      </span>
-                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.workMasterSummary}>
-                        {row.workMasterSummary}
-                      </span>
-                      <span>{row.gauge}</span>
-                      <span
-                        style={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          whiteSpace: 'pre-wrap',
-                        }}
-                        title={row.spec}
-                      >
-                        {row.spec}
-                      </span>
-                      <span
-                        style={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          whiteSpace: 'pre-wrap',
-                        }}
-                        title={row.formula}
-                      >
-                        {row.formula}
-                      </span>
-                      <span>{row.unit}</span>
-                      <span>{row.outputType}</span>
-                      <span>{formatCartTimestamp(row.createdAt)}</span>
-                    </div>
-                  ))}
+                  {cartTableRows.map((row, index) => {
+                    const expanded = expandedCartRows.has(row.id);
+                    return (
+                      <React.Fragment key={row.id}>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 150px 140px 80px 90px 120px 70px',
+                            gap: 6,
+                            fontSize: 11,
+                            color: '#0f172a',
+                            background: index % 2 === 0 ? '#f8fafc' : '#fff',
+                            padding: '6px 4px',
+                            borderRadius: 8,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              whiteSpace: expanded ? 'normal' : 'nowrap',
+                              overflow: expanded ? 'visible' : 'hidden',
+                              textOverflow: expanded ? 'clip' : 'ellipsis',
+                            }}
+                            title={row.revitTypesLabel}
+                          >
+                            {row.revitTypesLabel}
+                          </span>
+                          <span>{row.type}</span>
+                          <span
+                            style={{
+                              whiteSpace: expanded ? 'normal' : 'nowrap',
+                              overflow: expanded ? 'visible' : 'hidden',
+                              textOverflow: expanded ? 'clip' : 'ellipsis',
+                            }}
+                            title={row.itemPath}
+                          >
+                            {row.itemPath}
+                          </span>
+                          <span
+                            style={{
+                              whiteSpace: expanded ? 'normal' : 'nowrap',
+                              overflow: expanded ? 'visible' : 'hidden',
+                              textOverflow: expanded ? 'clip' : 'ellipsis',
+                            }}
+                            title={row.workMasterSummary}
+                          >
+                            {row.workMasterSummary}
+                          </span>
+                          <span>{row.gauge}</span>
+                          <span
+                            style={expanded
+                              ? {
+                                  display: 'block',
+                                  whiteSpace: 'pre-wrap',
+                                }
+                              : {
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'pre-wrap',
+                                }}
+                            title={row.spec}
+                          >
+                            {row.spec}
+                          </span>
+                          <span
+                            style={expanded
+                              ? {
+                                  display: 'block',
+                                  whiteSpace: 'pre-wrap',
+                                }
+                              : {
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'pre-wrap',
+                                }}
+                            title={row.formula}
+                          >
+                            {row.formula}
+                          </span>
+                          <span>{row.unit}</span>
+                          <span>{row.outputType}</span>
+                          <span>{formatCartTimestamp(row.createdAt)}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleCartRowExpand(row.id)}
+                            style={{
+                              border: '1px solid #cbd5f5',
+                              background: expanded ? '#e0f2fe' : '#fff',
+                              borderRadius: 8,
+                              padding: '4px 6px',
+                              fontSize: 10,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {expanded ? '숨기기' : '자세히'}
+                          </button>
+                        </div>
+                        {expanded && (
+                          <div
+                            style={{
+                              margin: '4px 0 8px',
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              background: '#eef2ff',
+                              fontSize: 10,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            <div style={{ color: '#1f2937' }}><strong>Spec:</strong> {row.spec || '—'}</div>
+                            <div style={{ color: '#1f2937' }}><strong>수식:</strong> {row.formula || '—'}</div>
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               </>
             ) : (
