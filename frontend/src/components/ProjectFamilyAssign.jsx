@@ -31,6 +31,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
   const [savedCartEntries, setSavedCartEntries] = useState([]);
   const [cartStatusMessage, setCartStatusMessage] = useState('');
+  const [standardItemWorkMasters, setStandardItemWorkMasters] = useState({});
 
   useEffect(() => {
     setSavedCartEntries(readWorkMasterCartEntries());
@@ -153,6 +154,69 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       cancelled = true;
     };
   }, [apiBaseUrl, selectedFamily?.id]);
+
+  useEffect(() => {
+    if (!apiBaseUrl || !familyAssignments.length) {
+      setStandardItemWorkMasters({});
+      return undefined;
+    }
+    const ids = Array.from(
+      new Set(
+        familyAssignments
+          .map((assignment) => assignment?.standard_item?.id)
+          .filter((id) => Number.isFinite(id))
+      )
+    );
+    if (!ids.length) {
+      setStandardItemWorkMasters({});
+      return undefined;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const results = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const res = await fetch(`${apiBaseUrl}/standard-items/${id}`);
+              if (!res.ok) throw new Error('failed');
+              const data = await res.json();
+              let selectedWorkMaster = null;
+              const selectedId = data?.selected_work_master_id;
+              if (selectedId) {
+                try {
+                  const wmRes = await fetch(`${apiBaseUrl}/work-masters/${selectedId}`);
+                  if (wmRes.ok) {
+                    selectedWorkMaster = await wmRes.json();
+                  }
+                } catch (error) {
+                  // ignore fetch error, keep null
+                }
+              }
+              return [id, { standardItem: data, selectedWorkMaster }];
+            } catch (error) {
+              return [id, null];
+            }
+          })
+        );
+        if (cancelled) return;
+        const map = {};
+        results.forEach(([id, payload]) => {
+          if (payload) {
+            map[id] = payload;
+          }
+        });
+        setStandardItemWorkMasters(map);
+      } catch (error) {
+        if (!cancelled) {
+          setStandardItemWorkMasters({});
+        }
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, familyAssignments]);
 
     useEffect(() => {
       if (!apiBaseUrl || !selectedFamily?.id) {
@@ -547,6 +611,95 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     });
     return map;
   }, [assignmentRowsByType]);
+
+  const assignmentById = useMemo(() => {
+    const map = new Map();
+    familyAssignments.forEach((assignment) => {
+      if (assignment?.id != null) {
+        map.set(assignment.id, assignment);
+      }
+    });
+    return map;
+  }, [familyAssignments]);
+
+  const standardItemById = useMemo(() => {
+    const map = new Map();
+    familyAssignments.forEach((assignment) => {
+      const standardItem = assignment?.standard_item;
+      if (standardItem?.id != null) {
+        map.set(standardItem.id, standardItem);
+      }
+    });
+    return map;
+  }, [familyAssignments]);
+
+  const buildItemPath = (standardItem) => {
+    if (!standardItem) return '—';
+    const level2 = standardItem.name ?? '—';
+    if (!standardItem.parent_id) return level2;
+    const parent = standardItemById.get(standardItem.parent_id);
+    const level1 = parent?.name;
+    const parts = [level1, level2].filter(Boolean);
+    return parts.length ? parts.join(' | ') : level2;
+  };
+
+  const buildWorkMasterSummary = (workMaster) => {
+    if (!workMaster) return '—';
+    const parts = [
+      workMaster.work_master_code,
+      workMaster.cat_large_desc,
+      workMaster.cat_mid_desc,
+      workMaster.cat_small_desc,
+      workMaster.work_group_code,
+      workMaster.discipline,
+    ].filter(Boolean);
+    return parts.length ? parts.join(' | ') : '—';
+  };
+
+  const buildUnitLabel = (workMaster) => {
+    if (!workMaster) return '—';
+    const parts = [workMaster.uom1, workMaster.uom2].filter(Boolean);
+    return parts.length ? parts.join(' / ') : '—';
+  };
+
+  const resolveWorkMaster = (assignment) => {
+    if (assignment?.work_master) return assignment.work_master;
+
+    const std = assignment?.standard_item;
+    const stdSelectedId = std?.selected_work_master_id;
+
+    if (std && Array.isArray(std.work_masters) && std.work_masters.length) {
+      if (stdSelectedId) {
+        const match = std.work_masters.find((wm) => wm.id === stdSelectedId);
+        if (match) return match;
+      }
+      return std.work_masters[0];
+    }
+
+    const stdId = std?.id;
+    if (!stdId) return null;
+    const entry = standardItemWorkMasters[stdId];
+    const detail = entry?.standardItem;
+    const selectedWorkMaster = entry?.selectedWorkMaster;
+    if (selectedWorkMaster) return selectedWorkMaster;
+    if (detail && Array.isArray(detail.work_masters) && detail.work_masters.length) {
+      const selectedId = detail.selected_work_master_id || stdSelectedId;
+      if (selectedId) {
+        const match = detail.work_masters.find((wm) => wm.id === selectedId);
+        if (match) return match;
+      }
+      return detail.work_masters[0];
+    }
+    return null;
+  };
+
+  const visibleCartEntries = useMemo(() => {
+    if (!currentSelectedRevitTypes.length) return [];
+    const selectedSet = new Set(currentSelectedRevitTypes);
+    return savedCartEntries.filter((entry) =>
+      Array.isArray(entry?.revitTypes) && entry.revitTypes.some((name) => selectedSet.has(name))
+    );
+  }, [currentSelectedRevitTypes, savedCartEntries]);
 
   const renderAssignmentCard = (title, typeKey) => {
     const assignments = assignmentGroups[typeKey];
@@ -1254,31 +1407,102 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             <span>Work Master 장바구니 👜</span>
           </div>
           <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {savedCartEntries.length ? (
-              savedCartEntries.map((entry) => (
-                <div
-                  key={entry.id}
-                  style={{
-                    borderRadius: 10,
-                    padding: '8px 10px',
-                    background: '#fff',
-                    boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
-                    fontSize: 11,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 4,
-                  }}
-                >
-                  <div style={{ fontWeight: 600 }}>{entry.revitTypes.join(', ')}</div>
-                  <div style={{ display: 'flex', gap: 6, fontSize: 11, color: '#475467' }}>
-                    <span>{entry.assignmentIds.length}개 Work Master 항목</span>
-                    <span>·</span>
-                    <span>저장 {formatCartTimestamp(entry.createdAt)}</span>
+            {visibleCartEntries.length ? (
+              visibleCartEntries.map((entry) => {
+                const rows = (entry.assignmentIds || [])
+                  .map((id) => assignmentById.get(id))
+                  .filter(Boolean)
+                  .map((assignment) => {
+                    const standardItem = assignment?.standard_item;
+                    const workMaster = resolveWorkMaster(assignment);
+                    return {
+                      id: assignment.id,
+                      type: standardItem?.type ?? '—',
+                      itemPath: buildItemPath(standardItem),
+                      workMasterSummary: buildWorkMasterSummary(workMaster),
+                      gauge: (workMaster?.gauge ?? '').toUpperCase() || '—',
+                      spec: workMaster?.add_spec ?? '—',
+                      formula: assignment.formula ?? '—',
+                      unit: buildUnitLabel(workMaster),
+                      outputType: selectedFamily?.sequence_number ?? '—',
+                    };
+                  });
+
+                return (
+                  <div
+                    key={entry.id}
+                    style={{
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      background: '#fff',
+                      boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
+                      fontSize: 11,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>{entry.revitTypes.join(', ')}</div>
+                    <div style={{ display: 'flex', gap: 6, fontSize: 11, color: '#475467' }}>
+                      <span>{rows.length}개 Work Master 항목</span>
+                      <span>·</span>
+                      <span>저장 {formatCartTimestamp(entry.createdAt)}</span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '70px 1.2fr 1.6fr 70px 140px 120px 80px 90px',
+                        gap: 6,
+                        fontWeight: 700,
+                        color: '#0f172a',
+                      }}
+                    >
+                      <span>분류</span>
+                      <span>Item</span>
+                      <span>Work Master</span>
+                      <span>Gauge</span>
+                      <span>Spec</span>
+                      <span>수식</span>
+                      <span>단위</span>
+                      <span>산출유형</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {rows.length ? (
+                        rows.map((row) => (
+                          <div
+                            key={row.id}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '70px 1.2fr 1.6fr 70px 140px 120px 80px 90px',
+                              gap: 6,
+                              color: '#0f172a',
+                            }}
+                          >
+                            <span>{row.type}</span>
+                            <span>{row.itemPath}</span>
+                            <span>{row.workMasterSummary}</span>
+                            <span>{row.gauge}</span>
+                            <span style={{ whiteSpace: 'pre-wrap' }}>{row.spec}</span>
+                            <span style={{ whiteSpace: 'pre-wrap' }}>{row.formula}</span>
+                            <span>{row.unit}</span>
+                            <span>{row.outputType}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                          저장된 Work Master 상세를 불러올 수 없습니다.
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>저장된 항목이 없습니다.</div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                {currentSelectedRevitTypes.length
+                  ? '선택된 Revit 타입에 해당하는 저장 항목이 없습니다.'
+                  : 'Revit 타입을 선택하면 해당 장바구니 항목이 표시됩니다.'}
+              </div>
             )}
           </div>
         </div>

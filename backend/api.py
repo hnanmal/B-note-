@@ -112,6 +112,21 @@ def read_work_masters(
     return work_masters
 
 
+@router.get(
+    "/work-masters/{work_master_id}",
+    response_model=schemas.WorkMaster,
+    tags=["Work Masters"],
+)
+def read_work_master(
+    work_master_id: int,
+    db: Session = Depends(get_db),
+):
+    db_work_master = crud.get_work_master(db, work_master_id=work_master_id)
+    if not db_work_master:
+        raise HTTPException(status_code=404, detail="WorkMaster not found")
+    return db_work_master
+
+
 @router.post(
     "/work-masters/upload",
     summary="Upload and upsert Work Masters from Excel",
@@ -297,6 +312,22 @@ def update_project_work_master(
     if not payload:
         return db_work_master
     return crud.update_work_master_fields(db, db_work_master=db_work_master, updates=payload)
+
+
+@router.get(
+    "/project/{project_identifier}/work-masters/{work_master_id}",
+    response_model=schemas.WorkMaster,
+    tags=["Project Data"],
+)
+def read_project_work_master(
+    project_identifier: str,
+    work_master_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    db_work_master = crud.get_work_master(db, work_master_id=work_master_id)
+    if not db_work_master:
+        raise HTTPException(status_code=404, detail="WorkMaster not found")
+    return db_work_master
 
 
 @router.post(
