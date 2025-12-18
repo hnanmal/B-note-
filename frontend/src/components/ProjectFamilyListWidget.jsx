@@ -180,7 +180,12 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
               fontSize: 11,
               color: '#0f172a',
               borderBottom: '1px solid rgba(15,23,42,0.08)',
-              background: node.id === selectedFamilyId ? '#e0f2fe' : 'transparent',
+              background:
+                node.id === selectedFamilyId
+                  ? '#e0f2fe'
+                  : Array.isArray(node.revit_types) && node.revit_types.length
+                    ? '#f3e8ff'
+                    : 'transparent',
               cursor: onFamilySelect ? 'pointer' : 'default',
             }}
           >
