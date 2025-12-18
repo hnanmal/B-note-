@@ -1220,7 +1220,16 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             <span key={`${typeKey}-${col}`} style={{ fontWeight: 600 }}>{col}</span>
           ))}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+          }}
+        >
           {assignmentsLoading ? (
             <div style={{ fontSize: 12, color: '#475467' }}>할당된 항목을 불러오는 중입니다...</div>
           ) : assignmentsError ? (
@@ -1890,6 +1899,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                     display: 'flex',
                     gap: 12,
                     minHeight: 360,
+                    flex: 1,
                   }}
                 >
                   {renderWorkMasterColumn('GWM', 'GWM')}
