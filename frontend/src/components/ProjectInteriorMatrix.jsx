@@ -286,6 +286,14 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const [standardItems, setStandardItems] = useState([]);
   const [roomFamilyId, setRoomFamilyId] = useState(null);
 
+  const buildingOptions = useMemo(() => {
+    const set = new Set();
+    buildings.forEach((b) => {
+      if (b?.name) set.add(b.name);
+    });
+    return Array.from(set);
+  }, [buildings]);
+
   const reloadCartEntries = async () => {
     if (!apiBaseUrl) return;
     try {
@@ -471,14 +479,6 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
       setInteriorSections([]);
     }
   }, [standardItems, projectAbbr, cartEntries]);
-
-  const buildingOptions = useMemo(() => {
-    const set = new Set();
-    buildings.forEach((b) => {
-      if (b?.name) set.add(b.name);
-    });
-    return Array.from(set);
-  }, [buildings]);
 
   useEffect(() => {
     if (!selectedBuilding && buildingOptions.length) {
