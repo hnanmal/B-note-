@@ -2058,22 +2058,25 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                               <span style={{ fontWeight: 600, whiteSpace: 'pre-wrap' }} title={row.spec}>
                                 {row.spec}
                               </span>
+                              <span style={{ color: '#475467', whiteSpace: 'nowrap' }}>{row.unit}</span>
+                              <span style={{ flex: 1 }} />
                               <input
                                 type="text"
                                 value={formulaValue}
                                 onChange={(event) => handleCartFormulaChange(row, event.target.value)}
                                 style={{
                                   minWidth: 160,
+                                  maxWidth: 220,
                                   border: '1px solid #cbd5f5',
                                   borderRadius: 6,
                                   padding: '4px 6px',
                                   fontSize: 11,
                                   color: '#111827',
                                   background: '#fff',
+                                  textAlign: 'right',
                                 }}
                                 title="수식을 필요에 따라 조정하여 저장합니다 (패밀리 표준 수식은 변경되지 않습니다)"
                               />
-                              <span style={{ color: '#475467', whiteSpace: 'nowrap' }}>{row.unit}</span>
                             </div>
                           </div>
                           );
