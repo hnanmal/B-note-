@@ -388,9 +388,12 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         const listData = await listRes.json();
         if (cancelled) return;
         const items = Array.isArray(listData) ? listData : [];
+        const roomFamilies = items.filter((item) => typeof item?.name === 'string'
+          && item.name.trim().toLowerCase() === 'rooms');
+        if (!roomFamilies.length) return;
         const allRooms = [];
         const revitPayloads = await Promise.allSettled(
-          items
+          roomFamilies
             .filter((item) => item?.id)
             .map(async (item) => {
               const res = await fetch(`${apiBaseUrl}/family-list/${item.id}/revit-types`);
