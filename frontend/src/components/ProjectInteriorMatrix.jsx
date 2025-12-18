@@ -82,6 +82,7 @@ const normalizeSampleRooms = () => SAMPLE_ROOMS.map((room) => ({
   std: room.std || '',
 }));
 
+
 const buildSectionsFromSamples = () => SAMPLE_SECTIONS.map((section) => ({
   id: section.id,
   label: section.label,
@@ -95,19 +96,39 @@ const buildSectionsFromSamples = () => SAMPLE_SECTIONS.map((section) => ({
   }),
 }));
 
-const parseRevitRoom = (value) => {
+const parseRevitRoom = (value, knownBuildings = []) => {
   const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) {
+    return { key: '', label: '', building: '', std: '' };
+  }
+
   const parts = raw.split('\t');
-  const hasBuilding = parts.length > 1;
-  const building = hasBuilding ? (parts.shift() || '').trim() : '';
-  const label = (hasBuilding ? parts.join('\t') : raw) || raw;
+  const first = (parts[0] || '').trim();
+  const rest = parts.slice(1).join('\t').trim();
+  const normalizedKnown = knownBuildings.map((b) => (b || '').trim().toLowerCase());
+  const looksLikeBuilding =
+    parts.length > 1
+    && first
+    && (normalizedKnown.includes(first.toLowerCase()) || first.toLowerCase().includes('building'));
+  const building = looksLikeBuilding ? first : '';
+  const label = building ? (rest || raw) : raw.replace(/\t+/g, ' ');
+  const stdMatch = label.match(/^(\d+(?:\.\d+)?)/);
+  const std = stdMatch ? stdMatch[1] : '';
   return {
-    key: raw || label,
+    key: raw,
     label,
     building,
-    std: '',
+    std,
   };
 };
+
+const normalizeRoomKey = (value) =>
+  (value || '')
+    .replace(/\t+/g, '_')
+    .replace(/\s+/g, ' ')
+    .replace(/_/g, ' ')
+    .trim()
+    .toLowerCase();
 
 const buildSectionsFromStandardItems = (items, projectAbbr = '') => {
   if (!Array.isArray(items)) return [];
@@ -161,8 +182,101 @@ const buildSectionsFromStandardItems = (items, projectAbbr = '') => {
   return sections.sort((a, b) => a.label.localeCompare(b.label));
 };
 
+const buildSectionsFromCart = (cartEntries, standardItems, projectAbbr = '') => {
+  if (!Array.isArray(cartEntries) || !Array.isArray(standardItems)) return [];
+  const itemMap = new Map();
+  standardItems.forEach((item) => {
+    if (item?.id != null) itemMap.set(item.id, item);
+  });
+
+  const collected = [];
+  cartEntries.forEach((entry) => {
+    (entry?.standardItemIds || []).forEach((id) => {
+      const item = itemMap.get(id);
+      if (!item) return;
+      if ((item.type || '').toUpperCase() !== 'SWM') return;
+      // Allow non-derived items so cart rows always render when present in DB
+      collected.push(item);
+    });
+  });
+  if (!collected.length) return [];
+
+  const grouped = new Map();
+  collected.forEach((item) => {
+    const parentId = item.parent_id || 'uncategorized';
+    if (!grouped.has(parentId)) grouped.set(parentId, []);
+    grouped.get(parentId).push(item);
+  });
+
+  const sections = [];
+  grouped.forEach((itemsForParent, parentId) => {
+    const parentName = parentId === 'uncategorized' ? 'Cart Items' : itemMap.get(parentId)?.name;
+    const enriched = itemsForParent.map((child) => {
+      const deriveParent = child.derive_from ? itemMap.get(child.derive_from)?.name : null;
+      const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
+      const childName = (child.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || child.name;
+      const label = deriveParent ? `${deriveParent}${abbrPart}::${childName}` : child.name;
+      return { key: `std-${child.id}`, label, standardItemId: child.id };
+    });
+    const sorted = enriched.sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+    sections.push({
+      id: `cart-${parentId}`,
+      label: parentName || 'Cart Items',
+      items: sorted,
+    });
+  });
+
+  return sections.sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+};
+
+const normalizeCartEntry = (entry) => ({
+  id: entry?.id,
+  revitTypes: entry?.revitTypes ?? entry?.revit_types ?? [],
+  assignmentIds: entry?.assignmentIds ?? entry?.assignment_ids ?? [],
+  standardItemIds: entry?.standardItemIds ?? entry?.standard_item_ids ?? [],
+  formula: entry?.formula ?? null,
+  createdAt: entry?.createdAt ?? entry?.created_at ?? null,
+});
+
+const mergeCartExtrasIntoSections = (baseSections, cartEntries, standardItems, projectAbbr = '') => {
+  const existingIds = new Set();
+  baseSections.forEach((section) => {
+    section.items.forEach((item) => {
+      if (item?.standardItemId != null) existingIds.add(item.standardItemId);
+    });
+  });
+
+  const itemMap = new Map();
+  standardItems.forEach((item) => {
+    if (item?.id != null) itemMap.set(item.id, item);
+  });
+
+  const extras = [];
+  cartEntries.forEach((entry) => {
+    (entry?.standardItemIds || []).forEach((id) => {
+      if (existingIds.has(id)) return;
+      const item = itemMap.get(id);
+      if (!item) return;
+      if ((item.type || '').toUpperCase() !== 'SWM') return;
+      const deriveParent = item.derive_from ? itemMap.get(item.derive_from)?.name : null;
+      const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
+      const childName = (item.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || item.name;
+      const label = deriveParent ? `${deriveParent}${abbrPart}::${childName}` : item.name;
+      extras.push({ key: `cart-${id}`, label, standardItemId: id });
+    });
+  });
+
+  if (!extras.length) return baseSections;
+  const extraSection = {
+    id: 'cart-extra',
+    label: 'Cart Items',
+    items: extras.sort((a, b) => (a.label || '').localeCompare(b.label || '')),
+  };
+  return [...baseSections, extraSection];
+};
+
 export default function ProjectInteriorMatrix({ apiBaseUrl }) {
-  const [rooms, setRooms] = useState(normalizeSampleRooms);
+  const [rooms, setRooms] = useState([]);
   const [buildings, setBuildings] = useState([]);
   const [interiorSections, setInteriorSections] = useState(buildSectionsFromSamples);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
@@ -170,6 +284,52 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const [cartEntries, setCartEntries] = useState([]);
   const [projectAbbr, setProjectAbbr] = useState('');
   const [standardItems, setStandardItems] = useState([]);
+  const [roomFamilyId, setRoomFamilyId] = useState(null);
+
+  const reloadCartEntries = async () => {
+    if (!apiBaseUrl) return;
+    try {
+      const res = await fetch(`${apiBaseUrl}/workmaster-cart`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const normalized = Array.isArray(data) ? data.map(normalizeCartEntry) : [];
+      setCartEntries(normalized);
+      const parsedRooms = [];
+      const seen = new Set();
+      normalized.forEach((entry) => {
+        (entry?.revitTypes || []).forEach((rt) => {
+          const room = parseRevitRoom(rt, buildingOptions);
+          if (!seen.has(room.key)) {
+            seen.add(room.key);
+            parsedRooms.push(room);
+          }
+        });
+      });
+      if (parsedRooms.length) {
+        setRooms(parsedRooms);
+      }
+    } catch (error) {
+      // ignore fetch errors
+    }
+  };
+
+  useEffect(() => {
+    if (rooms.length) return;
+    const parsedRooms = [];
+    const seen = new Set();
+    cartEntries.forEach((entry) => {
+      (entry?.revitTypes || []).forEach((rt) => {
+        const room = parseRevitRoom(rt, buildingOptions);
+        if (!seen.has(room.key)) {
+          seen.add(room.key);
+          parsedRooms.push(room);
+        }
+      });
+    });
+    if (parsedRooms.length) {
+      setRooms(parsedRooms);
+    }
+  }, [cartEntries, rooms.length]);
 
   useEffect(() => {
     if (!apiBaseUrl || !apiBaseUrl.includes('/project/')) return undefined;
@@ -210,35 +370,59 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   }, [apiBaseUrl]);
 
   useEffect(() => {
-    if (!apiBaseUrl) return undefined;
+    if (!apiBaseUrl || !apiBaseUrl.includes('/project/')) return undefined;
     let cancelled = false;
-    const loadCart = async () => {
+    const loadRoomsFromFamily = async () => {
       try {
-        const res = await fetch(`${apiBaseUrl}/workmaster-cart`);
-        if (!res.ok) return;
-        const data = await res.json();
+        // Load all family list items, collect every revit type as room header
+        const listRes = await fetch(`${apiBaseUrl}/family-list/`);
+        if (!listRes.ok) return;
+        const listData = await listRes.json();
         if (cancelled) return;
-        const normalized = Array.isArray(data) ? data : [];
-        setCartEntries(normalized);
-        const parsedRooms = [];
-        const seen = new Set();
-        normalized.forEach((entry) => {
-          (entry?.revitTypes || []).forEach((rt) => {
-            const room = parseRevitRoom(rt);
-            if (!seen.has(room.key)) {
-              seen.add(room.key);
-              parsedRooms.push(room);
-            }
-          });
+        const items = Array.isArray(listData) ? listData : [];
+        const allRooms = [];
+        const revitPayloads = await Promise.allSettled(
+          items
+            .filter((item) => item?.id)
+            .map(async (item) => {
+              const res = await fetch(`${apiBaseUrl}/family-list/${item.id}/revit-types`);
+              if (!res.ok) return [];
+              const data = await res.json();
+              return Array.isArray(data) ? data : [];
+            })
+        );
+        revitPayloads.forEach((result) => {
+          if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+            result.value.forEach((rt) => {
+              const room = parseRevitRoom(rt?.type_name || '', buildingOptions);
+              if (room.key) allRooms.push(room);
+            });
+          }
         });
-        if (parsedRooms.length) {
-          setRooms(parsedRooms);
+        if (allRooms.length) {
+          const unique = [];
+          const seen = new Set();
+          allRooms.forEach((r) => {
+            if (seen.has(r.key)) return;
+            seen.add(r.key);
+            unique.push(r);
+          });
+          setRooms(unique);
         }
       } catch (error) {
-        // ignore cart fetch errors
+        // ignore; fallback to cart-derived rooms
       }
     };
-    loadCart();
+    loadRoomsFromFamily();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    if (!apiBaseUrl) return undefined;
+    let cancelled = false;
+    reloadCartEntries().catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -254,39 +438,42 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         const data = await res.json();
         if (cancelled) return;
         setStandardItems(Array.isArray(data) ? data : []);
-        const built = buildSectionsFromStandardItems(data, projectAbbr);
-        if (built.length) {
-          setInteriorSections(built);
-        }
       } catch (error) {
-        // fall back to samples on failure
-        if (!cancelled) setInteriorSections(buildSectionsFromSamples());
+        if (!cancelled) setStandardItems([]);
       }
     };
     loadStandardItems();
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, projectAbbr]);
+  }, [apiBaseUrl]);
 
   useEffect(() => {
-    if (!standardItems.length) return;
-    const built = buildSectionsFromStandardItems(standardItems, projectAbbr);
-    if (built.length) {
-      setInteriorSections(built);
+    const derivedSections = buildSectionsFromStandardItems(standardItems, projectAbbr);
+    if (derivedSections.length) {
+      const merged = mergeCartExtrasIntoSections(derivedSections, cartEntries, standardItems, projectAbbr);
+      setInteriorSections(merged);
+      return;
     }
-  }, [standardItems, projectAbbr]);
+    const cartSections = buildSectionsFromCart(cartEntries, standardItems, projectAbbr);
+    if (cartSections.length) {
+      setInteriorSections(cartSections);
+      return;
+    }
+    if (!standardItems.length) {
+      setInteriorSections(buildSectionsFromSamples());
+    } else {
+      setInteriorSections([]);
+    }
+  }, [standardItems, projectAbbr, cartEntries]);
 
   const buildingOptions = useMemo(() => {
     const set = new Set();
     buildings.forEach((b) => {
       if (b?.name) set.add(b.name);
     });
-    rooms.forEach((room) => {
-      if (room?.building) set.add(room.building);
-    });
     return Array.from(set);
-  }, [buildings, rooms]);
+  }, [buildings]);
 
   useEffect(() => {
     if (!selectedBuilding && buildingOptions.length) {
@@ -307,24 +494,33 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   }, [selectedBuilding]);
 
   const entryAssignmentIds = (standardItemId) => {
-    const assignmentId = INTERIOR_ITEM_ASSIGNMENT_MAP[standardItemId];
-    return assignmentId ? [assignmentId] : [];
+    const mapAssignment = INTERIOR_ITEM_ASSIGNMENT_MAP[standardItemId];
+    if (mapAssignment) return [mapAssignment];
+    const fromCart = cartEntries.find(
+      (entry) => Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId)
+        && Array.isArray(entry?.assignmentIds) && entry.assignmentIds.length
+    );
+    if (fromCart) return [...fromCart.assignmentIds];
+    return [];
   };
 
   const handleToggle = (itemKey, standardItemId, roomKey) => {
     if (!selectedBuilding) return;
     if (!standardItemId) return;
 
-    const existing = cartEntries.find(
-      (entry) => Array.isArray(entry?.revitTypes) && entry.revitTypes.includes(roomKey)
-        && Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId)
-    );
+    const existing = cartEntries.find((entry) => {
+      const matchesStd = Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId);
+      if (!matchesStd) return false;
+      const revits = Array.isArray(entry?.revitTypes) ? entry.revitTypes : [];
+      const targetNorm = normalizeRoomKey(roomKey);
+      return revits.some((rt) => normalizeRoomKey(rt) === targetNorm);
+    });
 
     const saveEntry = async () => {
       const payload = {
-        revitTypes: [roomKey],
-        assignmentIds: entryAssignmentIds(standardItemId),
-        standardItemIds: [standardItemId],
+        revit_types: [roomKey],
+        assignment_ids: entryAssignmentIds(standardItemId),
+        standard_item_ids: [standardItemId],
         formula: '=A',
       };
       await fetch(`${apiBaseUrl}/workmaster-cart`, {
@@ -332,29 +528,18 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }).catch(() => null);
+      await reloadCartEntries();
     };
 
     const deleteEntry = async (entryId) => {
       await fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, { method: 'DELETE' }).catch(() => null);
+      await reloadCartEntries();
     };
 
     if (existing?.id) {
-      deleteEntry(existing.id).then(() => {
-        setCartEntries((prev) => prev.filter((e) => e.id !== existing.id));
-      });
+      deleteEntry(existing.id).catch(() => {});
     } else {
-      saveEntry().then(() => {
-        setCartEntries((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            revitTypes: [roomKey],
-            assignmentIds: entryAssignmentIds(standardItemId),
-            standardItemIds: [standardItemId],
-            formula: '=A',
-          },
-        ]);
-      });
+      saveEntry().catch(() => {});
     }
 
     setSelectionByBuilding((prev) => {
@@ -372,10 +557,13 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
 
   const isChecked = (itemKey, standardItemId, roomKey) => {
     if (!standardItemId) return false;
-    const hasCart = cartEntries.some(
-      (entry) => Array.isArray(entry?.revitTypes) && entry.revitTypes.includes(roomKey)
-        && Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId)
-    );
+    const targetNorm = normalizeRoomKey(roomKey);
+    const hasCart = cartEntries.some((entry) => {
+      const matchesStd = Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId);
+      if (!matchesStd) return false;
+      const revits = Array.isArray(entry?.revitTypes) ? entry.revitTypes : [];
+      return revits.some((rt) => normalizeRoomKey(rt) === targetNorm);
+    });
     if (hasCart) return true;
 
     const bucket = selectionByBuilding[selectedBuilding];
@@ -385,7 +573,12 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   };
 
   const tableHeaders = useMemo(
-    () => rooms.filter((room) => !selectedBuilding || room.building === selectedBuilding),
+    () => rooms.filter((room) => {
+      const matchesBuilding = !selectedBuilding
+        || !room.building
+        || room.building === selectedBuilding;
+      return matchesBuilding;
+    }),
     [rooms, selectedBuilding]
   );
 
