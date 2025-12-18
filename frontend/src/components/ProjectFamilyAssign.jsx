@@ -1807,6 +1807,9 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                         gap: 8,
                         fontSize: 11,
                         color: '#475467',
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                        paddingRight: 4,
                       }}
                     >
                       <span style={{ fontWeight: 600 }}>Calc Code</span>
