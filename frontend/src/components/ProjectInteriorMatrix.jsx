@@ -589,19 +589,26 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     const targetNorm = normalizeRoomKey(parsedTarget.label || roomKey);
     const targetBuilding = selectedBuilding || parsedTarget.building || '';
 
-    const existing = cartEntries.find((entry) => {
+    const matchEntry = (entry, { requireBuilding = true } = {}) => {
       const matchesStd = Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId);
       if (!matchesStd) return false;
       const revits = Array.isArray(entry?.revitTypes) ? entry.revitTypes : [];
       const buildings = deriveBuildingNames(entry, buildingOptions);
-      const matchesBuilding = !targetBuilding || !buildings.length || buildings.includes(targetBuilding);
+      const matchesBuilding = !requireBuilding
+        || !targetBuilding
+        || !buildings.length
+        || buildings.includes(targetBuilding);
       if (!matchesBuilding) return false;
       return revits.some((rt) => {
         const parsed = parseRevitRoom(rt, buildingOptions);
         const norm = normalizeRoomKey(parsed.label || rt);
         return norm === targetNorm;
       });
-    });
+    };
+
+    const existing =
+      cartEntries.find((entry) => matchEntry(entry, { requireBuilding: true }))
+      || cartEntries.find((entry) => matchEntry(entry, { requireBuilding: false }));
 
     const saveEntry = async () => {
       const buildingName = targetBuilding;
@@ -630,6 +637,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     };
 
     if (existing?.id) {
+      // Optimistic removal for immediate UI update
+      setCartEntries((prev) => prev.filter((entry) => entry.id !== existing.id));
       deleteEntry(existing.id).catch(() => {});
     } else {
       saveEntry().catch(() => {});
@@ -638,12 +647,16 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     setSelectionByBuilding((prev) => {
       const bucket = prev[selectedBuilding] ? new Map(prev[selectedBuilding]) : new Map();
       const roomSet = new Set(bucket.get(itemKey) || []);
-      if (roomSet.has(roomKey)) {
+      if (existing?.id) {
         roomSet.delete(roomKey);
       } else {
         roomSet.add(roomKey);
       }
-      bucket.set(itemKey, roomSet);
+      if (roomSet.size) {
+        bucket.set(itemKey, roomSet);
+      } else {
+        bucket.delete(itemKey);
+      }
       return { ...prev, [selectedBuilding]: bucket };
     });
   };
