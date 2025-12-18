@@ -8,10 +8,15 @@ export default function ProjectInputMain({ apiBaseUrl }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const sortedBuildings = useMemo(
-    () => [...buildings].sort((a, b) => a.name.localeCompare(b.name)),
-    [buildings]
-  );
+  const sortedBuildings = useMemo(() => {
+    const list = [...buildings];
+    return list.sort((a, b) => {
+      const aDate = new Date(a?.created_at || 0).getTime();
+      const bDate = new Date(b?.created_at || 0).getTime();
+      if (aDate !== bDate) return aDate - bDate;
+      return (a?.id || 0) - (b?.id || 0);
+    });
+  }, [buildings]);
 
   const fetchBuildings = useCallback(async () => {
     setLoading(true);

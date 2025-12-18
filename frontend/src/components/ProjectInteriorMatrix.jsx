@@ -130,6 +130,19 @@ const normalizeRoomKey = (value) =>
     .trim()
     .toLowerCase();
 
+const deriveBuildingNames = (entry, knownBuildings = []) => {
+  const explicit = Array.isArray(entry?.buildingNames ?? entry?.building_names)
+    ? (entry.buildingNames ?? entry.building_names)
+    : [];
+  const cleaned = explicit.map((b) => (b || '').trim()).filter(Boolean);
+  if (cleaned.length) return Array.from(new Set(cleaned));
+
+  const inferred = (entry?.revitTypes ?? entry?.revit_types ?? [])
+    .map((rt) => parseRevitRoom(rt, knownBuildings).building)
+    .filter(Boolean);
+  return Array.from(new Set(inferred));
+};
+
 const buildSectionsFromStandardItems = (items, projectAbbr = '') => {
   if (!Array.isArray(items)) return [];
   const swmItems = items.filter((item) => (item?.type || '').toUpperCase() === 'SWM');
@@ -234,6 +247,7 @@ const normalizeCartEntry = (entry) => ({
   revitTypes: entry?.revitTypes ?? entry?.revit_types ?? [],
   assignmentIds: entry?.assignmentIds ?? entry?.assignment_ids ?? [],
   standardItemIds: entry?.standardItemIds ?? entry?.standard_item_ids ?? [],
+  buildingNames: entry?.buildingNames ?? entry?.building_names ?? [],
   formula: entry?.formula ?? null,
   createdAt: entry?.createdAt ?? entry?.created_at ?? null,
 });
@@ -287,11 +301,21 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const [roomFamilyId, setRoomFamilyId] = useState(null);
 
   const buildingOptions = useMemo(() => {
-    const set = new Set();
-    buildings.forEach((b) => {
-      if (b?.name) set.add(b.name);
+    const sorted = [...buildings].sort((a, b) => {
+      const aDate = new Date(a?.created_at || 0).getTime();
+      const bDate = new Date(b?.created_at || 0).getTime();
+      if (aDate !== bDate) return aDate - bDate;
+      return (a?.id || 0) - (b?.id || 0);
     });
-    return Array.from(set);
+    const result = [];
+    const seen = new Set();
+    sorted.forEach((b) => {
+      if (!b?.name) return;
+      if (seen.has(b.name)) return;
+      seen.add(b.name);
+      result.push(b.name);
+    });
+    return result;
   }, [buildings]);
 
   const reloadCartEntries = async () => {
@@ -305,10 +329,14 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
       const parsedRooms = [];
       const seen = new Set();
       normalized.forEach((entry) => {
-        (entry?.revitTypes || []).forEach((rt) => {
+        const buildingsForEntry = deriveBuildingNames(entry, buildingOptions);
+        (entry?.revitTypes || []).forEach((rt, idx) => {
           const room = parseRevitRoom(rt, buildingOptions);
-          if (!seen.has(room.key)) {
-            seen.add(room.key);
+          const buildingName = buildingsForEntry[idx] || buildingsForEntry[0] || room.building || '';
+          if (buildingName) room.building = buildingName;
+          const dedupKey = buildingName ? `${room.key}__${buildingName}` : room.key;
+          if (!seen.has(dedupKey)) {
+            seen.add(dedupKey);
             parsedRooms.push(room);
           }
         });
@@ -326,10 +354,14 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     const parsedRooms = [];
     const seen = new Set();
     cartEntries.forEach((entry) => {
-      (entry?.revitTypes || []).forEach((rt) => {
+      const buildingsForEntry = deriveBuildingNames(entry, buildingOptions);
+      (entry?.revitTypes || []).forEach((rt, idx) => {
         const room = parseRevitRoom(rt, buildingOptions);
-        if (!seen.has(room.key)) {
-          seen.add(room.key);
+        const buildingName = buildingsForEntry[idx] || buildingsForEntry[0] || room.building || '';
+        if (buildingName) room.building = buildingName;
+        const dedupKey = buildingName ? `${room.key}__${buildingName}` : room.key;
+        if (!seen.has(dedupKey)) {
+          seen.add(dedupKey);
           parsedRooms.push(room);
         }
       });
@@ -407,11 +439,11 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
             result.value.forEach((rt) => {
               const room = parseRevitRoom(rt?.type_name || '', buildingOptions);
               const buildingName = (rt?.building_name || '').trim();
+              const dedupKey = buildingName ? `${room.key}__${buildingName}` : room.key;
               if (buildingName) {
                 room.building = buildingName;
-                room.key = `${room.key}__${buildingName}`;
               }
-              if (room.key) allRooms.push(room);
+              if (room.key) allRooms.push({ ...room, dedupKey });
             });
           }
         });
@@ -419,8 +451,9 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
           const unique = [];
           const seen = new Set();
           allRooms.forEach((r) => {
-            if (seen.has(r.key)) return;
-            seen.add(r.key);
+            const key = r.dedupKey || r.key;
+            if (seen.has(key)) return;
+            seen.add(key);
             unique.push(r);
           });
           setRooms(unique);
@@ -516,17 +549,33 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     if (!selectedBuilding) return;
     if (!standardItemId) return;
 
+    const parsedTarget = parseRevitRoom(roomKey, buildingOptions);
+    const targetNorm = normalizeRoomKey(parsedTarget.label || roomKey);
+    const targetBuilding = selectedBuilding || parsedTarget.building || '';
+
     const existing = cartEntries.find((entry) => {
       const matchesStd = Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId);
       if (!matchesStd) return false;
       const revits = Array.isArray(entry?.revitTypes) ? entry.revitTypes : [];
-      const targetNorm = normalizeRoomKey(roomKey);
-      return revits.some((rt) => normalizeRoomKey(rt) === targetNorm);
+      const buildings = deriveBuildingNames(entry, buildingOptions);
+      const matchesBuilding = !targetBuilding || !buildings.length || buildings.includes(targetBuilding);
+      if (!matchesBuilding) return false;
+      return revits.some((rt) => {
+        const parsed = parseRevitRoom(rt, buildingOptions);
+        const norm = normalizeRoomKey(parsed.label || rt);
+        return norm === targetNorm;
+      });
     });
 
     const saveEntry = async () => {
+      const buildingName = targetBuilding;
+      let baseRoom = parsedTarget.label || roomKey;
+      if (buildingName && roomKey.startsWith(`${buildingName}\t`)) {
+        baseRoom = roomKey.slice(buildingName.length + 1).trim();
+      }
       const payload = {
-        revit_types: [roomKey],
+        revit_types: [baseRoom],
+        building_names: buildingName ? [buildingName] : [],
         assignment_ids: entryAssignmentIds(standardItemId),
         standard_item_ids: [standardItemId],
         formula: '=A',
@@ -565,12 +614,21 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
 
   const isChecked = (itemKey, standardItemId, roomKey) => {
     if (!standardItemId) return false;
-    const targetNorm = normalizeRoomKey(roomKey);
+    const parsedTarget = parseRevitRoom(roomKey, buildingOptions);
+    const targetNorm = normalizeRoomKey(parsedTarget.label || roomKey);
+    const targetBuilding = selectedBuilding || parsedTarget.building || '';
     const hasCart = cartEntries.some((entry) => {
       const matchesStd = Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId);
       if (!matchesStd) return false;
       const revits = Array.isArray(entry?.revitTypes) ? entry.revitTypes : [];
-      return revits.some((rt) => normalizeRoomKey(rt) === targetNorm);
+      const buildings = deriveBuildingNames(entry, buildingOptions);
+      const matchesBuilding = !targetBuilding || !buildings.length || buildings.includes(targetBuilding);
+      if (!matchesBuilding) return false;
+      return revits.some((rt) => {
+        const parsed = parseRevitRoom(rt, buildingOptions);
+        const norm = normalizeRoomKey(parsed.label || rt);
+        return norm === targetNorm;
+      });
     });
     if (hasCart) return true;
 
@@ -673,7 +731,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                 </th>
                 {tableHeaders.map((room) => (
                   <th
-                    key={room.key}
+                    key={`${room.key}__${room.building || 'global'}`}
                     style={{
                       borderBottom: '1px solid #e2e8f0',
                       fontSize: 12,

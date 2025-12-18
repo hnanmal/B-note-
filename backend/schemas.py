@@ -78,6 +78,7 @@ class WorkMasterCartEntryBase(BaseModel):
     revit_types: List[str]
     assignment_ids: List[int]
     standard_item_ids: List[int]
+    building_names: List[str] = Field(default_factory=list)
     formula: Optional[str] = None
 
 

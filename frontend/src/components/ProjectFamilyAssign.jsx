@@ -116,9 +116,17 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
-        setBuildings(Array.isArray(data) ? data : []);
-        if (Array.isArray(data) && data.length) {
-          setSelectedBuilding((prev) => prev ?? data[0]);
+        const sorted = Array.isArray(data)
+          ? [...data].sort((a, b) => {
+              const aDate = new Date(a?.created_at || 0).getTime();
+              const bDate = new Date(b?.created_at || 0).getTime();
+              if (aDate !== bDate) return aDate - bDate;
+              return (a?.id || 0) - (b?.id || 0);
+            })
+          : [];
+        setBuildings(sorted);
+        if (sorted.length) {
+          setSelectedBuilding((prev) => prev ?? sorted[0]);
         }
       })
       .catch(() => {

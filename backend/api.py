@@ -385,11 +385,13 @@ def _normalize_cart_payload(raw_payload):
     revit_types = raw_payload.get("revitTypes") or raw_payload.get("revit_types") or []
     assignment_ids = raw_payload.get("assignmentIds") or raw_payload.get("assignment_ids") or []
     standard_item_ids = raw_payload.get("standardItemIds") or raw_payload.get("standard_item_ids") or []
+    building_names = raw_payload.get("buildingNames") or raw_payload.get("building_names") or []
     formula = raw_payload.get("formula")
     return {
         "revit_types": _ensure_list(revit_types),
         "assignment_ids": _ensure_list(assignment_ids),
         "standard_item_ids": _ensure_list(standard_item_ids),
+        "building_names": _ensure_list(building_names),
         "formula": formula,
     }
 
