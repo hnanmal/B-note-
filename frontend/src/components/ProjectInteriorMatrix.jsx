@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 const SAMPLE_ROOMS = [
-  '101_MESS ROOM',
-  '102_LOBBY',
-  '103_FEMALE WASH ROOM LOCKER ROOM',
-  '104_MALE WASH ROOM LOCKER ROOM',
-  '105_JANITOR',
-  '106_TOILET ROOM',
-  '107_SECURITY & TRUCK LOADING CONTROL ROOM',
+  { name: '101_MESS ROOM', building: 'test_building1', std: '0.1' },
+  { name: '102_LOBBY', building: 'test_building1', std: '0.1' },
+  { name: '103_FEMALE WASH ROOM LOCKER ROOM', building: 'test_building1', std: '0.1' },
+  { name: '104_MALE WASH ROOM LOCKER ROOM', building: 'test_building1', std: '0.1' },
+  { name: '105_JANITOR', building: 'test_building1', std: '0.1' },
+  { name: '106_TOILET ROOM', building: 'test_building1', std: '0.1' },
+  { name: '107_SECURITY & TRUCK LOADING CONTROL ROOM', building: 'test_building1', std: '0.1' },
 ];
 
 const SAMPLE_SECTIONS = [
@@ -67,35 +67,44 @@ const SAMPLE_SECTIONS = [
   },
 ];
 
-const defaultTypeKey = 'Type-A';
-
 export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const [rooms, setRooms] = useState(SAMPLE_ROOMS);
   const [interiorSections, setInteriorSections] = useState(SAMPLE_SECTIONS);
-  const [revitTypes, setRevitTypes] = useState([defaultTypeKey]);
-  const [selectedType, setSelectedType] = useState(defaultTypeKey);
-  const [selectionByType, setSelectionByType] = useState({ [defaultTypeKey]: new Map() });
+  const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [selectionByBuilding, setSelectionByBuilding] = useState({});
 
   useEffect(() => {
     if (!apiBaseUrl) return;
     // TODO: wire to project rooms endpoint when available
   }, [apiBaseUrl]);
 
-  const ensureTypeBucket = (typeName) => {
-    setSelectionByType((prev) => {
-      if (prev[typeName]) return prev;
-      const next = { ...prev, [typeName]: new Map() };
-      return next;
+  const buildingOptions = useMemo(() => {
+    const unique = Array.from(new Set(rooms.map((room) => room.building).filter(Boolean)));
+    return unique;
+  }, [rooms]);
+
+  useEffect(() => {
+    if (!selectedBuilding && buildingOptions.length) {
+      setSelectedBuilding(buildingOptions[0]);
+    }
+  }, [buildingOptions, selectedBuilding]);
+
+  const ensureBuildingBucket = (building) => {
+    if (!building) return;
+    setSelectionByBuilding((prev) => {
+      if (prev[building]) return prev;
+      return { ...prev, [building]: new Map() };
     });
   };
 
   useEffect(() => {
-    ensureTypeBucket(selectedType);
-  }, [selectedType]);
+    ensureBuildingBucket(selectedBuilding);
+  }, [selectedBuilding]);
 
   const handleToggle = (itemKey, roomName) => {
-    setSelectionByType((prev) => {
-      const bucket = prev[selectedType] ? new Map(prev[selectedType]) : new Map();
+    if (!selectedBuilding) return;
+    setSelectionByBuilding((prev) => {
+      const bucket = prev[selectedBuilding] ? new Map(prev[selectedBuilding]) : new Map();
       const roomSet = new Set(bucket.get(itemKey) || []);
       if (roomSet.has(roomName)) {
         roomSet.delete(roomName);
@@ -103,27 +112,21 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         roomSet.add(roomName);
       }
       bucket.set(itemKey, roomSet);
-      return { ...prev, [selectedType]: bucket };
+      return { ...prev, [selectedBuilding]: bucket };
     });
   };
 
   const isChecked = (itemKey, roomName) => {
-    const bucket = selectionByType[selectedType];
+    const bucket = selectionByBuilding[selectedBuilding];
     if (!bucket) return false;
     const roomSet = bucket.get(itemKey);
     return roomSet ? roomSet.has(roomName) : false;
   };
 
-  const addTypeFromInput = (value) => {
-    const next = value.trim();
-    if (!next) return;
-    setRevitTypes((prev) => (prev.includes(next) ? prev : [...prev, next]));
-    setSelectedType(next);
-  };
-
-  const [newTypeValue, setNewTypeValue] = useState('');
-
-  const tableHeaders = useMemo(() => rooms, [rooms]);
+  const tableHeaders = useMemo(
+    () => rooms.filter((room) => !selectedBuilding || room.building === selectedBuilding),
+    [rooms, selectedBuilding]
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', minHeight: 0 }}>
@@ -144,47 +147,22 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: '#0f172a', fontWeight: 600 }}>등록된 Revit Type</span>
+          <span style={{ fontSize: 12, color: '#0f172a', fontWeight: 600 }}>Building List</span>
           <select
-            value={selectedType}
-            onChange={(event) => setSelectedType(event.target.value)}
+            value={selectedBuilding || ''}
+            onChange={(event) => setSelectedBuilding(event.target.value || null)}
             style={{ border: '1px solid #cbd5f5', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}
           >
-            {revitTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
+            {!selectedBuilding && <option value="" disabled>건물을 선택하세요</option>}
+            {buildingOptions.map((building) => (
+              <option key={building} value={building}>
+                {building}
               </option>
             ))}
           </select>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <input
-            value={newTypeValue}
-            onChange={(event) => setNewTypeValue(event.target.value)}
-            placeholder="Revit Type 추가"
-            style={{ border: '1px solid #cbd5f5', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              addTypeFromInput(newTypeValue);
-              setNewTypeValue('');
-            }}
-            style={{
-              border: '1px solid #2563eb',
-              background: '#2563eb',
-              color: '#fff',
-              borderRadius: 8,
-              padding: '6px 10px',
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-          >
-            추가
-          </button>
-        </div>
         <div style={{ fontSize: 11, color: '#475467' }}>
-          0.1 Rooms 기준 · 두 번 클릭하면 체크/해제됩니다.
+          건물별 등록된 Room 기준 · 두 번 클릭하면 체크/해제됩니다.
         </div>
       </div>
 
@@ -210,7 +188,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
           alignItems: 'center',
           padding: '0 4px',
         }}>
-          <span>인터리어 매트릭스 · Revit Type: {selectedType}</span>
+          <span>인터리어 매트릭스 · Building: {selectedBuilding || '—'}</span>
           <span style={{ color: '#94a3b8' }}>더블 클릭으로 체크</span>
         </div>
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto', borderRadius: 10, border: '1px solid #e2e8f0' }}>
@@ -233,7 +211,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                 </th>
                 {tableHeaders.map((room) => (
                   <th
-                    key={room}
+                    key={room.name}
                     style={{
                       borderBottom: '1px solid #e2e8f0',
                       fontSize: 12,
@@ -243,7 +221,11 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {room}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{room.name}</span>
+                      <span style={{ fontSize: 11, color: '#475467' }}>{room.building}</span>
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>Std {room.std}</span>
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -284,11 +266,12 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                           {item}
                         </td>
                         {tableHeaders.map((room) => {
-                          const checked = isChecked(itemKey, room);
+                          const roomKey = room.name;
+                          const checked = isChecked(itemKey, roomKey);
                           return (
                             <td
-                              key={`${itemKey}-${room}`}
-                              onDoubleClick={() => handleToggle(itemKey, room)}
+                              key={`${itemKey}-${roomKey}`}
+                              onDoubleClick={() => handleToggle(itemKey, roomKey)}
                               style={{
                                 borderBottom: '1px solid #f1f5f9',
                                 textAlign: 'center',
