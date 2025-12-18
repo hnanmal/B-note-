@@ -1347,6 +1347,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const leftColumnWidth = collapsedColumns.left ? 64 : 360;
   const middleColumnFlex = collapsedColumns.middle ? '0 0 64px' : '1 1 0%';
   const rightColumnWidth = collapsedColumns.right ? 64 : 720;
+  const columnHeight = 'calc(100vh - 120px)';
 
   return (
     <div
@@ -1372,8 +1373,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           gap: collapsedColumns.left ? 8 : 12,
           alignItems: collapsedColumns.left ? 'center' : 'stretch',
           minHeight: 0,
-          height: 'calc(100vh - 150px)',
-          maxHeight: 'calc(100vh - 150px)',
+          height: columnHeight,
+          maxHeight: columnHeight,
           overflowY: 'auto',
         }}
       >
@@ -1418,6 +1419,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           flex: middleColumnFlex,
           minWidth: collapsedColumns.middle ? 64 : 0,
           width: collapsedColumns.middle ? 64 : 'auto',
+          height: columnHeight,
+          minHeight: 0,
           borderRadius: 16,
           background: '#fff',
           padding: collapsedColumns.middle ? 10 : 14,
@@ -1841,7 +1844,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           display: 'flex',
           flexDirection: 'column',
           gap: collapsedColumns.right ? 8 : 12,
-          height: 'calc(100vh - 150px)',
+          height: columnHeight,
           minHeight: 0,
           overflow: 'hidden',
         }}
