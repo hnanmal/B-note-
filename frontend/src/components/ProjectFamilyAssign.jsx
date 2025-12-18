@@ -1353,7 +1353,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       style={{
         display: 'flex',
         gap: 16,
-        padding: 24,
+        padding: '12px 18px 16px',
         background: '#f8fafc',
         minHeight: '100vh',
       }}
