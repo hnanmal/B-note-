@@ -347,46 +347,48 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     return names;
   }, [selectedRevitIndexes, displayedRevitEntries, activeRevitType]);
 
-  const cartSignatureByRevitType = useMemo(() => {
-    const bucket = new Map();
-    savedCartEntries.forEach((entry) => {
-      const revitTypes = Array.isArray(entry?.revitTypes) ? entry.revitTypes : [];
-      if (!revitTypes.length) return;
-      const assignmentIds = Array.isArray(entry?.assignmentIds)
-        ? [...entry.assignmentIds].sort((a, b) => a - b)
-        : [];
-      const standardIds = Array.isArray(entry?.standardItemIds)
-        ? [...entry.standardItemIds].sort((a, b) => a - b)
-        : [];
-      const sigPart = `a:${assignmentIds.join(',')}|s:${standardIds.join(',')}|f:${entry?.formula ?? ''}`;
-      revitTypes.forEach((typeName) => {
-        if (!typeName) return;
-        if (!bucket.has(typeName)) bucket.set(typeName, []);
-        bucket.get(typeName).push(sigPart);
-      });
-    });
-    const result = new Map();
-    bucket.forEach((parts, typeName) => {
-      const signature = parts.slice().sort().join(';');
-      result.set(typeName, signature);
-    });
-    return result;
-  }, [savedCartEntries]);
-
   const handleSelectMatchingRevitTypes = useCallback(() => {
-    const referenceType = currentSelectedRevitTypes[0];
-    if (!referenceType) return;
-    const referenceSignature = cartSignatureByRevitType.get(referenceType);
-    if (!referenceSignature) return;
-    const next = new Set(selectedRevitIndexes.length ? selectedRevitIndexes : [activeRevitIndexClamped]);
-    displayedRevitEntries.forEach((entry, index) => {
-      const sig = cartSignatureByRevitType.get(entry?.type_name);
-      if (sig && sig === referenceSignature) {
-        next.add(index);
-      }
-    });
-    setSelectedRevitIndexes(Array.from(next).sort((a, b) => a - b));
-  }, [currentSelectedRevitTypes, cartSignatureByRevitType, selectedRevitIndexes, activeRevitIndexClamped, displayedRevitEntries]);
+    if (!displayedRevitEntries.length || !savedCartEntries.length) return;
+    const baseTypeName =
+      currentSelectedRevitTypes[0] || activeRevitType || displayedRevitEntries[0]?.type_name;
+    if (!baseTypeName) return;
+
+    const buildSignature = (typeName) => {
+      if (!typeName) return '';
+      const relatedEntries = savedCartEntries.filter(
+        (entry) => Array.isArray(entry?.revitTypes) && entry.revitTypes.includes(typeName)
+      );
+      if (!relatedEntries.length) return '';
+
+      const parts = relatedEntries.map((entry) => {
+        const assignmentIds = Array.isArray(entry.assignmentIds)
+          ? [...entry.assignmentIds].sort((a, b) => (a > b ? 1 : a < b ? -1 : 0))
+          : [];
+        const standardItemIds = Array.isArray(entry.standardItemIds)
+          ? [...entry.standardItemIds].sort((a, b) => (a > b ? 1 : a < b ? -1 : 0))
+          : [];
+        const formula = entry.formula || '';
+        return `${assignmentIds.join(',')}|${standardItemIds.join(',')}|${formula}`;
+      });
+
+      parts.sort();
+      return parts.join('||');
+    };
+
+    const baseSignature = buildSignature(baseTypeName);
+    if (!baseSignature) return;
+
+    const matchingIndexes = displayedRevitEntries
+      .map((entry, index) => ({ index, signature: buildSignature(entry?.type_name) }))
+      .filter(({ signature }) => signature && signature === baseSignature)
+      .map(({ index }) => index);
+
+    if (matchingIndexes.length) {
+      setSelectedRevitIndexes(matchingIndexes);
+      setSelectionAnchor(matchingIndexes[0]);
+      setActiveRevitIndex(matchingIndexes[0]);
+    }
+  }, [displayedRevitEntries, savedCartEntries, currentSelectedRevitTypes, activeRevitType]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -402,7 +404,6 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleSelectMatchingRevitTypes]);
-
 
   useEffect(() => {
     setActiveRevitIndex((prev) => {
@@ -865,14 +866,6 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     return null;
   };
 
-  const visibleCartEntries = useMemo(() => {
-    if (!currentSelectedRevitTypes.length) return [];
-    const selectedSet = new Set(currentSelectedRevitTypes);
-    return savedCartEntries.filter((entry) =>
-      Array.isArray(entry?.revitTypes) && entry.revitTypes.some((name) => selectedSet.has(name))
-    );
-  }, [currentSelectedRevitTypes, savedCartEntries]);
-
   const toggleCartRowExpand = (rowId) => {
     setExpandedCartRows((prev) => {
       const next = new Set(prev);
@@ -885,40 +878,64 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     });
   };
 
-  const handleCartFormulaChange = async (entryId, value) => {
+  const handleCartFormulaChange = async (rowInfo, value) => {
+    const targetIds = Array.isArray(rowInfo?.entryIds) && rowInfo.entryIds.length
+      ? rowInfo.entryIds
+      : rowInfo?.entryId
+        ? [rowInfo.entryId]
+        : [];
+    if (!targetIds.length) return;
+
     setSavedCartEntries((prev) =>
-      prev.map((entry) => (entry.id === entryId ? { ...entry, formula: value } : entry))
+      prev.map((entry) => (targetIds.includes(entry.id) ? { ...entry, formula: value } : entry))
     );
     if (!apiBaseUrl) return;
     try {
-      await fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formula: value }),
-      });
+      await Promise.all(
+        targetIds.map((id) =>
+          fetch(`${apiBaseUrl}/workmaster-cart/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ formula: value }),
+          }).catch(() => null)
+        )
+      );
     } catch (error) {
       // swallow errors; UI already updated
     }
   };
 
-  const handleDeleteCartEntry = async (entryId) => {
-    setSavedCartEntries((prev) => prev.filter((entry) => entry.id !== entryId));
+  const handleDeleteCartEntry = async (entryIds) => {
+    const targets = Array.isArray(entryIds) ? entryIds : [entryIds];
+    setSavedCartEntries((prev) => prev.filter((entry) => !targets.includes(entry.id)));
     if (!apiBaseUrl) return;
     try {
-      await fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, { method: 'DELETE' });
+      await Promise.all(
+        targets.map((id) =>
+          fetch(`${apiBaseUrl}/workmaster-cart/${id}`, { method: 'DELETE' }).catch(() => null)
+        )
+      );
     } catch (error) {
       // ignore network errors; optimistic update already applied
     }
   };
 
+  const visibleCartEntries = useMemo(() => {
+    if (!currentSelectedRevitTypes.length) return [];
+    const selectedSet = new Set(currentSelectedRevitTypes);
+    return savedCartEntries.filter((entry) =>
+      Array.isArray(entry?.revitTypes) && entry.revitTypes.some((name) => selectedSet.has(name))
+    );
+  }, [currentSelectedRevitTypes, savedCartEntries]);
+
   const cartTableRows = useMemo(() => {
-    const rows = [];
+    const flatRows = [];
     visibleCartEntries.forEach((entry) => {
       const assignments = (entry.assignmentIds || [])
         .map((id) => assignmentById.get(id))
         .filter(Boolean);
       if (!assignments.length) {
-        rows.push({
+        flatRows.push({
           id: `${entry.id}-empty`,
           revitTypesLabel: entry.revitTypes.join(', '),
           createdAt: entry.createdAt,
@@ -931,6 +948,11 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           unit: '—',
           outputType: selectedFamily?.sequence_number ?? '—',
           entryId: entry.id,
+          entryIds: [entry.id],
+          assignmentId: null,
+          workMasterId: null,
+          groupKey: `${entry.id}-empty`,
+          revitTypes: entry.revitTypes ?? [],
         });
         return;
       }
@@ -938,7 +960,9 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         const standardItem = assignment?.standard_item;
         const workMaster = resolveWorkMaster(assignment);
         const entryFormula = entry.formula || assignment.formula || '—';
-        rows.push({
+        const workMasterId = workMaster?.id ?? standardItem?.selected_work_master_id ?? 'na';
+        const groupKey = `${assignment.id ?? 'na'}|${workMasterId}|${entryFormula}`;
+        flatRows.push({
           id: `${entry.id}-${assignment.id}`,
           revitTypesLabel: entry.revitTypes.join(', '),
           createdAt: entry.createdAt,
@@ -951,11 +975,43 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           unit: buildUnitLabel(workMaster),
           outputType: selectedFamily?.sequence_number ?? '—',
           entryId: entry.id,
+          entryIds: [entry.id],
+          assignmentId: assignment?.id ?? null,
+          workMasterId,
+          groupKey,
+          revitTypes: entry.revitTypes ?? [],
         });
       });
     });
-    return rows;
-  }, [visibleCartEntries, assignmentById, selectedFamily?.sequence_number, standardItemWorkMasters]);
+
+    const grouped = new Map();
+    flatRows.forEach((row) => {
+      const key = row.groupKey;
+      if (!grouped.has(key)) {
+        grouped.set(key, { ...row });
+        return;
+      }
+      const existing = grouped.get(key);
+      const mergedIds = Array.from(new Set([...(existing.entryIds || []), ...row.entryIds]));
+      const mergedRevitTypes = Array.from(
+        new Set([...(existing.revitTypes || []), ...(row.revitTypes || [])])
+      );
+      grouped.set(key, {
+        ...existing,
+        entryIds: mergedIds,
+        revitTypes: mergedRevitTypes,
+        revitTypesLabel: mergedRevitTypes.join(', '),
+        createdAt: existing.createdAt > row.createdAt ? existing.createdAt : row.createdAt,
+      });
+    });
+
+    const rows = Array.from(grouped.values());
+    return rows.sort((a, b) => {
+      const aTime = a.createdAt || '';
+      const bTime = b.createdAt || '';
+      return aTime > bTime ? -1 : aTime < bTime ? 1 : 0;
+    });
+  }, [visibleCartEntries, assignmentById, selectedFamily?.sequence_number, buildItemPath, resolveWorkMaster]);
 
   const renderAssignmentCard = (title, typeKey) => {
     const assignments = assignmentGroups[typeKey];
@@ -1718,7 +1774,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                         <span style={{ color: '#475467' }}>{displayGauge}</span>
                         <button
                           type="button"
-                          onClick={() => handleDeleteCartEntry(row.entryId, row.assignmentId)}
+                          onClick={() => handleDeleteCartEntry(row.entryIds ?? row.entryId)}
                           style={{
                             marginLeft: 'auto',
                             border: '1px solid #ef4444',
@@ -1749,7 +1805,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                         <input
                           type="text"
                           value={formulaValue}
-                          onChange={(event) => handleCartFormulaChange(row.entryId, event.target.value)}
+                          onChange={(event) => handleCartFormulaChange(row, event.target.value)}
                           style={{
                             minWidth: 160,
                             border: '1px solid #cbd5f5',
