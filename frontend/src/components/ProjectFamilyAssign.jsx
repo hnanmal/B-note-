@@ -1997,6 +1997,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                               border: '1px solid #e2e8f0',
                             }}
                           >
+                            {/* 1st line: type + item name + delete */}
                             <div
                               style={{
                                 display: 'flex',
@@ -2005,15 +2006,10 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                                 flexWrap: 'wrap',
                               }}
                             >
-                              <span style={{ minWidth: 0 }} />
-                              <span style={{ color: '#475467' }}>{row.type}</span>
+                              <span style={{ color: '#334155', fontWeight: 700 }}>{row.type}</span>
                               <span style={{ color: '#111827', whiteSpace: 'normal' }} title={row.itemPath}>
                                 {row.itemPath}
                               </span>
-                              <span style={{ color: '#111827', whiteSpace: 'normal' }} title={row.workMasterSummary}>
-                                {row.workMasterSummary}
-                              </span>
-                              <span style={{ color: '#475467' }}>{displayGauge}</span>
                               <button
                                 type="button"
                                 onClick={() => handleDeleteCartEntry(row.entryIds ?? row.entryId)}
@@ -2032,13 +2028,31 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                                 삭제
                               </button>
                             </div>
+
+                            {/* 2nd line: work master + gauge */}
                             <div
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 8,
                                 flexWrap: 'wrap',
-                                paddingLeft: 4,
+                                color: '#111827',
+                              }}
+                            >
+                              <span style={{ whiteSpace: 'normal' }} title={row.workMasterSummary}>
+                                {row.workMasterSummary}
+                              </span>
+                              <span style={{ color: '#475467' }}>{displayGauge}</span>
+                            </div>
+
+                            {/* 3rd line: spec + formula + unit */}
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                flexWrap: 'wrap',
+                                paddingLeft: 2,
                               }}
                             >
                               <span style={{ fontWeight: 600, whiteSpace: 'pre-wrap' }} title={row.spec}>
