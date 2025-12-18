@@ -214,12 +214,12 @@ function App() {
   }, [isProjectEditorRoute, activePage]);
 
   return (
-    <div className="App" style={{ height: 'calc(100vh - 1.5rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+    <div className="App" style={{ height: 'calc(100vh - 1rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
       <header className="App-header-fixed" style={headerStyle}>
         <div className="app-title">{headerTitle}</div>
       </header>
-  <div style={{ height: 32 }} />
-      <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100% - 64px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
+  <div style={{ height: 10 }} />
+      <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100% - 38px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
   {/* Sidebar: Only navigation, toggleable, fixed to left */}
         <div
           className={`sidebar-nav${sidebarOpen ? '' : ' collapsed'}`}
@@ -234,7 +234,7 @@ function App() {
             flexDirection: 'column',
             alignItems: 'center',
             position: 'relative',
-            height: 'calc(100% - 64px)',
+            height: 'calc(100% - 38px)',
             zIndex: 10,
           }}
         >

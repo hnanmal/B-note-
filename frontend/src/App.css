@@ -23,7 +23,7 @@
   top: 0;
   left: 0;
   width: 100vw;
-  height: 32px;
+  height: 28px;
   background: #f6d975;
   border-bottom: 1px solid #e0c34d;
   z-index: 100;
@@ -44,7 +44,7 @@
 
 #root {
   margin: 0 auto;
-  padding: 0.25rem 1rem 1rem;
+  padding: 0.15rem 0.8rem 0.8rem;
   text-align: center;
 }
 

@@ -1352,8 +1352,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     <div
       style={{
         display: 'flex',
-        gap: 16,
-        padding: '12px 18px 16px',
+        gap: 12,
+        padding: '8px 12px 12px',
         background: '#f8fafc',
         minHeight: '100vh',
       }}
@@ -1365,7 +1365,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           minWidth: leftColumnWidth,
           borderRadius: 16,
           background: '#fff',
-          padding: collapsedColumns.left ? 10 : 16,
+          padding: collapsedColumns.left ? 8 : 12,
           boxShadow: '0 10px 40px rgba(15,23,42,0.08)',
           display: 'flex',
           flexDirection: 'column',
@@ -1420,10 +1420,10 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           width: collapsedColumns.middle ? 64 : 'auto',
           borderRadius: 16,
           background: '#fff',
-          padding: collapsedColumns.middle ? 12 : 20,
+          padding: collapsedColumns.middle ? 10 : 14,
           display: 'flex',
           flexDirection: 'column',
-          gap: collapsedColumns.middle ? 8 : 16,
+          gap: collapsedColumns.middle ? 8 : 12,
           boxShadow: '0 10px 40px rgba(15,23,42,0.05)',
         }}
       >
@@ -1836,7 +1836,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           width: rightColumnWidth,
           background: '#fff',
           borderRadius: 16,
-          padding: collapsedColumns.right ? 12 : 16,
+          padding: collapsedColumns.right ? 10 : 12,
           boxShadow: '0 6px 24px rgba(15,23,42,0.08)',
           display: 'flex',
           flexDirection: 'column',
