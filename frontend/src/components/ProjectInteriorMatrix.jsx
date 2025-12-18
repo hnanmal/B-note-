@@ -346,7 +346,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, buildingOptions]);
 
   useEffect(() => {
     if (!apiBaseUrl) return undefined;
@@ -395,6 +395,11 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
           if (result.status === 'fulfilled' && Array.isArray(result.value)) {
             result.value.forEach((rt) => {
               const room = parseRevitRoom(rt?.type_name || '', buildingOptions);
+              const buildingName = (rt?.building_name || '').trim();
+              if (buildingName) {
+                room.building = buildingName;
+                room.key = `${room.key}__${buildingName}`;
+              }
               if (room.key) allRooms.push(room);
             });
           }

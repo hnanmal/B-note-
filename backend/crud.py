@@ -486,24 +486,36 @@ def list_family_revit_types(db: Session, family_item_id: int):
     )
 
 
-def replace_family_revit_types(db: Session, family_item_id: int, type_names: List[str]):
-    normalized_names = [name.strip() for name in type_names if name and name.strip()]
+def replace_family_revit_types(db: Session, family_item_id: int, entries: List[dict]):
+    normalized_entries: List[dict] = []
+    for entry in entries:
+        type_name = (entry.get("type_name") or "").strip()
+        if not type_name:
+            continue
+        building_name_raw = entry.get("building_name")
+        building_name = building_name_raw.strip() if isinstance(building_name_raw, str) else None
+        normalized_entries.append({"type_name": type_name, "building_name": building_name})
+
     (
         db.query(models.FamilyRevitType)
         .filter(models.FamilyRevitType.family_list_id == family_item_id)
         .delete(synchronize_session=False)
     )
     created_entries: List[models.FamilyRevitType] = []
-    for name in normalized_names:
-        entry = models.FamilyRevitType(family_list_id=family_item_id, type_name=name)
-        db.add(entry)
-        created_entries.append(entry)
+    for entry in normalized_entries:
+        record = models.FamilyRevitType(
+            family_list_id=family_item_id,
+            type_name=entry["type_name"],
+            building_name=entry.get("building_name"),
+        )
+        db.add(record)
+        created_entries.append(record)
     if created_entries:
         db.flush()
     db.commit()
     if created_entries:
-        for entry in created_entries:
-            db.refresh(entry)
+        for record in created_entries:
+            db.refresh(record)
     return (
         db.query(models.FamilyRevitType)
         .filter(models.FamilyRevitType.family_list_id == family_item_id)

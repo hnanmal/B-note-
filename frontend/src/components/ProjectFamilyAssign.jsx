@@ -598,19 +598,28 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       setRevitTypesSaveError('한 줄에 하나씩 Revit 타입을 입력한 후 ↓ 버튼을 눌러 저장하세요.');
       return;
     }
-    const existingTypeNames = savedRevitTypeEntries.map((entry) => entry.type_name).filter(Boolean);
-    const combinedTypeNames = [...existingTypeNames];
-    typeNames.forEach((name) => {
-      if (!combinedTypeNames.includes(name)) {
-        combinedTypeNames.push(name);
-      }
+    const existingEntries = savedRevitTypeEntries.map((entry) => ({
+      type_name: entry.type_name,
+      building_name: entry.building_name || null,
+    })).filter((entry) => entry.type_name);
+
+    const newEntries = typeNames.map((name) => ({
+      type_name: name,
+      building_name: selectedBuilding?.name || null,
+    }));
+
+    const dedup = new Map();
+    [...existingEntries, ...newEntries].forEach((entry) => {
+      const key = `${entry.type_name}|||${entry.building_name || ''}`;
+      if (!dedup.has(key)) dedup.set(key, entry);
     });
+    const combinedEntries = Array.from(dedup.values());
     setRevitTypesSaving(true);
     setRevitTypesSaveError(null);
     fetch(`${apiBaseUrl}/family-list/${selectedFamily.id}/revit-types`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type_names: combinedTypeNames }),
+      body: JSON.stringify({ entries: combinedEntries }),
     })
       .then((res) => {
         if (!res.ok) {
@@ -649,9 +658,10 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       : [activeRevitIndexClamped].filter((index) => index >= 0);
     if (!targetIndexes.length) return;
     const removalSet = new Set(targetIndexes);
-    const remainingTypeNames = savedRevitTypeEntries
+    const remainingEntries = savedRevitTypeEntries
       .filter((_, index) => !removalSet.has(index))
-      .map((entry) => entry.type_name);
+      .map((entry) => ({ type_name: entry.type_name, building_name: entry.building_name || null }))
+      .filter((entry) => entry.type_name);
     const removedEntries = targetIndexes
       .map((index) => displayedRevitEntries[index])
       .filter(Boolean);
@@ -660,7 +670,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     fetch(`${apiBaseUrl}/family-list/${selectedFamily.id}/revit-types`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type_names: remainingTypeNames }),
+      body: JSON.stringify({ entries: remainingEntries }),
     })
       .then((res) => {
         if (!res.ok) {
@@ -1604,7 +1614,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                                 </span>
                               );
                             })()}
-                            <span style={{ fontSize: 12 }}>{buildingLabel}</span>
+                            <span style={{ fontSize: 12 }}>{entry.building_name || '—'}</span>
                             <span style={{ fontSize: 12 }}>{familySequence}</span>
                           </div>
                         );

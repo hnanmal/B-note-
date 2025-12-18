@@ -219,6 +219,7 @@ class FamilyRevitType(Base):
     id = Column(Integer, primary_key=True, index=True)
     family_list_id = Column(Integer, ForeignKey("family_list.id"), nullable=False)
     type_name = Column(String, nullable=False)
+    building_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     family_list_item = relationship(

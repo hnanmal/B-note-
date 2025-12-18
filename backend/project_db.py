@@ -44,6 +44,7 @@ EXTRA_TABLE_STATEMENTS = [
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         family_list_id INTEGER NOT NULL,
         type_name TEXT NOT NULL,
+        building_name TEXT,
         created_at TEXT NOT NULL
     )
     """,
@@ -176,6 +177,10 @@ def ensure_extra_tables(db_path: Path) -> None:
         cursor = conn.cursor()
         for stmt in EXTRA_TABLE_STATEMENTS:
             cursor.execute(stmt)
+        cursor.execute("PRAGMA table_info(family_revit_type)")
+        frt_columns = {row[1] for row in cursor.fetchall()}
+        if 'building_name' not in frt_columns:
+            cursor.execute("ALTER TABLE family_revit_type ADD COLUMN building_name TEXT")
         cursor.execute("PRAGMA table_info(work_masters)")
         wm_columns = {row[1] for row in cursor.fetchall()}
         if 'add_spec' not in wm_columns:

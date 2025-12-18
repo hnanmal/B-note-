@@ -9,6 +9,7 @@ from .database import (
     ensure_gwm_family_assign_columns,
     ensure_work_master_columns,
     ensure_standard_item_columns,
+    ensure_family_revit_type_columns,
 )
 
 # 데이터베이스 테이블 생성
@@ -23,6 +24,7 @@ ensure_calc_dictionary_columns(engine)
 ensure_gwm_family_assign_columns(engine)
 ensure_work_master_columns(engine)
 ensure_standard_item_columns(engine)
+ensure_family_revit_type_columns(engine)
 
 app = FastAPI(
     title="B-note API",

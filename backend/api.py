@@ -1361,7 +1361,10 @@ def replace_project_family_revit_types(
     family_item = crud.get_family_item(db, item_id)
     if not family_item:
         raise HTTPException(status_code=404, detail="FamilyList item not found")
-    return crud.replace_family_revit_types(db, family_item_id=item_id, type_names=payload.type_names)
+    entries = payload.entries
+    if not entries:
+        entries = [{"type_name": name} for name in payload.type_names]
+    return crud.replace_family_revit_types(db, family_item_id=item_id, entries=entries)
 
 
 @router.get(

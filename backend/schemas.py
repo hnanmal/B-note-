@@ -205,6 +205,7 @@ class CalcDictionaryEntry(CalcDictionaryEntryBase):
 
 class FamilyRevitTypeBase(BaseModel):
     type_name: str
+    building_name: Optional[str] = None
 
 
 class FamilyRevitTypeCreate(FamilyRevitTypeBase):
@@ -223,6 +224,7 @@ class FamilyRevitTypeListPayload(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     type_names: List[str] = Field(default_factory=list)
+    entries: List[FamilyRevitTypeBase] = Field(default_factory=list)
 
 
 class CalcDictionarySyncResult(BaseModel):

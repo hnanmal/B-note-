@@ -102,3 +102,29 @@ def ensure_standard_item_columns(engine):
         column_names = [col[1] for col in columns]
         if 'derive_from' not in column_names:
             conn.execute(text("ALTER TABLE standard_items ADD COLUMN derive_from INTEGER"))
+
+
+def ensure_family_revit_type_columns(engine):
+    with engine.connect() as conn:
+        try:
+            columns = conn.execute(text("PRAGMA table_info('family_revit_type')")).fetchall()
+        except OperationalError:
+            columns = []
+        column_names = [col[1] for col in columns]
+        if not columns:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS family_revit_type (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        family_list_id INTEGER NOT NULL,
+                        type_name TEXT NOT NULL,
+                        building_name TEXT,
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+            )
+            return
+        if 'building_name' not in column_names:
+            conn.execute(text("ALTER TABLE family_revit_type ADD COLUMN building_name TEXT"))
