@@ -1536,7 +1536,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 150px 140px 80px 90px 120px 70px',
+                    gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 50px 75px 140px 10px 70px',
                     gap: 6,
                     fontSize: 11,
                     fontWeight: 700,
@@ -1553,8 +1553,6 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                   <span>Spec</span>
                   <span>수식</span>
                   <span>단위</span>
-                  <span>산출유형</span>
-                  <span>저장시각</span>
                   <span>자세히</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1565,7 +1563,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                         <div
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 70px 150px 140px 80px 90px 120px 70px',
+                            gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 50px 75px 140px 25px 70px',
                             gap: 6,
                             fontSize: 11,
                             color: '#0f172a',
@@ -1574,13 +1572,14 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                             borderRadius: 8,
                             alignItems: 'center',
                           }}
-                        >
+                          >
                           <span
                             style={{
                               fontWeight: 600,
                               whiteSpace: expanded ? 'normal' : 'nowrap',
-                              overflow: expanded ? 'visible' : 'hidden',
+                              overflow: 'hidden',
                               textOverflow: expanded ? 'clip' : 'ellipsis',
+                              wordBreak: 'break-word',
                             }}
                             title={row.revitTypesLabel}
                           >
@@ -1590,8 +1589,9 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                           <span
                             style={{
                               whiteSpace: expanded ? 'normal' : 'nowrap',
-                              overflow: expanded ? 'visible' : 'hidden',
+                              overflow: 'hidden',
                               textOverflow: expanded ? 'clip' : 'ellipsis',
+                              wordBreak: 'break-word',
                             }}
                             title={row.itemPath}
                           >
@@ -1600,8 +1600,9 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                           <span
                             style={{
                               whiteSpace: expanded ? 'normal' : 'nowrap',
-                              overflow: expanded ? 'visible' : 'hidden',
+                              overflow: 'hidden',
                               textOverflow: expanded ? 'clip' : 'ellipsis',
+                              wordBreak: 'break-word',
                             }}
                             title={row.workMasterSummary}
                           >
@@ -1613,6 +1614,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                               ? {
                                   display: 'block',
                                   whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
                                 }
                               : {
                                   display: '-webkit-box',
@@ -1620,6 +1622,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                                   WebkitBoxOrient: 'vertical',
                                   overflow: 'hidden',
                                   whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
                                 }}
                             title={row.spec}
                           >
@@ -1630,6 +1633,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                               ? {
                                   display: 'block',
                                   whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
                                 }
                               : {
                                   display: '-webkit-box',
@@ -1637,14 +1641,13 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                                   WebkitBoxOrient: 'vertical',
                                   overflow: 'hidden',
                                   whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
                                 }}
                             title={row.formula}
                           >
                             {row.formula}
                           </span>
                           <span>{row.unit}</span>
-                          <span>{row.outputType}</span>
-                          <span>{formatCartTimestamp(row.createdAt)}</span>
                           <button
                             type="button"
                             onClick={() => toggleCartRowExpand(row.id)}
