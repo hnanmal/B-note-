@@ -426,11 +426,22 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       currentSelectedRevitTypes[0] || activeRevitType || displayedRevitEntries[0]?.type_name;
     if (!baseTypeName) return;
 
+    const targetBuilding = (selectedBuilding?.name || '').trim();
+    const knownBuildings = buildings.map((b) => (b?.name || '').trim()).filter(Boolean);
+
     const buildSignature = (typeName) => {
       if (!typeName) return 'EMPTY';
-      const relatedEntries = savedCartEntries.filter(
-        (entry) => Array.isArray(entry?.revitTypes) && entry.revitTypes.includes(typeName)
-      );
+      const targetNormalized = normalizeRoomLabel(typeName, targetBuilding);
+      const relatedEntries = savedCartEntries.filter((entry) => {
+        if (!Array.isArray(entry?.revitTypes)) return false;
+        const entryBuildings = deriveEntryBuildingNames(entry, knownBuildings);
+        if (targetBuilding && entryBuildings.length && !entryBuildings.includes(targetBuilding)) {
+          return false;
+        }
+        return entry.revitTypes.some(
+          (name) => normalizeRoomLabel(name, targetBuilding) === targetNormalized
+        );
+      });
       if (!relatedEntries.length) return 'EMPTY';
 
       const parts = relatedEntries.map((entry) => {
