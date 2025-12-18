@@ -1832,6 +1832,9 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           display: 'flex',
           flexDirection: 'column',
           gap: collapsedColumns.right ? 8 : 12,
+          height: 'calc(100vh - 150px)',
+          minHeight: 0,
+          overflow: 'hidden',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -1911,7 +1914,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                       background: selectedAssignmentIds.length && currentSelectedRevitTypes.length ? '#2563eb' : '#cbd5f5',
                       color: '#fff',
                       fontWeight: 600,
-                      padding: '10px 20px',
+                      fontSize: 12,
+                      padding: '8px 14px',
                       cursor: selectedAssignmentIds.length && currentSelectedRevitTypes.length ? 'pointer' : 'not-allowed',
                     }}
                   >
@@ -1923,37 +1927,19 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                 </div>
               </>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Work Master 장바구니</div>
-              <button
-                type="button"
-                onClick={() => togglePanel('cart')}
-                style={{
-                  border: '1px solid #cbd5f5',
-                  background: '#fff',
-                  borderRadius: 8,
-                  padding: '2px 8px',
-                  fontSize: 11,
-                  cursor: 'pointer',
-                }}
-              >
-                {collapsedPanels.cart ? '펼치기' : '접기'}
-              </button>
-            </div>
-            {!collapsedPanels.cart && (
-              <div
-                style={{
-                  borderRadius: 12,
-                  border: '1px solid #dae1f3',
-                  background: '#f8fafc',
-                  minHeight: 160,
-                  maxHeight: 260,
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 0,
-                }}
-              >
+            <div
+              style={{
+                borderRadius: 12,
+                border: '1px solid #dae1f3',
+                background: '#f8fafc',
+                minHeight: 160,
+                flex: 1,
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0,
+              }}
+            >
                 <div
                   style={{
                     borderRadius: '10px 10px 0 0',
@@ -2088,20 +2074,6 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                   )}
                 </div>
               </div>
-            )}
-            <div
-              style={{
-                borderRadius: 12,
-                border: '1px dashed #cbd5f5',
-                padding: 10,
-                fontSize: 11,
-                color: '#94a3b8',
-              }}
-            >
-              선택된 건물/패밀리 항목에 대응하는 Work Master를
-              <br />
-              오른쪽 표에 표시합니다.
-            </div>
           </>
         )}
       </div>
