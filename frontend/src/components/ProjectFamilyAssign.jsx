@@ -608,7 +608,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   );
 
   const assignmentRowsByType = useMemo(() => {
-    const buildRows = (assignments) => {
+    const buildRows = (assignments, { onlyDerivedLeaves = false } = {}) => {
       const rows = [];
       const rowByItemId = new Map();
       assignments.forEach((assignment) => {
@@ -628,6 +628,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           unit: 'EA',
           standardItemId: assignment.standard_item?.id,
           parentId: assignment.standard_item?.parent_id,
+          deriveFrom: assignment.standard_item?.derive_from,
           children: [],
         };
         rows.push(row);
@@ -657,7 +658,10 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       const flattenedRows = [];
 
       const traverseNode = (node, depth = 0) => {
-        flattenedRows.push({ ...node, depth });
+        const keepNode = !onlyDerivedLeaves || node.hasChildren || node.deriveFrom != null;
+        if (keepNode) {
+          flattenedRows.push({ ...node, depth });
+        }
         node.children.sort(sortByItem).forEach((child) => traverseNode(child, depth + 1));
       };
 
@@ -667,7 +671,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
 
     return {
       GWM: buildRows(assignmentGroups.GWM),
-      SWM: buildRows(assignmentGroups.SWM),
+      SWM: buildRows(assignmentGroups.SWM, { onlyDerivedLeaves: true }),
     };
   }, [assignmentGroups]);
 
