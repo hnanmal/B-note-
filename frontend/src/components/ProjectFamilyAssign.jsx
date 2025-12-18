@@ -2036,8 +2036,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                                 flexWrap: 'wrap',
                               }}
                             >
-                              <span style={{ color: '#334155', fontWeight: 700 }}>{row.type}</span>
-                              <span style={{ color: '#111827', whiteSpace: 'normal' }} title={row.itemPath}>
+                              <span style={{ color: '#334155', fontWeight: 500 }}>{row.type}</span>
+                              <span style={{ color: '#111827', fontWeight: 700, whiteSpace: 'normal' }} title={row.itemPath}>
                                 {row.itemPath}
                               </span>
                               <button
