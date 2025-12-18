@@ -8,6 +8,27 @@ const INTERIOR_ITEM_ASSIGNMENT_MAP = {
   422: 948,
 };
 
+const SECTION_ORDER = {
+  floor: 0,
+  skirt: 1,
+  wall: 2,
+  base: 3,
+};
+
+const sortSectionsByPriority = (sections = []) => {
+  const getOrder = (label = '') => {
+    const key = label.trim().toLowerCase();
+    const match = Object.entries(SECTION_ORDER).find(([name]) => key.startsWith(name));
+    return match ? match[1] : Number.MAX_SAFE_INTEGER;
+  };
+  return [...sections].sort((a, b) => {
+    const ao = getOrder(a.label);
+    const bo = getOrder(b.label);
+    if (ao !== bo) return ao - bo;
+    return (a.label || '').localeCompare(b.label || '');
+  });
+};
+
 const SAMPLE_ROOMS = [
   { name: '101_MESS ROOM', building: 'test_building1', std: '0.1' },
   { name: '102_LOBBY', building: 'test_building1', std: '0.1' },
@@ -192,7 +213,7 @@ const buildSectionsFromStandardItems = (items, projectAbbr = '') => {
     })
     .filter(Boolean);
 
-  return sections.sort((a, b) => a.label.localeCompare(b.label));
+  return sortSectionsByPriority(sections);
 };
 
 const buildSectionsFromCart = (cartEntries, standardItems, projectAbbr = '') => {
@@ -239,7 +260,7 @@ const buildSectionsFromCart = (cartEntries, standardItems, projectAbbr = '') => 
     });
   });
 
-  return sections.sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+  return sortSectionsByPriority(sections);
 };
 
 const normalizeCartEntry = (entry) => ({
@@ -291,13 +312,13 @@ const mergeCartExtrasIntoSections = (baseSections, cartEntries, standardItems, p
     });
   });
 
-  if (!extras.length) return baseSections;
+  if (!extras.length) return sortSectionsByPriority(baseSections);
   const extraSection = {
     id: 'cart-extra',
     label: 'Cart Items',
     items: extras.sort((a, b) => (a.label || '').localeCompare(b.label || '')),
   };
-  return [...baseSections, extraSection];
+  return sortSectionsByPriority([...baseSections, extraSection]);
 };
 
 export default function ProjectInteriorMatrix({ apiBaseUrl }) {
