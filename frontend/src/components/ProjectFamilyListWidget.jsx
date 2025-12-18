@@ -93,7 +93,9 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
   return (
     <div
       style={{
-        flex: '0 0 320px',
+        flex: 1,
+        width: '100%',
+        boxSizing: 'border-box',
         background: '#fff',
         borderRadius: 16,
         padding: 16,
@@ -102,7 +104,7 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
         flexDirection: 'column',
         gap: 12,
         minHeight: 0,
-        maxHeight: 'calc(100vh - 48px)',
+        maxHeight: '100%',
         overflow: 'hidden',
       }}
     >
@@ -155,12 +157,17 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
           if (nextNode) onFamilySelect(nextNode);
         }}
         style={{
+          width: '100%',
+          boxSizing: 'border-box',
           flex: 1,
           minHeight: 0,
           overflowY: 'auto',
+          overflowX: 'hidden',
           border: '1px solid #e2e8f0',
           borderRadius: 12,
-          padding: 12,
+          padding: '12px 16px 12px 12px',
+          scrollbarGutter: 'stable both-edges',
+          paddingRight: 18,
           background: '#f8fafc',
         }}
       >

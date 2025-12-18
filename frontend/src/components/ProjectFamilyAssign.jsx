@@ -1335,7 +1335,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     );
   };
 
-  const leftColumnWidth = collapsedColumns.left ? 64 : 320;
+  const leftColumnWidth = collapsedColumns.left ? 64 : 360;
   const middleColumnFlex = collapsedColumns.middle ? '0 0 64px' : '1 1 0%';
   const rightColumnWidth = collapsedColumns.right ? 64 : 720;
 
@@ -1362,6 +1362,10 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           flexDirection: 'column',
           gap: collapsedColumns.left ? 8 : 12,
           alignItems: collapsedColumns.left ? 'center' : 'stretch',
+          minHeight: 0,
+          height: 'calc(100vh - 60px)',
+          maxHeight: 'calc(100vh - 60px)',
+          overflowY: 'auto',
         }}
       >
         <div
@@ -1389,7 +1393,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           </button>
         </div>
         {!collapsedColumns.left && (
-          <div style={{ flex: 1, minHeight: 400 }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <ProjectFamilyListWidget
               apiBaseUrl={apiBaseUrl}
               selectedFamilyId={selectedFamily?.id}
