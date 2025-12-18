@@ -399,7 +399,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       assignmentIds: [assignmentId],
       standardItemIds: standardItemId ? [standardItemId] : [],
       createdAt: base.createdAt ?? new Date().toISOString(),
-      formula: assignment?.formula ?? null,
+      formula: base.formula ?? assignment?.formula ?? null,
     };
   };
 
@@ -412,9 +412,14 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       setCartStatusMessage('저장할 Revit 타입을 선택하세요.');
       return;
     }
-    const entriesToSave = selectedAssignmentIds.map((assignmentId) =>
-      buildCartEntryFromAssignment(assignmentId)
-    );
+    const entriesToSave = [];
+    currentSelectedRevitTypes.forEach((revitType) => {
+      selectedAssignmentIds.forEach((assignmentId) => {
+        entriesToSave.push(
+          buildCartEntryFromAssignment(assignmentId, { revitTypes: [revitType] })
+        );
+      });
+    });
 
     setSavedCartEntries((prev) => [...entriesToSave, ...prev]);
     setCartStatusMessage('장바구니 저장 중...');
@@ -811,75 +816,13 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     }
   };
 
-  const handleDeleteCartEntry = async (entryId, assignmentId = null) => {
-    setSavedCartEntries((prev) => {
-      const next = [];
-      prev.forEach((entry) => {
-        if (entry.id !== entryId) {
-          next.push(entry);
-          return;
-        }
-        const hasMultiple = Array.isArray(entry.assignmentIds) && entry.assignmentIds.length > 1;
-        if (!hasMultiple || !assignmentId) {
-          return; // remove entire entry
-        }
-        const remainingAssignments = entry.assignmentIds.filter((id) => id !== assignmentId);
-        if (!remainingAssignments.length) {
-          return;
-        }
-        remainingAssignments.forEach((id) => {
-          const newEntry = buildCartEntryFromAssignment(id, {
-            revitTypes: entry.revitTypes,
-            createdAt: entry.createdAt,
-          });
-          next.push(newEntry);
-        });
-      });
-      return next;
-    });
-
+  const handleDeleteCartEntry = async (entryId) => {
+    setSavedCartEntries((prev) => prev.filter((entry) => entry.id !== entryId));
     if (!apiBaseUrl) return;
-
-    const originalEntry = savedCartEntries.find((entry) => entry.id === entryId);
-    const hasMultiple = originalEntry?.assignmentIds?.length > 1;
-
-    const deleteOriginal = fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, {
-      method: 'DELETE',
-    }).catch(() => null);
-
-    const recreateCalls = !assignmentId || !hasMultiple
-      ? []
-      : (originalEntry.assignmentIds || [])
-          .filter((id) => id !== assignmentId)
-          .map((id) => {
-            const tempEntry = buildCartEntryFromAssignment(id, {
-              revitTypes: originalEntry.revitTypes,
-              createdAt: originalEntry.createdAt,
-            });
-            return fetch(`${apiBaseUrl}/workmaster-cart`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                revit_types: tempEntry.revitTypes,
-                assignment_ids: tempEntry.assignmentIds,
-                standard_item_ids: tempEntry.standardItemIds,
-                formula: tempEntry.formula,
-              }),
-            })
-              .then((res) => (res.ok ? res.json() : null))
-              .then((payload) => {
-                if (!payload) return null;
-                const saved = normalizeCartEntry(payload);
-                setSavedCartEntries((prev) => [saved, ...prev.filter((e) => e.id !== tempEntry.id)]);
-                return saved;
-              })
-              .catch(() => null);
-          });
-
     try {
-      await Promise.all([deleteOriginal, ...recreateCalls]);
+      await fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, { method: 'DELETE' });
     } catch (error) {
-      // ignore
+      // ignore network errors; optimistic update already applied
     }
   };
 
@@ -1679,15 +1622,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                           flexWrap: 'wrap',
                         }}
                       >
-                        <span
-                          style={{
-                            fontWeight: 600,
-                            whiteSpace: 'normal',
-                          }}
-                          title={row.revitTypesLabel}
-                        >
-                          {row.revitTypesLabel}
-                        </span>
+                        <span style={{ minWidth: 0 }} />
                         <span style={{ color: '#475467' }}>{row.type}</span>
                         <span style={{ color: '#111827', whiteSpace: 'normal' }} title={row.itemPath}>
                           {row.itemPath}
