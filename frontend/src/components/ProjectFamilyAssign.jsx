@@ -81,28 +81,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   }, [apiBaseUrl]);
 
   useEffect(() => {
-    persistWorkMasterCartEntries(savedCartEntries);
-  }, [savedCartEntries]);
-
-  const collectSubtreeAssignmentIds = (node, includeSelf = true) => {
-    const ids = [];
-    const initialChildren = Array.isArray(node?.children) ? node.children : [];
-    const stack = includeSelf ? [node] : [...initialChildren];
-    while (stack.length) {
-      const current = stack.pop();
-      if (!current) continue;
-      if (current.id != null) {
-        ids.push(current.id);
-      }
-      if (Array.isArray(current.children)) {
-        current.children.forEach((child) => stack.push(child));
-      }
-    }
-    return ids;
-  };
-
-  useEffect(() => {
-    if (!apiBaseUrl) return;
+    if (!apiBaseUrl) return undefined;
     let cancelled = false;
     setLoadingBuildings(true);
     fetch(`${apiBaseUrl}/building-list/`)
@@ -197,6 +176,23 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       cancelled = true;
     };
   }, [apiBaseUrl, selectedFamily?.id]);
+
+  const collectSubtreeAssignmentIds = (node, includeSelf = true) => {
+    const ids = [];
+    const initialChildren = Array.isArray(node?.children) ? node.children : [];
+    const stack = includeSelf ? [node] : [...initialChildren];
+    while (stack.length) {
+      const current = stack.pop();
+      if (!current) continue;
+      if (current.id != null) {
+        ids.push(current.id);
+      }
+      if (Array.isArray(current.children)) {
+        current.children.forEach((child) => stack.push(child));
+      }
+    }
+    return ids;
+  };
 
   useEffect(() => {
     if (!apiBaseUrl || !familyAssignments.length) {
@@ -394,6 +390,19 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     });
   };
 
+  const buildCartEntryFromAssignment = (assignmentId, base = {}) => {
+    const standardItemId = assignmentRowMap.get(assignmentId)?.standardItemId;
+    const assignment = assignmentById.get(assignmentId);
+    return {
+      id: `cart-${Date.now()}-${assignmentId}-${Math.random().toString(16).slice(2)}`,
+      revitTypes: base.revitTypes ?? currentSelectedRevitTypes,
+      assignmentIds: [assignmentId],
+      standardItemIds: standardItemId ? [standardItemId] : [],
+      createdAt: base.createdAt ?? new Date().toISOString(),
+      formula: assignment?.formula ?? null,
+    };
+  };
+
   const handleSaveAssignmentCart = async () => {
     if (!selectedAssignmentIds.length) {
       setCartStatusMessage('선택된 Work Master 항목이 없습니다.');
@@ -403,23 +412,11 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       setCartStatusMessage('저장할 Revit 타입을 선택하세요.');
       return;
     }
-    const baseFormula = assignmentById.get(selectedAssignmentIds[0])?.formula ?? '';
-    const optimisticId = `cart-${Date.now()}`;
-    const newEntry = {
-      id: optimisticId,
-      revitTypes: currentSelectedRevitTypes,
-      assignmentIds: [...selectedAssignmentIds],
-      standardItemIds: Array.from(
-        new Set(
-          selectedAssignmentIds
-            .map((assignmentId) => assignmentRowMap.get(assignmentId)?.standardItemId)
-            .filter(Boolean)
-        )
-      ),
-      createdAt: new Date().toISOString(),
-      formula: baseFormula,
-    };
-    setSavedCartEntries((prev) => [newEntry, ...prev]);
+    const entriesToSave = selectedAssignmentIds.map((assignmentId) =>
+      buildCartEntryFromAssignment(assignmentId)
+    );
+
+    setSavedCartEntries((prev) => [...entriesToSave, ...prev]);
     setCartStatusMessage('장바구니 저장 중...');
 
     if (!apiBaseUrl) {
@@ -428,21 +425,31 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     }
 
     try {
-      const res = await fetch(`${apiBaseUrl}/workmaster-cart`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          revit_types: newEntry.revitTypes,
-          assignment_ids: newEntry.assignmentIds,
-          standard_item_ids: newEntry.standardItemIds,
-          formula: newEntry.formula,
-        }),
-      });
-      if (!res.ok) throw new Error('save failed');
-      const payload = await res.json();
-      const saved = normalizeCartEntry(payload);
-      setSavedCartEntries((prev) => [saved, ...prev.filter((entry) => entry.id !== optimisticId)]);
-      setCartStatusMessage('장바구니에 저장되었습니다.');
+      const results = await Promise.allSettled(
+        entriesToSave.map(async (entry) => {
+          const res = await fetch(`${apiBaseUrl}/workmaster-cart`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              revit_types: entry.revitTypes,
+              assignment_ids: entry.assignmentIds,
+              standard_item_ids: entry.standardItemIds,
+              formula: entry.formula,
+            }),
+          });
+          if (!res.ok) throw new Error('save failed');
+          const payload = await res.json();
+          const saved = normalizeCartEntry(payload);
+          setSavedCartEntries((prev) => [saved, ...prev.filter((e) => e.id !== entry.id)]);
+          return saved;
+        })
+      );
+      const anyRejected = results.some((r) => r.status === 'rejected');
+      if (anyRejected) {
+        setCartStatusMessage('일부 항목이 로컬에만 저장되었습니다. 다시 시도하세요.');
+      } else {
+        setCartStatusMessage('장바구니에 저장되었습니다.');
+      }
     } catch (error) {
       setCartStatusMessage('장바구니를 로컬에만 저장했습니다. 다시 시도하세요.');
     }
@@ -804,15 +811,75 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     }
   };
 
-  const handleDeleteCartEntry = async (entryId) => {
-    setSavedCartEntries((prev) => prev.filter((entry) => entry.id !== entryId));
-    if (!apiBaseUrl) return;
-    try {
-      await fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, {
-        method: 'DELETE',
+  const handleDeleteCartEntry = async (entryId, assignmentId = null) => {
+    setSavedCartEntries((prev) => {
+      const next = [];
+      prev.forEach((entry) => {
+        if (entry.id !== entryId) {
+          next.push(entry);
+          return;
+        }
+        const hasMultiple = Array.isArray(entry.assignmentIds) && entry.assignmentIds.length > 1;
+        if (!hasMultiple || !assignmentId) {
+          return; // remove entire entry
+        }
+        const remainingAssignments = entry.assignmentIds.filter((id) => id !== assignmentId);
+        if (!remainingAssignments.length) {
+          return;
+        }
+        remainingAssignments.forEach((id) => {
+          const newEntry = buildCartEntryFromAssignment(id, {
+            revitTypes: entry.revitTypes,
+            createdAt: entry.createdAt,
+          });
+          next.push(newEntry);
+        });
       });
+      return next;
+    });
+
+    if (!apiBaseUrl) return;
+
+    const originalEntry = savedCartEntries.find((entry) => entry.id === entryId);
+    const hasMultiple = originalEntry?.assignmentIds?.length > 1;
+
+    const deleteOriginal = fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, {
+      method: 'DELETE',
+    }).catch(() => null);
+
+    const recreateCalls = !assignmentId || !hasMultiple
+      ? []
+      : (originalEntry.assignmentIds || [])
+          .filter((id) => id !== assignmentId)
+          .map((id) => {
+            const tempEntry = buildCartEntryFromAssignment(id, {
+              revitTypes: originalEntry.revitTypes,
+              createdAt: originalEntry.createdAt,
+            });
+            return fetch(`${apiBaseUrl}/workmaster-cart`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                revit_types: tempEntry.revitTypes,
+                assignment_ids: tempEntry.assignmentIds,
+                standard_item_ids: tempEntry.standardItemIds,
+                formula: tempEntry.formula,
+              }),
+            })
+              .then((res) => (res.ok ? res.json() : null))
+              .then((payload) => {
+                if (!payload) return null;
+                const saved = normalizeCartEntry(payload);
+                setSavedCartEntries((prev) => [saved, ...prev.filter((e) => e.id !== tempEntry.id)]);
+                return saved;
+              })
+              .catch(() => null);
+          });
+
+    try {
+      await Promise.all([deleteOriginal, ...recreateCalls]);
     } catch (error) {
-      // ignore delete failure
+      // ignore
     }
   };
 
@@ -832,7 +899,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           workMasterSummary: '—',
           gauge: '—',
           spec: '—',
-          formula: entry.formula ?? '—',
+          formula: entry.formula || '—',
           unit: '—',
           outputType: selectedFamily?.sequence_number ?? '—',
           entryId: entry.id,
@@ -842,7 +909,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       assignments.forEach((assignment) => {
         const standardItem = assignment?.standard_item;
         const workMaster = resolveWorkMaster(assignment);
-        const entryFormula = entry.formula ?? assignment.formula ?? '—';
+        const entryFormula = entry.formula || assignment.formula || '—';
         rows.push({
           id: `${entry.id}-${assignment.id}`,
           revitTypesLabel: entry.revitTypes.join(', '),
@@ -1590,7 +1657,6 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                   {cartTableRows.map((row, index) => {
                     const formulaValue = row.formula ?? '';
                     const displayGauge = row.gauge && row.gauge !== '—' ? `(${row.gauge})` : '—';
-                    const isFirstOfEntry = index === 0 || cartTableRows[index - 1].entryId !== row.entryId;
                     return (
                     <div
                       key={row.id}
@@ -1630,25 +1696,23 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                           {row.workMasterSummary}
                         </span>
                         <span style={{ color: '#475467' }}>{displayGauge}</span>
-                        {isFirstOfEntry && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteCartEntry(row.entryId)}
-                            style={{
-                              marginLeft: 'auto',
-                              border: '1px solid #ef4444',
-                              background: '#fff1f2',
-                              color: '#b91c1c',
-                              borderRadius: 6,
-                              padding: '4px 8px',
-                              fontSize: 10,
-                              cursor: 'pointer',
-                            }}
-                            title="이 장바구니 항목을 삭제"
-                          >
-                            삭제
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCartEntry(row.entryId, row.assignmentId)}
+                          style={{
+                            marginLeft: 'auto',
+                            border: '1px solid #ef4444',
+                            background: '#fff1f2',
+                            color: '#b91c1c',
+                            borderRadius: 6,
+                            padding: '4px 8px',
+                            fontSize: 10,
+                            cursor: 'pointer',
+                          }}
+                          title="이 장바구니 항목을 삭제"
+                        >
+                          삭제
+                        </button>
                       </div>
                       <div
                         style={{
