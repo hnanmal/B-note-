@@ -327,6 +327,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const [interiorSections, setInteriorSections] = useState(buildSectionsFromSamples);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [selectedRoomKey, setSelectedRoomKey] = useState(null);
+  const [copyTargetRoomKey, setCopyTargetRoomKey] = useState(null);
   const [selectionByBuilding, setSelectionByBuilding] = useState({});
   const [cartEntries, setCartEntries] = useState([]);
   const [projectAbbr, setProjectAbbr] = useState('');
@@ -720,11 +721,29 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     [rooms, selectedBuilding]
   );
 
+  const handleCopySelectionToRoom = () => {
+    if (!selectedRoomKey || !copyTargetRoomKey) return;
+    if (selectedRoomKey === copyTargetRoomKey) return;
+
+    interiorSections.forEach((section) => {
+      section.items.forEach((item) => {
+        const itemKey = item.key;
+        const stdId = item.standardItemId;
+        const sourceChecked = isChecked(itemKey, stdId, selectedRoomKey);
+        const targetChecked = isChecked(itemKey, stdId, copyTargetRoomKey);
+        if (sourceChecked !== targetChecked) {
+          handleToggle(itemKey, stdId, copyTargetRoomKey);
+        }
+      });
+    });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', minHeight: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Project Interior Matrix</h2>
         <span style={{ fontSize: 12, color: '#475467' }}>더블 클릭으로 체크/해제</span>
+        <span style={{ fontSize: 11, color: '#94a3b8' }}>· 선택 룸 → 다른 룸 복사 지원</span>
       </div>
       <div
         style={{
@@ -755,6 +774,64 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         </div>
         <div style={{ fontSize: 11, color: '#475467' }}>
           건물별 등록된 Room 기준 · 두 번 클릭하면 체크/해제됩니다.
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, color: '#0f172a', fontWeight: 600 }}>룸 복사</span>
+          <select
+            value={selectedRoomKey || ''}
+            onChange={(event) => setSelectedRoomKey(event.target.value || null)}
+            style={{ border: '1px solid #cbd5f5', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}
+          >
+            <option value="" disabled>
+              원본 룸 선택
+            </option>
+            {tableHeaders.map((room) => (
+              <option key={`${room.key}-src`} value={room.key}>
+                {room.label}
+              </option>
+            ))}
+          </select>
+          <span style={{ fontSize: 12, color: '#475467' }}>→</span>
+          <select
+            value={copyTargetRoomKey || ''}
+            onChange={(event) => setCopyTargetRoomKey(event.target.value || null)}
+            style={{ border: '1px solid #cbd5f5', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}
+          >
+            <option value="" disabled>
+              대상 룸 선택
+            </option>
+            {tableHeaders
+              .filter((room) => room.key !== selectedRoomKey)
+              .map((room) => (
+                <option key={`${room.key}-dest`} value={room.key}>
+                  {room.label}
+                </option>
+              ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleCopySelectionToRoom}
+            disabled={!selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey}
+            style={{
+              border: '1px solid #2563eb',
+              background: !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey
+                ? '#e5e7eb'
+                : '#2563eb',
+              color: !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey
+                ? '#94a3b8'
+                : '#fff',
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey
+                ? 'not-allowed'
+                : 'pointer',
+            }}
+            title="선택한 원본 룸의 체크 상태를 대상 룸에 그대로 복사합니다"
+          >
+            체크 복사
+          </button>
         </div>
       </div>
 
