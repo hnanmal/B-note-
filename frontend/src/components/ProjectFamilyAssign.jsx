@@ -31,6 +31,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const [revitTypesError, setRevitTypesError] = useState(null);
   const [revitTypesSaving, setRevitTypesSaving] = useState(false);
   const [revitTypesSaveError, setRevitTypesSaveError] = useState(null);
+  const [projectAbbr, setProjectAbbr] = useState('');
   const [calcDictEntries, setCalcDictEntries] = useState([]);
   const [calcDictLoading, setCalcDictLoading] = useState(false);
   const [calcDictError, setCalcDictError] = useState(null);
@@ -46,6 +47,24 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   useEffect(() => {
     setSavedCartEntries(readWorkMasterCartEntries());
   }, []);
+
+  useEffect(() => {
+    if (!apiBaseUrl) return undefined;
+    let cancelled = false;
+    fetch(`${apiBaseUrl}/metadata/abbr`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (cancelled) return;
+        setProjectAbbr(payload?.pjt_abbr ?? '');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProjectAbbr('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
 
   useEffect(() => {
     if (!apiBaseUrl) return undefined;
@@ -675,6 +694,34 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     [familyAssignments]
   );
 
+  const standardItemById = useMemo(() => {
+    const map = new Map();
+    familyAssignments.forEach((assignment) => {
+      const standardItem = assignment?.standard_item;
+      if (standardItem?.id != null) {
+        map.set(standardItem.id, standardItem);
+      }
+    });
+    return map;
+  }, [familyAssignments]);
+
+  const buildItemPath = (standardItem) => {
+    if (!standardItem) return '—';
+    const isDerived = Boolean(standardItem.derive_from);
+    if (isDerived) {
+      const parentName = standardItemById.get(standardItem.derive_from)?.name;
+      const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
+      const childName = (standardItem.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || standardItem.name;
+      return `${parentName ?? '부모'}${abbrPart}::${childName}`;
+    }
+    const level2 = standardItem.name ?? '—';
+    if (!standardItem.parent_id) return level2;
+    const parent = standardItemById.get(standardItem.parent_id);
+    const level1 = parent?.name;
+    const parts = [level1, level2].filter(Boolean);
+    return parts.length ? parts.join(' | ') : level2;
+  };
+
   const assignmentRowsByType = useMemo(() => {
     const buildRows = (assignments, { onlyDerivedLeaves = false } = {}) => {
       const rows = [];
@@ -687,11 +734,14 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         if (assignment.description) {
           detailParts.push(assignment.description);
         }
+        const itemLabel = assignment.standard_item?.type === 'SWM'
+          ? buildItemPath(assignment.standard_item)
+          : assignment.standard_item?.name ?? 'Unnamed';
         const row = {
           id: assignment.id,
           use: '●',
           discipline: assignment.standard_item?.type ?? '—',
-          item: assignment.standard_item?.name ?? 'Unnamed',
+          item: itemLabel,
           detail: detailParts.length ? detailParts.join(' · ') : '—',
           unit: 'EA',
           standardItemId: assignment.standard_item?.id,
@@ -764,27 +814,6 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     });
     return map;
   }, [familyAssignments]);
-
-  const standardItemById = useMemo(() => {
-    const map = new Map();
-    familyAssignments.forEach((assignment) => {
-      const standardItem = assignment?.standard_item;
-      if (standardItem?.id != null) {
-        map.set(standardItem.id, standardItem);
-      }
-    });
-    return map;
-  }, [familyAssignments]);
-
-  const buildItemPath = (standardItem) => {
-    if (!standardItem) return '—';
-    const level2 = standardItem.name ?? '—';
-    if (!standardItem.parent_id) return level2;
-    const parent = standardItemById.get(standardItem.parent_id);
-    const level1 = parent?.name;
-    const parts = [level1, level2].filter(Boolean);
-    return parts.length ? parts.join(' | ') : level2;
-  };
 
   const buildWorkMasterSummary = (workMaster) => {
     if (!workMaster) return '—';
