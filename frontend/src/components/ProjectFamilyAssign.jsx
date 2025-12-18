@@ -1770,22 +1770,39 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                 gap: 10,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Calc Dictionary</div>
-                <button
-                  type="button"
-                  onClick={() => togglePanel('calc')}
-                  style={{
-                    border: '1px solid #cbd5f5',
-                    background: '#fff',
-                    borderRadius: 8,
-                    padding: '2px 8px',
-                    fontSize: 11,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {collapsedPanels.calc ? '펼치기' : '접기'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    type="button"
+                    style={{
+                      borderRadius: 10,
+                      border: '1px solid #2563eb',
+                      padding: '6px 10px',
+                      background: '#2563eb',
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: 11,
+                      width: 'fit-content',
+                    }}
+                  >
+                    Update from common-input
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => togglePanel('calc')}
+                    style={{
+                      border: '1px solid #cbd5f5',
+                      background: '#fff',
+                      borderRadius: 8,
+                      padding: '2px 8px',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {collapsedPanels.calc ? '펼치기' : '접기'}
+                  </button>
+                </div>
               </div>
               {!collapsedPanels.calc && (
                 <>
@@ -1827,21 +1844,6 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                 </>
               )}
             </div>
-
-            <button
-              type="button"
-              style={{
-                borderRadius: 12,
-                border: 'none',
-                padding: '10px 16px',
-                background: '#2563eb',
-                color: '#fff',
-                fontWeight: 600,
-                width: 'fit-content',
-              }}
-            >
-              Update from common-input
-            </button>
             {/* Removed middle-column assigned Work Master panel as requested */}
           </>
         )}
