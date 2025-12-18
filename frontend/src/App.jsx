@@ -9,6 +9,7 @@ import CommonInputPage from './components/CommonInputPage';
 import TeamStandardFamilyList from './components/TeamStandardFamilyList';
 import ProjectInputMain from './components/ProjectInputMain';
 import ProjectFamilyAssign from './components/ProjectFamilyAssign';
+import ProjectInteriorMatrix from './components/ProjectInteriorMatrix';
 import ProjectStandardSelect from './components/ProjectStandardSelect';
 import ProjectMain from './components/ProjectMain';
 
@@ -834,15 +835,7 @@ function App() {
             </div>
           ) : (
             <div className="panel project-input" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
-              <div style={{ background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 10px 30px rgba(15,23,42,0.08)', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }}>
-                <h2 style={{ margin: 0, fontSize: 18 }}>{projectInputPages[activePage]}</h2>
-                <p style={{ margin: 0, fontSize: 13, color: '#475467' }}>
-                  작업이 준비 중입니다.
-                </p>
-                <div style={{ fontSize: 12, color: '#64748b' }}>
-                  세부 구현 전단계이며, 수정 요청 시 이 탭을 기반으로 추가 작업을 진행합니다.
-                </div>
-              </div>
+              <ProjectInteriorMatrix apiBaseUrl={projectApiBase} />
             </div>
           )
         ) : activePage === 'project-main' ? (
