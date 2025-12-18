@@ -356,6 +356,18 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     return names;
   }, [selectedRevitIndexes, displayedRevitEntries, activeRevitType]);
 
+  const revitTypesWithCart = useMemo(() => {
+    const set = new Set();
+    savedCartEntries.forEach((entry) => {
+      if (Array.isArray(entry?.revitTypes)) {
+        entry.revitTypes.forEach((name) => {
+          if (name) set.add(name);
+        });
+      }
+    });
+    return set;
+  }, [savedCartEntries]);
+
   const handleSelectMatchingRevitTypes = useCallback(() => {
     if (!displayedRevitEntries.length) return;
     const baseTypeName =
@@ -1578,7 +1590,20 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                               cursor: 'pointer',
                             }}
                           >
-                            <span style={{ fontSize: 12, color: '#0f172a' }}>{entry.type_name}</span>
+                            {(() => {
+                              const hasCart = revitTypesWithCart.has(entry.type_name);
+                              return (
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    color: hasCart ? '#0f172a' : '#b91c1c',
+                                    fontWeight: hasCart ? 500 : 600,
+                                  }}
+                                >
+                                  {entry.type_name}
+                                </span>
+                              );
+                            })()}
                             <span style={{ fontSize: 12 }}>{buildingLabel}</span>
                             <span style={{ fontSize: 12 }}>{familySequence}</span>
                           </div>
