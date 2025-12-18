@@ -338,9 +338,12 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     if (!target) return savedRevitTypeEntries;
     return savedRevitTypeEntries.filter((entry) => {
       const b = (entry?.building_name || '').trim();
-      return !b || b === target;
+      return b === target;
     });
   }, [savedRevitTypeEntries, selectedBuilding?.name]);
+
+  const totalRevitCount = savedRevitTypeEntries.length;
+  const selectedRevitCount = displayedRevitEntries.length;
 
   const activeRevitIndexClamped = displayedRevitEntries.length
     ? Math.min(activeRevitIndex, displayedRevitEntries.length - 1)
@@ -363,17 +366,16 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     return names;
   }, [selectedRevitIndexes, displayedRevitEntries, activeRevitType]);
 
-  const revitTypesWithCart = useMemo(() => {
-    const set = new Set();
-    savedCartEntries.forEach((entry) => {
-      if (Array.isArray(entry?.revitTypes)) {
-        entry.revitTypes.forEach((name) => {
-          if (name) set.add(name);
-        });
-      }
+  const revitTypesByBuilding = useMemo(() => {
+    const byBuilding = new Map();
+    savedRevitTypeEntries.forEach((entry) => {
+      const b = (entry?.building_name || '').trim();
+      const key = b || '';
+      if (!byBuilding.has(key)) byBuilding.set(key, new Set());
+      if (entry?.type_name) byBuilding.get(key).add(entry.type_name);
     });
-    return set;
-  }, [savedCartEntries]);
+    return byBuilding;
+  }, [savedRevitTypeEntries]);
 
   const handleSelectMatchingRevitTypes = useCallback(() => {
     if (!displayedRevitEntries.length) return;
@@ -1314,6 +1316,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             <ProjectFamilyListWidget
               apiBaseUrl={apiBaseUrl}
               selectedFamilyId={selectedFamily?.id}
+              selectedBuildingName={(selectedBuilding?.name || '').trim()}
               onFamilySelect={setSelectedFamily}
             />
           </div>
@@ -1590,6 +1593,11 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                       displayedRevitEntries.map((entry, index) => {
                         const isActive = index === activeRevitIndexClamped;
                         const isSelected = selectedRevitIndexSet.has(index);
+                        const entryBuilding = (entry.building_name || '').trim();
+                        const selectedBuildingName = (selectedBuilding?.name || '').trim();
+                        const matchesBuilding = entryBuilding && entryBuilding === selectedBuildingName;
+                        const familySet = revitTypesByBuilding.get(entryBuilding || '') || new Set();
+                        const hasFamily = matchesBuilding && familySet.has(entry.type_name);
                         return (
                           <div
                             key={entry.id ?? `${entry.type_name}-${index}`}
@@ -1599,22 +1607,23 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                               gridTemplateColumns: '2fr 1fr 1fr',
                               padding: '6px 8px',
                               borderRadius: 10,
-                              background: isActive
-                                ? '#dbeafe'
-                                : isSelected
-                                  ? '#eff6ff'
-                                  : 'transparent',
+                              background: hasFamily
+                                ? '#ede9fe'
+                                : isActive
+                                  ? '#dbeafe'
+                                  : isSelected
+                                    ? '#eff6ff'
+                                    : 'transparent',
                               cursor: 'pointer',
                             }}
                           >
                             {(() => {
-                              const hasCart = revitTypesWithCart.has(entry.type_name);
                               return (
                                 <span
                                   style={{
                                     fontSize: 12,
-                                    color: hasCart ? '#0f172a' : '#b91c1c',
-                                    fontWeight: hasCart ? 500 : 600,
+                                    color: hasFamily ? '#0f172a' : '#b91c1c',
+                                    fontWeight: hasFamily ? 500 : 600,
                                   }}
                                 >
                                   {entry.type_name}
@@ -1626,6 +1635,12 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                           </div>
                         );
                       })
+                    ) : selectedBuilding?.name ? (
+                      <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                        {totalRevitCount
+                          ? '선택한 빌딩에 등록된 Revit 타입이 없습니다.'
+                          : '입력된 Revit 타입이 없습니다.'}
+                      </div>
                     ) : (
                       <div style={{ fontSize: 12, color: '#94a3b8' }}>입력된 Revit 타입이 없습니다.</div>
                     )}

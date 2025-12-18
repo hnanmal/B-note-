@@ -37,7 +37,7 @@ const flattenTree = (nodes, level = 0, accumulator = []) => {
   return accumulator;
 };
 
-export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, onFamilySelect }) {
+export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, selectedBuildingName = '', onFamilySelect }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -170,7 +170,16 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
         {!error && !flattened.length && (
           <div style={{ color: '#94a3b8', fontSize: 12 }}>Family 항목이 없습니다.</div>
         )}
-        {!error && flattened.map((node) => (
+        {!error && flattened.map((node) => {
+          const hasRevitForBuilding = Array.isArray(node.revit_types)
+            ? node.revit_types.some((rt) => {
+                const b = (rt?.building_name || '').trim();
+                const target = (selectedBuildingName || '').trim();
+                if (!target) return !!rt?.type_name; // no building selected: any revit type
+                return b === target;
+              })
+            : false;
+          return (
           <div
             key={`${node.id}-${node.level}`}
             onClick={() => onFamilySelect?.(node)}
@@ -183,7 +192,7 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
               background:
                 node.id === selectedFamilyId
                   ? '#e0f2fe'
-                  : Array.isArray(node.revit_types) && node.revit_types.length
+                  : hasRevitForBuilding
                     ? '#f3e8ff'
                     : 'transparent',
               cursor: onFamilySelect ? 'pointer' : 'default',
@@ -200,7 +209,8 @@ export default function ProjectFamilyListWidget({ apiBaseUrl, selectedFamilyId, 
               <strong style={{ fontWeight: 600 }}>{node.name || 'Unnamed'}</strong>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
