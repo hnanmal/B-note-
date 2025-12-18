@@ -8,6 +8,40 @@ import {
 
 const WORK_MASTER_COLUMNS = ['Use', 'GWM', 'Item', '상세', '단위'];
 
+const stripBuildingPrefix = (value, buildingName) => {
+  const raw = (value || '').trim();
+  if (!raw.includes('\t')) return raw;
+  const target = (buildingName || '').trim();
+  if (target && raw.startsWith(`${target}\t`)) {
+    return raw.slice(target.length + 1).trim();
+  }
+  return raw;
+};
+
+const normalizeRoomLabel = (value, buildingName) =>
+  stripBuildingPrefix(value, buildingName).replace(/\s+/g, ' ').trim().toLowerCase();
+
+const deriveEntryBuildingNames = (entry, knownBuildings = []) => {
+  const explicit = Array.isArray(entry?.buildingNames ?? entry?.building_names)
+    ? entry.buildingNames ?? entry.building_names
+    : [];
+  const cleaned = explicit.map((b) => (b || '').trim()).filter(Boolean);
+  if (cleaned.length) return Array.from(new Set(cleaned));
+
+  const normalizedKnown = new Set(knownBuildings.map((b) => (b || '').trim()));
+  const inferred = (entry?.revitTypes ?? entry?.revit_types ?? [])
+    .map((rt) => {
+      const raw = (rt || '').trim();
+      if (!raw.includes('\t')) return '';
+      const prefix = raw.split('\t')[0].trim();
+      if (!prefix) return '';
+      if (!normalizedKnown.size || normalizedKnown.has(prefix)) return prefix;
+      return '';
+    })
+    .filter(Boolean);
+  return Array.from(new Set(inferred));
+};
+
 const normalizeCartEntry = (entry) => ({
   id: entry?.id ?? `cart-${Date.now()}`,
   revitTypes: entry?.revitTypes ?? entry?.revit_types ?? [],
@@ -15,6 +49,7 @@ const normalizeCartEntry = (entry) => ({
   standardItemIds: entry?.standardItemIds ?? entry?.standard_item_ids ?? [],
   createdAt: entry?.createdAt ?? entry?.created_at ?? new Date().toISOString(),
   formula: entry?.formula ?? null,
+  buildingNames: deriveEntryBuildingNames(entry),
 });
 
 export default function ProjectFamilyAssign({ apiBaseUrl }) {
@@ -514,13 +549,28 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const buildCartEntryFromAssignment = (assignmentId, base = {}) => {
     const standardItemId = assignmentRowMap.get(assignmentId)?.standardItemId;
     const assignment = assignmentById.get(assignmentId);
+    const buildingName = (selectedBuilding?.name || '').trim();
+    const knownBuildings = buildings.map((b) => (b?.name || '').trim()).filter(Boolean);
+    const rawRevitTypes = Array.isArray(base.revitTypes) ? base.revitTypes : currentSelectedRevitTypes;
+    const cleanedRevitTypes = rawRevitTypes.map((rt) => stripBuildingPrefix(rt, buildingName || inferredBuilding));
+    const baseBuildings = Array.isArray(base.buildingNames ?? base.building_names)
+      ? base.buildingNames ?? base.building_names
+      : [];
+    const inferredBuilding = !buildingName
+      ? deriveEntryBuildingNames({ revitTypes: rawRevitTypes, buildingNames: baseBuildings }, knownBuildings)[0] || ''
+      : '';
+    const finalBuilding = buildingName || inferredBuilding;
+    const buildingNames = finalBuilding
+      ? Array.from(new Set([finalBuilding, ...baseBuildings.filter(Boolean)]))
+      : baseBuildings.filter(Boolean);
     return {
       id: `cart-${Date.now()}-${assignmentId}-${Math.random().toString(16).slice(2)}`,
-      revitTypes: base.revitTypes ?? currentSelectedRevitTypes,
+      revitTypes: cleanedRevitTypes,
       assignmentIds: [assignmentId],
       standardItemIds: standardItemId ? [standardItemId] : [],
       createdAt: base.createdAt ?? new Date().toISOString(),
       formula: base.formula ?? assignment?.formula ?? null,
+      buildingNames,
     };
   };
 
@@ -560,6 +610,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
               revit_types: entry.revitTypes,
               assignment_ids: entry.assignmentIds,
               standard_item_ids: entry.standardItemIds,
+              building_names: entry.buildingNames,
               formula: entry.formula,
             }),
           });
@@ -977,11 +1028,25 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
 
   const visibleCartEntries = useMemo(() => {
     if (!currentSelectedRevitTypes.length) return [];
-    const selectedSet = new Set(currentSelectedRevitTypes);
-    return savedCartEntries.filter((entry) =>
-      Array.isArray(entry?.revitTypes) && entry.revitTypes.some((name) => selectedSet.has(name))
+    const targetBuilding = (selectedBuilding?.name || '').trim();
+    const selectedSet = new Set(
+      currentSelectedRevitTypes
+        .map((name) => normalizeRoomLabel(name, targetBuilding))
+        .filter(Boolean)
     );
-  }, [currentSelectedRevitTypes, savedCartEntries]);
+    const knownBuildings = buildings.map((b) => (b?.name || '').trim()).filter(Boolean);
+    return savedCartEntries.filter((entry) => {
+      const names = Array.isArray(entry?.revitTypes)
+        ? entry.revitTypes.map((name) => normalizeRoomLabel(name, targetBuilding)).filter(Boolean)
+        : [];
+      if (!names.some((name) => selectedSet.has(name))) return false;
+      const buildingsForEntry = deriveEntryBuildingNames(entry, knownBuildings);
+      if (targetBuilding && buildingsForEntry.length) {
+        return buildingsForEntry.includes(targetBuilding);
+      }
+      return true;
+    });
+  }, [currentSelectedRevitTypes, savedCartEntries, selectedBuilding?.name, buildings]);
 
   const cartTableRows = useMemo(() => {
     const flatRows = [];
