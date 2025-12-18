@@ -357,17 +357,17 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   }, [selectedRevitIndexes, displayedRevitEntries, activeRevitType]);
 
   const handleSelectMatchingRevitTypes = useCallback(() => {
-    if (!displayedRevitEntries.length || !savedCartEntries.length) return;
+    if (!displayedRevitEntries.length) return;
     const baseTypeName =
       currentSelectedRevitTypes[0] || activeRevitType || displayedRevitEntries[0]?.type_name;
     if (!baseTypeName) return;
 
     const buildSignature = (typeName) => {
-      if (!typeName) return '';
+      if (!typeName) return 'EMPTY';
       const relatedEntries = savedCartEntries.filter(
         (entry) => Array.isArray(entry?.revitTypes) && entry.revitTypes.includes(typeName)
       );
-      if (!relatedEntries.length) return '';
+      if (!relatedEntries.length) return 'EMPTY';
 
       const parts = relatedEntries.map((entry) => {
         const assignmentIds = Array.isArray(entry.assignmentIds)
@@ -385,11 +385,10 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     };
 
     const baseSignature = buildSignature(baseTypeName);
-    if (!baseSignature) return;
 
     const matchingIndexes = displayedRevitEntries
       .map((entry, index) => ({ index, signature: buildSignature(entry?.type_name) }))
-      .filter(({ signature }) => signature && signature === baseSignature)
+      .filter(({ signature }) => signature === baseSignature)
       .map(({ index }) => index);
 
     if (matchingIndexes.length) {
@@ -1430,7 +1429,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                     }}
                   />
                   <div style={{ fontSize: 11, color: '#475467', lineHeight: 1.4 }}>
-                    &lt;S&gt; 키를 눌러 장바구니를 동일한 항목으로 일괄 지정하세요.
+                    &lt;S&gt; 키를 눌러 장바구니가 동일한 항목들을 일괄 선택하세요.
                   </div>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     <button
