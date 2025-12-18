@@ -1797,43 +1797,6 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <button
-                type="button"
-                style={{
-                  width: 40,
-                  height: 38,
-                  borderRadius: 12,
-                  border: '1px solid #cbd5f5',
-                  background: '#fff',
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  fontSize: 16,
-                  cursor: 'pointer',
-                }}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                style={{
-                  width: 40,
-                  height: 38,
-                  borderRadius: 12,
-                  border: '1px solid #cbd5f5',
-                  background: '#fff',
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  fontSize: 16,
-                  cursor: 'pointer',
-                }}
-              >
-                ↓
-              </button>
-              <span style={{ fontSize: 12, color: '#475467' }}>
-                윗/아랫 방향 버튼을 눌러 작업 대상 건물 순번을 조정하세요.
-              </span>
-            </div>
             <button
               type="button"
               style={{
@@ -1848,70 +1811,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
             >
               Update from common-input
             </button>
-            <div style={{ fontSize: 12, color: '#475467' }}>Matched WMs for Selected Standard Types</div>
-            <div
-              style={{
-                flex: 1,
-                borderRadius: 12,
-                border: '1px solid #e5e7eb',
-                padding: 12,
-                background: '#fff',
-                minHeight: 120,
-                color: '#94a3b8',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              자동 매칭 결과가 없습니다.
-            </div>
-            <div
-              style={{
-                borderRadius: 16,
-                border: '1px solid #e0f2fe',
-                padding: 16,
-                background: '#fff',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                boxShadow: '0 4px 16px rgba(15,23,42,0.08)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>할당된 Work Master</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: '#475467' }}>
-                    {selectedFamily ? '선택된 패밀리 기준' : '패밀리를 선택하면 목록이 나타납니다.'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => togglePanel('assignments')}
-                    style={{
-                      border: '1px solid #cbd5f5',
-                      background: '#fff',
-                      borderRadius: 8,
-                      padding: '2px 8px',
-                      fontSize: 11,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {collapsedPanels.assignments ? '펼치기' : '접기'}
-                  </button>
-                </div>
-              </div>
-              {!collapsedPanels.assignments && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: 12,
-                  }}
-                >
-                  {renderAssignmentCard('GWM', 'GWM')}
-                  {renderAssignmentCard('SWM', 'SWM')}
-                </div>
-              )}
-            </div>
+            {/* Removed middle-column assigned Work Master panel as requested */}
           </>
         )}
       </div>
