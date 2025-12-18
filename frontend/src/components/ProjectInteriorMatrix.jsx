@@ -138,20 +138,22 @@ const buildSectionsFromStandardItems = (items, projectAbbr = '') => {
       const grandchildren = childrenByParent.get(child.id) || [];
       const derivedGrand = grandchildren.filter((item) => item.derive_from);
       if (!derivedGrand.length) return null;
-      const sortedGrand = [...derivedGrand].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      const enriched = derivedGrand.map((grand) => {
+        const parentName = itemMap.get(grand.derive_from)?.name;
+        const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
+        const childName = (grand.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || grand.name;
+        const label = parentName ? `${parentName}${abbrPart}::${childName}` : grand.name;
+        return {
+          key: `std-${grand.id}`,
+          label,
+          standardItemId: grand.id,
+        };
+      });
+      const sortedGrand = enriched.sort((a, b) => (a.label || '').localeCompare(b.label || ''));
       return {
         id: `std-${child.id}`,
         label: child.name,
-        items: sortedGrand.map((grand) => ({
-          key: `std-${grand.id}`,
-          label: (() => {
-            const parentName = itemMap.get(grand.derive_from)?.name;
-            const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
-            const childName = (grand.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || grand.name;
-            return parentName ? `${parentName}${abbrPart}::${childName}` : grand.name;
-          })(),
-          standardItemId: grand.id,
-        })),
+        items: sortedGrand,
       };
     })
     .filter(Boolean);
