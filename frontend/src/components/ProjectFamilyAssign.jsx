@@ -800,6 +800,18 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     }
   };
 
+  const handleDeleteCartEntry = async (entryId) => {
+    setSavedCartEntries((prev) => prev.filter((entry) => entry.id !== entryId));
+    if (!apiBaseUrl) return;
+    try {
+      await fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      // ignore delete failure
+    }
+  };
+
   const cartTableRows = useMemo(() => {
     const rows = [];
     visibleCartEntries.forEach((entry) => {
@@ -1574,6 +1586,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                   {cartTableRows.map((row, index) => {
                     const formulaValue = row.formula ?? '';
                     const displayGauge = row.gauge && row.gauge !== '—' ? `(${row.gauge})` : '—';
+                    const isFirstOfEntry = index === 0 || cartTableRows[index - 1].entryId !== row.entryId;
                     return (
                     <div
                       key={row.id}
@@ -1613,6 +1626,25 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                           {row.workMasterSummary}
                         </span>
                         <span style={{ color: '#475467' }}>{displayGauge}</span>
+                        {isFirstOfEntry && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCartEntry(row.entryId)}
+                            style={{
+                              marginLeft: 'auto',
+                              border: '1px solid #ef4444',
+                              background: '#fff1f2',
+                              color: '#b91c1c',
+                              borderRadius: 6,
+                              padding: '4px 8px',
+                              fontSize: 10,
+                              cursor: 'pointer',
+                            }}
+                            title="이 장바구니 항목을 삭제"
+                          >
+                            삭제
+                          </button>
+                        )}
                       </div>
                       <div
                         style={{
