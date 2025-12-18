@@ -1007,6 +1007,14 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
 
     const rows = Array.from(grouped.values());
     return rows.sort((a, b) => {
+      const aLabel = (a.revitTypesLabel || '').toLowerCase();
+      const bLabel = (b.revitTypesLabel || '').toLowerCase();
+      if (aLabel !== bLabel) return aLabel < bLabel ? -1 : 1;
+
+      const aItem = (a.itemPath || '').toLowerCase();
+      const bItem = (b.itemPath || '').toLowerCase();
+      if (aItem !== bItem) return aItem < bItem ? -1 : 1;
+
       const aTime = a.createdAt || '';
       const bTime = b.createdAt || '';
       return aTime > bTime ? -1 : aTime < bTime ? 1 : 0;
