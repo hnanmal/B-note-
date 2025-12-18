@@ -333,7 +333,14 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     [revitTypeInput]
   );
 
-  const displayedRevitEntries = savedRevitTypeEntries;
+  const displayedRevitEntries = useMemo(() => {
+    const target = (selectedBuilding?.name || '').trim();
+    if (!target) return savedRevitTypeEntries;
+    return savedRevitTypeEntries.filter((entry) => {
+      const b = (entry?.building_name || '').trim();
+      return !b || b === target;
+    });
+  }, [savedRevitTypeEntries, selectedBuilding?.name]);
 
   const activeRevitIndexClamped = displayedRevitEntries.length
     ? Math.min(activeRevitIndex, displayedRevitEntries.length - 1)
