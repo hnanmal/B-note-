@@ -1428,6 +1428,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           flexDirection: 'column',
           gap: collapsedColumns.middle ? 8 : 12,
           boxShadow: '0 10px 40px rgba(15,23,42,0.05)',
+          overflowY: 'auto',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
