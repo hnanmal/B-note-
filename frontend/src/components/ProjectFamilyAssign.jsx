@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ProjectFamilyListWidget from './ProjectFamilyListWidget';
 import {
   formatCartTimestamp,
@@ -327,6 +327,62 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         : [];
     return names;
   }, [selectedRevitIndexes, displayedRevitEntries, activeRevitType]);
+
+  const cartSignatureByRevitType = useMemo(() => {
+    const bucket = new Map();
+    savedCartEntries.forEach((entry) => {
+      const revitTypes = Array.isArray(entry?.revitTypes) ? entry.revitTypes : [];
+      if (!revitTypes.length) return;
+      const assignmentIds = Array.isArray(entry?.assignmentIds)
+        ? [...entry.assignmentIds].sort((a, b) => a - b)
+        : [];
+      const standardIds = Array.isArray(entry?.standardItemIds)
+        ? [...entry.standardItemIds].sort((a, b) => a - b)
+        : [];
+      const sigPart = `a:${assignmentIds.join(',')}|s:${standardIds.join(',')}|f:${entry?.formula ?? ''}`;
+      revitTypes.forEach((typeName) => {
+        if (!typeName) return;
+        if (!bucket.has(typeName)) bucket.set(typeName, []);
+        bucket.get(typeName).push(sigPart);
+      });
+    });
+    const result = new Map();
+    bucket.forEach((parts, typeName) => {
+      const signature = parts.slice().sort().join(';');
+      result.set(typeName, signature);
+    });
+    return result;
+  }, [savedCartEntries]);
+
+  const handleSelectMatchingRevitTypes = useCallback(() => {
+    const referenceType = currentSelectedRevitTypes[0];
+    if (!referenceType) return;
+    const referenceSignature = cartSignatureByRevitType.get(referenceType);
+    if (!referenceSignature) return;
+    const next = new Set(selectedRevitIndexes.length ? selectedRevitIndexes : [activeRevitIndexClamped]);
+    displayedRevitEntries.forEach((entry, index) => {
+      const sig = cartSignatureByRevitType.get(entry?.type_name);
+      if (sig && sig === referenceSignature) {
+        next.add(index);
+      }
+    });
+    setSelectedRevitIndexes(Array.from(next).sort((a, b) => a - b));
+  }, [currentSelectedRevitTypes, cartSignatureByRevitType, selectedRevitIndexes, activeRevitIndexClamped, displayedRevitEntries]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.key === 's' || event.key === 'S') && !event.ctrlKey && !event.metaKey) {
+        const tagName = event.target?.tagName;
+        if (tagName === 'INPUT' || tagName === 'TEXTAREA' || event.target?.isContentEditable) return;
+        event.preventDefault();
+        handleSelectMatchingRevitTypes();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleSelectMatchingRevitTypes]);
 
 
   useEffect(() => {
