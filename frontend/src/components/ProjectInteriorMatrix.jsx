@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
+const INTERIOR_ITEM_STANDARD_MAP = {
+  'Suspended Ceiling::[DQ] Acoustic T-Bar': 422,
+};
+
+const INTERIOR_ITEM_ASSIGNMENT_MAP = {
+  422: 948,
+};
+
 const SAMPLE_ROOMS = [
   { name: '101_MESS ROOM', building: 'test_building1', std: '0.1' },
   { name: '102_LOBBY', building: 'test_building1', std: '0.1' },
@@ -67,21 +75,216 @@ const SAMPLE_SECTIONS = [
   },
 ];
 
+const normalizeSampleRooms = () => SAMPLE_ROOMS.map((room) => ({
+  key: room.name,
+  label: room.name,
+  building: room.building || '',
+  std: room.std || '',
+}));
+
+const buildSectionsFromSamples = () => SAMPLE_SECTIONS.map((section) => ({
+  id: section.id,
+  label: section.label,
+  items: section.items.map((name) => {
+    const mapKey = `${section.id}::${name}`;
+    return {
+      key: mapKey,
+      label: name,
+      standardItemId: INTERIOR_ITEM_STANDARD_MAP[mapKey] || null,
+    };
+  }),
+}));
+
+const parseRevitRoom = (value) => {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  const parts = raw.split('\t');
+  const hasBuilding = parts.length > 1;
+  const building = hasBuilding ? (parts.shift() || '').trim() : '';
+  const label = (hasBuilding ? parts.join('\t') : raw) || raw;
+  return {
+    key: raw || label,
+    label,
+    building,
+    std: '',
+  };
+};
+
+const buildSectionsFromStandardItems = (items, projectAbbr = '') => {
+  if (!Array.isArray(items)) return [];
+  const swmItems = items.filter((item) => (item?.type || '').toUpperCase() === 'SWM');
+  if (!swmItems.length) return [];
+
+  const itemMap = new Map();
+  swmItems.forEach((item) => itemMap.set(item.id, item));
+
+  const childrenByParent = new Map();
+  swmItems.forEach((item) => {
+    if (!item.parent_id) return;
+    if (!childrenByParent.has(item.parent_id)) {
+      childrenByParent.set(item.parent_id, []);
+    }
+    childrenByParent.get(item.parent_id).push(item);
+  });
+
+  const roomFinishRoots = swmItems.filter(
+    (item) => typeof item.name === 'string' && item.name.toLowerCase().includes('room finish')
+  );
+  const targetRoot = roomFinishRoots.find((item) => !item.parent_id) || roomFinishRoots[0];
+  if (!targetRoot) return [];
+
+  const level1 = childrenByParent.get(targetRoot.id) || [];
+  const sections = level1
+    .map((child) => {
+      const grandchildren = childrenByParent.get(child.id) || [];
+      const derivedGrand = grandchildren.filter((item) => item.derive_from);
+      if (!derivedGrand.length) return null;
+      const sortedGrand = [...derivedGrand].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      return {
+        id: `std-${child.id}`,
+        label: child.name,
+        items: sortedGrand.map((grand) => ({
+          key: `std-${grand.id}`,
+          label: (() => {
+            const parentName = itemMap.get(grand.derive_from)?.name;
+            const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
+            const childName = (grand.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || grand.name;
+            return parentName ? `${parentName}${abbrPart}::${childName}` : grand.name;
+          })(),
+          standardItemId: grand.id,
+        })),
+      };
+    })
+    .filter(Boolean);
+
+  return sections.sort((a, b) => a.label.localeCompare(b.label));
+};
+
 export default function ProjectInteriorMatrix({ apiBaseUrl }) {
-  const [rooms, setRooms] = useState(SAMPLE_ROOMS);
-  const [interiorSections, setInteriorSections] = useState(SAMPLE_SECTIONS);
+  const [rooms, setRooms] = useState(normalizeSampleRooms);
+  const [buildings, setBuildings] = useState([]);
+  const [interiorSections, setInteriorSections] = useState(buildSectionsFromSamples);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [selectionByBuilding, setSelectionByBuilding] = useState({});
+  const [cartEntries, setCartEntries] = useState([]);
+  const [projectAbbr, setProjectAbbr] = useState('');
+  const [standardItems, setStandardItems] = useState([]);
 
   useEffect(() => {
-    if (!apiBaseUrl) return;
-    // TODO: wire to project rooms endpoint when available
+    if (!apiBaseUrl || !apiBaseUrl.includes('/project/')) return undefined;
+    let cancelled = false;
+    fetch(`${apiBaseUrl}/metadata/abbr`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (cancelled) return;
+        setProjectAbbr(payload?.pjt_abbr ?? '');
+      })
+      .catch(() => {
+        if (!cancelled) return;
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [apiBaseUrl]);
 
+  useEffect(() => {
+    if (!apiBaseUrl) return undefined;
+    let cancelled = false;
+    const loadBuildings = async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/building-list/`);
+        if (!res.ok) return;
+        const payload = await res.json();
+        if (cancelled) return;
+        setBuildings(Array.isArray(payload) ? payload : []);
+      } catch (error) {
+        if (cancelled) return;
+        setBuildings([]);
+      }
+    };
+    loadBuildings();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    if (!apiBaseUrl) return undefined;
+    let cancelled = false;
+    const loadCart = async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/workmaster-cart`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const normalized = Array.isArray(data) ? data : [];
+        setCartEntries(normalized);
+        const parsedRooms = [];
+        const seen = new Set();
+        normalized.forEach((entry) => {
+          (entry?.revitTypes || []).forEach((rt) => {
+            const room = parseRevitRoom(rt);
+            if (!seen.has(room.key)) {
+              seen.add(room.key);
+              parsedRooms.push(room);
+            }
+          });
+        });
+        if (parsedRooms.length) {
+          setRooms(parsedRooms);
+        }
+      } catch (error) {
+        // ignore cart fetch errors
+      }
+    };
+    loadCart();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    if (!apiBaseUrl) return undefined;
+    let cancelled = false;
+    const loadStandardItems = async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/standard-items/`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setStandardItems(Array.isArray(data) ? data : []);
+        const built = buildSectionsFromStandardItems(data, projectAbbr);
+        if (built.length) {
+          setInteriorSections(built);
+        }
+      } catch (error) {
+        // fall back to samples on failure
+        if (!cancelled) setInteriorSections(buildSectionsFromSamples());
+      }
+    };
+    loadStandardItems();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, projectAbbr]);
+
+  useEffect(() => {
+    if (!standardItems.length) return;
+    const built = buildSectionsFromStandardItems(standardItems, projectAbbr);
+    if (built.length) {
+      setInteriorSections(built);
+    }
+  }, [standardItems, projectAbbr]);
+
   const buildingOptions = useMemo(() => {
-    const unique = Array.from(new Set(rooms.map((room) => room.building).filter(Boolean)));
-    return unique;
-  }, [rooms]);
+    const set = new Set();
+    buildings.forEach((b) => {
+      if (b?.name) set.add(b.name);
+    });
+    rooms.forEach((room) => {
+      if (room?.building) set.add(room.building);
+    });
+    return Array.from(set);
+  }, [buildings, rooms]);
 
   useEffect(() => {
     if (!selectedBuilding && buildingOptions.length) {
@@ -101,26 +304,82 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     ensureBuildingBucket(selectedBuilding);
   }, [selectedBuilding]);
 
-  const handleToggle = (itemKey, roomName) => {
+  const entryAssignmentIds = (standardItemId) => {
+    const assignmentId = INTERIOR_ITEM_ASSIGNMENT_MAP[standardItemId];
+    return assignmentId ? [assignmentId] : [];
+  };
+
+  const handleToggle = (itemKey, standardItemId, roomKey) => {
     if (!selectedBuilding) return;
+    if (!standardItemId) return;
+
+    const existing = cartEntries.find(
+      (entry) => Array.isArray(entry?.revitTypes) && entry.revitTypes.includes(roomKey)
+        && Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId)
+    );
+
+    const saveEntry = async () => {
+      const payload = {
+        revitTypes: [roomKey],
+        assignmentIds: entryAssignmentIds(standardItemId),
+        standardItemIds: [standardItemId],
+        formula: '=A',
+      };
+      await fetch(`${apiBaseUrl}/workmaster-cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => null);
+    };
+
+    const deleteEntry = async (entryId) => {
+      await fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, { method: 'DELETE' }).catch(() => null);
+    };
+
+    if (existing?.id) {
+      deleteEntry(existing.id).then(() => {
+        setCartEntries((prev) => prev.filter((e) => e.id !== existing.id));
+      });
+    } else {
+      saveEntry().then(() => {
+        setCartEntries((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            revitTypes: [roomKey],
+            assignmentIds: entryAssignmentIds(standardItemId),
+            standardItemIds: [standardItemId],
+            formula: '=A',
+          },
+        ]);
+      });
+    }
+
     setSelectionByBuilding((prev) => {
       const bucket = prev[selectedBuilding] ? new Map(prev[selectedBuilding]) : new Map();
       const roomSet = new Set(bucket.get(itemKey) || []);
-      if (roomSet.has(roomName)) {
-        roomSet.delete(roomName);
+      if (roomSet.has(roomKey)) {
+        roomSet.delete(roomKey);
       } else {
-        roomSet.add(roomName);
+        roomSet.add(roomKey);
       }
       bucket.set(itemKey, roomSet);
       return { ...prev, [selectedBuilding]: bucket };
     });
   };
 
-  const isChecked = (itemKey, roomName) => {
+  const isChecked = (itemKey, standardItemId, roomKey) => {
+    if (!standardItemId) return false;
+    const hasCart = cartEntries.some(
+      (entry) => Array.isArray(entry?.revitTypes) && entry.revitTypes.includes(roomKey)
+        && Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId)
+    );
+    if (hasCart) return true;
+
     const bucket = selectionByBuilding[selectedBuilding];
     if (!bucket) return false;
     const roomSet = bucket.get(itemKey);
-    return roomSet ? roomSet.has(roomName) : false;
+    return roomSet ? roomSet.has(roomKey) : false;
   };
 
   const tableHeaders = useMemo(
@@ -211,7 +470,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                 </th>
                 {tableHeaders.map((room) => (
                   <th
-                    key={room.name}
+                    key={room.key}
                     style={{
                       borderBottom: '1px solid #e2e8f0',
                       fontSize: 12,
@@ -222,9 +481,9 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                     }}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{room.name}</span>
+                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{room.label}</span>
                       <span style={{ fontSize: 11, color: '#475467' }}>{room.building}</span>
-                      <span style={{ fontSize: 11, color: '#94a3b8' }}>Std {room.std}</span>
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>{room.std ? `Std ${room.std}` : ''}</span>
                     </div>
                   </th>
                 ))}
@@ -248,7 +507,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                     </td>
                   </tr>
                   {section.items.map((item) => {
-                    const itemKey = `${section.id}::${item}`;
+                    const itemKey = item.key;
                     return (
                       <tr key={itemKey}>
                         <td
@@ -263,15 +522,15 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {item}
+                          {item.label}
                         </td>
                         {tableHeaders.map((room) => {
-                          const roomKey = room.name;
-                          const checked = isChecked(itemKey, roomKey);
+                          const roomKey = room.key;
+                          const checked = isChecked(itemKey, item.standardItemId, roomKey);
                           return (
                             <td
                               key={`${itemKey}-${roomKey}`}
-                              onDoubleClick={() => handleToggle(itemKey, roomKey)}
+                              onDoubleClick={() => handleToggle(itemKey, item.standardItemId, roomKey)}
                               style={{
                                 borderBottom: '1px solid #f1f5f9',
                                 textAlign: 'center',
