@@ -1991,9 +1991,10 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                               gap: 4,
                               fontSize: 11,
                               color: '#0f172a',
-                              background: index % 2 === 0 ? '#f8fafc' : '#fff',
+                              background: index % 2 === 0 ? '#eef2ff' : '#f8fafc',
                               padding: '8px 10px',
                               borderRadius: 8,
+                              border: '1px solid #e2e8f0',
                             }}
                           >
                             <div
