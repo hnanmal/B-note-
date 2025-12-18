@@ -1051,9 +1051,13 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
   const cartTableRows = useMemo(() => {
     const flatRows = [];
     visibleCartEntries.forEach((entry) => {
-      const assignments = (entry.assignmentIds || [])
+      const explicitAssignments = (entry.assignmentIds || [])
         .map((id) => assignmentById.get(id))
         .filter(Boolean);
+      const fallbackAssignments = !explicitAssignments.length && Array.isArray(entry.standardItemIds)
+        ? familyAssignments.filter((assign) => entry.standardItemIds.includes(assign?.standard_item?.id)).filter(Boolean)
+        : [];
+      const assignments = explicitAssignments.length ? explicitAssignments : fallbackAssignments;
       if (!assignments.length) {
         flatRows.push({
           id: `${entry.id}-empty`,

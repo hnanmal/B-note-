@@ -252,6 +252,17 @@ const normalizeCartEntry = (entry) => ({
   createdAt: entry?.createdAt ?? entry?.created_at ?? null,
 });
 
+const indexAssignmentsByStandardItem = (assignments) => {
+  const map = new Map();
+  assignments.forEach((assignment) => {
+    const stdId = assignment?.standard_item?.id;
+    if (stdId != null && assignment?.id != null && !map.has(stdId)) {
+      map.set(stdId, assignment.id);
+    }
+  });
+  return map;
+};
+
 const mergeCartExtrasIntoSections = (baseSections, cartEntries, standardItems, projectAbbr = '') => {
   const existingIds = new Set();
   baseSections.forEach((section) => {
@@ -299,6 +310,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const [projectAbbr, setProjectAbbr] = useState('');
   const [standardItems, setStandardItems] = useState([]);
   const [roomFamilyId, setRoomFamilyId] = useState(null);
+  const [familyAssignments, setFamilyAssignments] = useState([]);
+  const assignmentIndex = useMemo(() => indexAssignmentsByStandardItem(familyAssignments), [familyAssignments]);
 
   const buildingOptions = useMemo(() => {
     const sorted = [...buildings].sort((a, b) => {
@@ -423,6 +436,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         const roomFamilies = items.filter((item) => typeof item?.name === 'string'
           && item.name.trim().toLowerCase() === 'rooms');
         if (!roomFamilies.length) return;
+        setRoomFamilyId((prev) => prev ?? roomFamilies[0]?.id ?? null);
         const allRooms = [];
         const revitPayloads = await Promise.allSettled(
           roomFamilies
@@ -476,6 +490,27 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
       cancelled = true;
     };
   }, [apiBaseUrl]);
+
+  useEffect(() => {
+    if (!apiBaseUrl || !roomFamilyId) return undefined;
+    let cancelled = false;
+    const loadAssignments = async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/family-list/${roomFamilyId}/assignments`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setFamilyAssignments(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (cancelled) return;
+        setFamilyAssignments([]);
+      }
+    };
+    loadAssignments();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, roomFamilyId]);
 
   useEffect(() => {
     if (!apiBaseUrl) return undefined;
@@ -537,6 +572,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const entryAssignmentIds = (standardItemId) => {
     const mapAssignment = INTERIOR_ITEM_ASSIGNMENT_MAP[standardItemId];
     if (mapAssignment) return [mapAssignment];
+    if (assignmentIndex.has(standardItemId)) return [assignmentIndex.get(standardItemId)];
     const fromCart = cartEntries.find(
       (entry) => Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId)
         && Array.isArray(entry?.assignmentIds) && entry.assignmentIds.length
