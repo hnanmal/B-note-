@@ -1363,8 +1363,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           gap: collapsedColumns.left ? 8 : 12,
           alignItems: collapsedColumns.left ? 'center' : 'stretch',
           minHeight: 0,
-          height: 'calc(100vh - 60px)',
-          maxHeight: 'calc(100vh - 60px)',
+          height: 'calc(100vh - 150px)',
+          maxHeight: 'calc(100vh - 150px)',
           overflowY: 'auto',
         }}
       >
