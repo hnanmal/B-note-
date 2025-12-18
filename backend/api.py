@@ -385,10 +385,12 @@ def _normalize_cart_payload(raw_payload):
     revit_types = raw_payload.get("revitTypes") or raw_payload.get("revit_types") or []
     assignment_ids = raw_payload.get("assignmentIds") or raw_payload.get("assignment_ids") or []
     standard_item_ids = raw_payload.get("standardItemIds") or raw_payload.get("standard_item_ids") or []
+    formula = raw_payload.get("formula")
     return {
         "revit_types": _ensure_list(revit_types),
         "assignment_ids": _ensure_list(assignment_ids),
         "standard_item_ids": _ensure_list(standard_item_ids),
+        "formula": formula,
     }
 
 
@@ -446,6 +448,43 @@ def create_project_workmaster_cart_entry(
     new_id = db.execute(text("SELECT last_insert_rowid()")).scalar()
     created_at = datetime.datetime.fromisoformat(now_iso)
     return schemas.WorkMasterCartEntry(id=new_id, created_at=created_at, **normalized)
+
+
+@router.patch(
+    "/project/{project_identifier}/workmaster-cart/{entry_id}",
+    response_model=schemas.WorkMasterCartEntry,
+    tags=["Project Data"],
+)
+def update_project_workmaster_cart_entry(
+    project_identifier: str,
+    entry_id: int,
+    payload: schemas.WorkMasterCartEntryUpdate,
+    db: Session = Depends(get_project_db_session),
+):
+    row = db.execute(
+        text("SELECT payload, created_at FROM workmaster_cart_entries WHERE id = :entry_id"),
+        {"entry_id": entry_id},
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Cart entry not found")
+    try:
+        current_payload = json.loads(row[0] or "{}")
+    except json.JSONDecodeError:
+        current_payload = {}
+    if payload.formula is not None:
+        current_payload["formula"] = payload.formula
+    normalized = _normalize_cart_payload(current_payload)
+    db.execute(
+        text("UPDATE workmaster_cart_entries SET payload = :payload WHERE id = :entry_id"),
+        {"payload": json.dumps(normalized, ensure_ascii=False), "entry_id": entry_id},
+    )
+    db.commit()
+    created_raw = row[1]
+    try:
+        created_at = datetime.datetime.fromisoformat(created_raw) if created_raw else datetime.datetime.utcnow()
+    except ValueError:
+        created_at = datetime.datetime.utcnow()
+    return schemas.WorkMasterCartEntry(id=entry_id, created_at=created_at, **normalized)
 
 
 @router.delete(

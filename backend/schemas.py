@@ -78,10 +78,15 @@ class WorkMasterCartEntryBase(BaseModel):
     revit_types: List[str]
     assignment_ids: List[int]
     standard_item_ids: List[int]
+    formula: Optional[str] = None
 
 
 class WorkMasterCartEntryCreate(WorkMasterCartEntryBase):
     pass
+
+
+class WorkMasterCartEntryUpdate(BaseModel):
+    formula: Optional[str] = None
 
 
 class WorkMasterCartEntry(WorkMasterCartEntryBase):

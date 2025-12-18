@@ -14,6 +14,7 @@ const normalizeCartEntry = (entry) => ({
   assignmentIds: entry?.assignmentIds ?? entry?.assignment_ids ?? [],
   standardItemIds: entry?.standardItemIds ?? entry?.standard_item_ids ?? [],
   createdAt: entry?.createdAt ?? entry?.created_at ?? new Date().toISOString(),
+  formula: entry?.formula ?? null,
 });
 
 export default function ProjectFamilyAssign({ apiBaseUrl }) {
@@ -402,6 +403,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       setCartStatusMessage('저장할 Revit 타입을 선택하세요.');
       return;
     }
+    const baseFormula = assignmentById.get(selectedAssignmentIds[0])?.formula ?? '';
     const optimisticId = `cart-${Date.now()}`;
     const newEntry = {
       id: optimisticId,
@@ -415,6 +417,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
         )
       ),
       createdAt: new Date().toISOString(),
+      formula: baseFormula,
     };
     setSavedCartEntries((prev) => [newEntry, ...prev]);
     setCartStatusMessage('장바구니 저장 중...');
@@ -432,6 +435,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           revit_types: newEntry.revitTypes,
           assignment_ids: newEntry.assignmentIds,
           standard_item_ids: newEntry.standardItemIds,
+          formula: newEntry.formula,
         }),
       });
       if (!res.ok) throw new Error('save failed');
@@ -780,6 +784,22 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     });
   };
 
+  const handleCartFormulaChange = async (entryId, value) => {
+    setSavedCartEntries((prev) =>
+      prev.map((entry) => (entry.id === entryId ? { ...entry, formula: value } : entry))
+    );
+    if (!apiBaseUrl) return;
+    try {
+      await fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formula: value }),
+      });
+    } catch (error) {
+      // swallow errors; UI already updated
+    }
+  };
+
   const cartTableRows = useMemo(() => {
     const rows = [];
     visibleCartEntries.forEach((entry) => {
@@ -796,15 +816,17 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           workMasterSummary: '—',
           gauge: '—',
           spec: '—',
-          formula: '—',
+          formula: entry.formula ?? '—',
           unit: '—',
           outputType: selectedFamily?.sequence_number ?? '—',
+          entryId: entry.id,
         });
         return;
       }
       assignments.forEach((assignment) => {
         const standardItem = assignment?.standard_item;
         const workMaster = resolveWorkMaster(assignment);
+        const entryFormula = entry.formula ?? assignment.formula ?? '—';
         rows.push({
           id: `${entry.id}-${assignment.id}`,
           revitTypesLabel: entry.revitTypes.join(', '),
@@ -814,9 +836,10 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
           workMasterSummary: buildWorkMasterSummary(workMaster),
           gauge: (workMaster?.gauge ?? '').toUpperCase() || '—',
           spec: workMaster?.add_spec ?? '—',
-          formula: assignment.formula ?? '—',
+          formula: entryFormula,
           unit: buildUnitLabel(workMaster),
           outputType: selectedFamily?.sequence_number ?? '—',
+          entryId: entry.id,
         });
       });
     });
@@ -1535,9 +1558,9 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
               <>
                 <div
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 50px 75px 140px 10px 70px',
-                    gap: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
                     fontSize: 11,
                     fontWeight: 700,
                     color: '#0f172a',
@@ -1545,140 +1568,82 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                     paddingBottom: 6,
                   }}
                 >
-                  <span>Revit Type</span>
-                  <span>분류</span>
-                  <span>Item</span>
-                  <span>Work Master</span>
-                  <span>Gauge</span>
-                  <span>Spec</span>
-                  <span>수식</span>
-                  <span>단위</span>
-                  <span>자세히</span>
+                  <span>Revit / Work Master</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {cartTableRows.map((row, index) => {
-                    const expanded = expandedCartRows.has(row.id);
+                    const formulaValue = row.formula ?? '';
+                    const displayGauge = row.gauge && row.gauge !== '—' ? `(${row.gauge})` : '—';
                     return (
-                      <React.Fragment key={row.id}>
-                        <div
+                    <div
+                      key={row.id}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                        fontSize: 11,
+                        color: '#0f172a',
+                        background: index % 2 === 0 ? '#f8fafc' : '#fff',
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span
                           style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1.2fr 64px 1fr 1.4fr 50px 75px 140px 25px 70px',
-                            gap: 6,
-                            fontSize: 11,
-                            color: '#0f172a',
-                            background: index % 2 === 0 ? '#f8fafc' : '#fff',
-                            padding: '6px 4px',
-                            borderRadius: 8,
-                            alignItems: 'center',
+                            fontWeight: 600,
+                            whiteSpace: 'normal',
                           }}
-                          >
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              whiteSpace: expanded ? 'normal' : 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: expanded ? 'clip' : 'ellipsis',
-                              wordBreak: 'break-word',
-                            }}
-                            title={row.revitTypesLabel}
-                          >
-                            {row.revitTypesLabel}
-                          </span>
-                          <span>{row.type}</span>
-                          <span
-                            style={{
-                              whiteSpace: expanded ? 'normal' : 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: expanded ? 'clip' : 'ellipsis',
-                              wordBreak: 'break-word',
-                            }}
-                            title={row.itemPath}
-                          >
-                            {row.itemPath}
-                          </span>
-                          <span
-                            style={{
-                              whiteSpace: expanded ? 'normal' : 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: expanded ? 'clip' : 'ellipsis',
-                              wordBreak: 'break-word',
-                            }}
-                            title={row.workMasterSummary}
-                          >
-                            {row.workMasterSummary}
-                          </span>
-                          <span>{row.gauge}</span>
-                          <span
-                            style={expanded
-                              ? {
-                                  display: 'block',
-                                  whiteSpace: 'pre-wrap',
-                                  wordBreak: 'break-word',
-                                }
-                              : {
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                  whiteSpace: 'pre-wrap',
-                                  wordBreak: 'break-word',
-                                }}
-                            title={row.spec}
-                          >
-                            {row.spec}
-                          </span>
-                          <span
-                            style={expanded
-                              ? {
-                                  display: 'block',
-                                  whiteSpace: 'pre-wrap',
-                                  wordBreak: 'break-word',
-                                }
-                              : {
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                  whiteSpace: 'pre-wrap',
-                                  wordBreak: 'break-word',
-                                }}
-                            title={row.formula}
-                          >
-                            {row.formula}
-                          </span>
-                          <span>{row.unit}</span>
-                          <button
-                            type="button"
-                            onClick={() => toggleCartRowExpand(row.id)}
-                            style={{
-                              border: '1px solid #cbd5f5',
-                              background: expanded ? '#e0f2fe' : '#fff',
-                              borderRadius: 8,
-                              padding: '4px 6px',
-                              fontSize: 10,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {expanded ? '숨기기' : '자세히'}
-                          </button>
-                        </div>
-                        {expanded && (
-                          <div
-                            style={{
-                              margin: '4px 0 8px',
-                              padding: '8px 10px',
-                              borderRadius: 8,
-                              background: '#eef2ff',
-                              fontSize: 10,
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            <div style={{ color: '#1f2937' }}><strong>Spec:</strong> {row.spec || '—'}</div>
-                            <div style={{ color: '#1f2937' }}><strong>수식:</strong> {row.formula || '—'}</div>
-                          </div>
-                        )}
-                      </React.Fragment>
+                          title={row.revitTypesLabel}
+                        >
+                          {row.revitTypesLabel}
+                        </span>
+                        <span style={{ color: '#475467' }}>{row.type}</span>
+                        <span style={{ color: '#111827', whiteSpace: 'normal' }} title={row.itemPath}>
+                          {row.itemPath}
+                        </span>
+                        <span style={{ color: '#111827', whiteSpace: 'normal' }} title={row.workMasterSummary}>
+                          {row.workMasterSummary}
+                        </span>
+                        <span style={{ color: '#475467' }}>{displayGauge}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          flexWrap: 'wrap',
+                          paddingLeft: 4,
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, whiteSpace: 'pre-wrap' }} title={row.spec}>
+                          {row.spec}
+                        </span>
+                        <input
+                          type="text"
+                          value={formulaValue}
+                          onChange={(event) => handleCartFormulaChange(row.entryId, event.target.value)}
+                          style={{
+                            minWidth: 160,
+                            border: '1px solid #cbd5f5',
+                            borderRadius: 6,
+                            padding: '4px 6px',
+                            fontSize: 11,
+                            color: '#111827',
+                            background: '#fff',
+                          }}
+                          title="수식을 필요에 따라 조정하여 저장합니다 (패밀리 표준 수식은 변경되지 않습니다)"
+                        />
+                        <span style={{ color: '#475467', whiteSpace: 'nowrap' }}>{row.unit}</span>
+                      </div>
+                    </div>
                     );
                   })}
                 </div>
