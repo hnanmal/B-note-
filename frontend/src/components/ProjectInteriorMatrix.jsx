@@ -314,7 +314,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         });
       });
       if (parsedRooms.length) {
-        setRooms(parsedRooms);
+        setRooms((prev) => (prev.length ? prev : parsedRooms));
       }
     } catch (error) {
       // ignore fetch errors
@@ -335,9 +335,9 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
       });
     });
     if (parsedRooms.length) {
-      setRooms(parsedRooms);
+      setRooms((prev) => (prev.length ? prev : parsedRooms));
     }
-  }, [cartEntries, rooms.length]);
+  }, [cartEntries, rooms.length, buildingOptions]);
 
   useEffect(() => {
     if (!apiBaseUrl || !apiBaseUrl.includes('/project/')) return undefined;
