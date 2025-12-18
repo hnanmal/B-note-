@@ -1675,6 +1675,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                         const matchesBuilding = entryBuilding && entryBuilding === selectedBuildingName;
                         const familySet = revitTypesByBuilding.get(entryBuilding || '') || new Set();
                         const hasFamily = matchesBuilding && familySet.has(entry.type_name);
+                        const isHighlighted = isActive || isSelected;
                         return (
                           <div
                             key={entry.id ?? `${entry.type_name}-${index}`}
@@ -1695,12 +1696,15 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                             }}
                           >
                             {(() => {
+                              const baseColor = hasFamily ? '#0f172a' : '#b91c1c';
+                              const color = isHighlighted ? '#2563eb' : baseColor;
+                              const weight = isHighlighted ? 700 : hasFamily ? 500 : 600;
                               return (
                                 <span
                                   style={{
                                     fontSize: 12,
-                                    color: hasFamily ? '#0f172a' : '#b91c1c',
-                                    fontWeight: hasFamily ? 500 : 600,
+                                    color,
+                                    fontWeight: weight,
                                   }}
                                 >
                                   {entry.type_name}

@@ -305,6 +305,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const [buildings, setBuildings] = useState([]);
   const [interiorSections, setInteriorSections] = useState(buildSectionsFromSamples);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [selectedRoomKey, setSelectedRoomKey] = useState(null);
   const [selectionByBuilding, setSelectionByBuilding] = useState({});
   const [cartEntries, setCartEntries] = useState([]);
   const [projectAbbr, setProjectAbbr] = useState('');
@@ -588,6 +589,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     const parsedTarget = parseRevitRoom(roomKey, buildingOptions);
     const targetNorm = normalizeRoomKey(parsedTarget.label || roomKey);
     const targetBuilding = selectedBuilding || parsedTarget.building || '';
+    setSelectedRoomKey(roomKey);
 
     const matchEntry = (entry, { requireBuilding = true } = {}) => {
       const matchesStd = Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId);
@@ -778,25 +780,34 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                 >
                   항목
                 </th>
-                {tableHeaders.map((room) => (
-                  <th
-                    key={`${room.key}__${room.building || 'global'}`}
-                    style={{
-                      borderBottom: '1px solid #e2e8f0',
-                      fontSize: 12,
-                      padding: '8px 10px',
-                      background: '#f8fafc',
-                      textAlign: 'center',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{room.label}</span>
-                      <span style={{ fontSize: 11, color: '#475467' }}>{room.building}</span>
-                      <span style={{ fontSize: 11, color: '#94a3b8' }}>{room.std ? `Std ${room.std}` : ''}</span>
-                    </div>
-                  </th>
-                ))}
+                {tableHeaders.map((room) => {
+                  const isSelected = selectedRoomKey === room.key;
+                  return (
+                    <th
+                      key={`${room.key}__${room.building || 'global'}`}
+                      onClick={() => setSelectedRoomKey(room.key)}
+                      style={{
+                        borderBottom: '1px solid #e2e8f0',
+                        fontSize: 12,
+                        padding: '8px 10px',
+                        background: '#f8fafc',
+                        textAlign: 'center',
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ fontWeight: 700, color: isSelected ? '#2563eb' : '#0f172a' }}>
+                          {room.label}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#475467', fontWeight: isSelected ? 700 : 400 }}>
+                          {room.building}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>{room.std ? `Std ${room.std}` : ''}</span>
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
