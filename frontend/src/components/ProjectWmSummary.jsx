@@ -289,6 +289,32 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
                         <input
                           value={editingSpec}
                           onChange={(e) => setEditingSpec(e.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Enter') return;
+                            if (event.altKey) {
+                              event.preventDefault();
+                              const target = event.target;
+                              if (!(target instanceof HTMLInputElement)) {
+                                setEditingSpec((prev) => `${prev}\n`);
+                                return;
+                              }
+                              const start = target.selectionStart ?? target.value.length;
+                              const end = target.selectionEnd ?? target.value.length;
+                              const nextValue = `${target.value.slice(0, start)}\n${target.value.slice(end)}`;
+                              setEditingSpec(nextValue);
+                              requestAnimationFrame(() => {
+                                try {
+                                  target.selectionStart = start + 1;
+                                  target.selectionEnd = start + 1;
+                                } catch {
+                                  // ignore
+                                }
+                              });
+                              return;
+                            }
+                            event.preventDefault();
+                            saveSpecEdit();
+                          }}
                           style={{
                             flex: 1,
                             border: '1px solid #d1d5db',
