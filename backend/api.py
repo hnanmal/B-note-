@@ -730,6 +730,29 @@ def get_project_work_master_selection_summary(
     return {"rows": rows}
 
 
+@router.get(
+    "/project/{project_identifier}/export/dynamo-json",
+    response_model=schemas.DynamoProjectExportPayload,
+    tags=["Project Data"],
+)
+def export_project_db_for_dynamo(
+    project_identifier: str,
+    db: Session = Depends(get_project_db_session),
+):
+    """Dynamo 테스트를 위한 프로젝트 DB JSON 추출 엔드포인트.
+
+    - 추후에는 "파일 다운로드" 대신 Dynamo가 직접 참조하는 라우터로 사용 가능
+    """
+
+    buildings = crud.list_buildings(db)
+    rows = crud.list_selected_work_master_summary(db)
+    return {
+        "project_identifier": project_identifier,
+        "buildings": buildings,
+        "wm_selection_summary": {"rows": rows},
+    }
+
+
 @router.post(
     "/project/{project_identifier}/standard-items/{standard_item_id}/derive",
     response_model=schemas.StandardItem,

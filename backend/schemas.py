@@ -174,6 +174,16 @@ class WorkMasterSummaryResponse(BaseModel):
     rows: List[WorkMasterSummaryRow] = Field(default_factory=list)
 
 
+class DynamoProjectExportPayload(BaseModel):
+    """Dynamo 테스트용으로 프로젝트 DB 내용을 JSON으로 추출하기 위한 페이로드."""
+
+    exported_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    project_identifier: str
+    buildings: List["BuildingItem"] = Field(default_factory=list)
+    wm_selection_summary: WorkMasterSummaryResponse
+
+
+
 class DerivedStandardItemCreate(BaseModel):
     suffix_description: str
     work_master_id: Optional[int] = None
