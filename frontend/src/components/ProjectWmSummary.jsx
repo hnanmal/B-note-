@@ -18,6 +18,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef(new Map());
   const pendingRestoreRef = useRef(null);
+  const specTextareaRef = useRef(null);
 
   const fetchSummary = useCallback(async () => {
     if (!apiBaseUrl) return;
@@ -66,6 +67,23 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     setEditingWorkMasterId(wmId);
     setEditingSpec((row?.add_spec ?? '').toString());
   }, []);
+
+  useEffect(() => {
+    if (editingWorkMasterId == null) return;
+    if (savingWorkMasterId != null) return;
+    const node = specTextareaRef.current;
+    if (!node) return;
+    requestAnimationFrame(() => {
+      try {
+        node.focus();
+        const len = node.value?.length ?? 0;
+        node.selectionStart = len;
+        node.selectionEnd = len;
+      } catch {
+        // ignore
+      }
+    });
+  }, [editingWorkMasterId, savingWorkMasterId]);
 
   const cancelSpecEdit = useCallback(() => {
     setEditingWorkMasterId(null);
@@ -287,6 +305,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
                     {isEditingSpec ? (
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <textarea
+                          ref={specTextareaRef}
                           value={editingSpec}
                           onChange={(e) => setEditingSpec(e.target.value)}
                           onKeyDown={(event) => {
