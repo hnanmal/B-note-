@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const handleResponse = async (response) => {
   if (response.ok) return response.json();
@@ -15,6 +15,9 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
   const [editingWorkMasterId, setEditingWorkMasterId] = useState(null);
   const [editingSpec, setEditingSpec] = useState('');
   const [savingWorkMasterId, setSavingWorkMasterId] = useState(null);
+  const scrollContainerRef = useRef(null);
+  const rowRefs = useRef(new Map());
+  const pendingRestoreRef = useRef(null);
 
   const fetchSummary = useCallback(async () => {
     if (!apiBaseUrl) return;
@@ -32,6 +35,31 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     }
   }, [apiBaseUrl]);
 
+  useEffect(() => {
+    const pending = pendingRestoreRef.current;
+    if (!pending) return;
+    if (loading) return;
+
+    pendingRestoreRef.current = null;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const restore = () => {
+      if (pending?.workMasterId != null) {
+        const node = rowRefs.current.get(pending.workMasterId);
+        if (node && node.scrollIntoView) {
+          node.scrollIntoView({ block: 'center' });
+          return;
+        }
+      }
+      if (typeof pending?.scrollTop === 'number') {
+        container.scrollTop = pending.scrollTop;
+      }
+    };
+
+    requestAnimationFrame(() => requestAnimationFrame(restore));
+  }, [loading, rows]);
+
   const startSpecEdit = useCallback((row) => {
     const wmId = row?.work_master_id ?? null;
     if (!wmId) return;
@@ -46,6 +74,11 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
 
   const saveSpecEdit = useCallback(async () => {
     if (!apiBaseUrl || !editingWorkMasterId) return;
+    const container = scrollContainerRef.current;
+    pendingRestoreRef.current = {
+      scrollTop: container ? container.scrollTop : 0,
+      workMasterId: editingWorkMasterId,
+    };
     setSavingWorkMasterId(editingWorkMasterId);
     setError(null);
     try {
@@ -192,7 +225,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
           총 <b>{filteredRows.length}</b>건
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 12 }}>
+        <div ref={scrollContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 12 }}>
           <div
             style={{
               display: 'grid',
@@ -232,6 +265,12 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
               return (
                 <div
                   key={`${row?.standard_item_id ?? 'std'}-${row?.work_master_id ?? 'wm'}-${idx}`}
+                  ref={(node) => {
+                    const key = row?.work_master_id;
+                    if (!key) return;
+                    if (node) rowRefs.current.set(key, node);
+                    else rowRefs.current.delete(key);
+                  }}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '52px 160px 64px 70px 240px 1fr 200px 1fr',
