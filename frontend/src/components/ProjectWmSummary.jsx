@@ -14,7 +14,6 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
   const [exporting, setExporting] = useState(false);
-  const [exportingDynamoJson, setExportingDynamoJson] = useState(false);
   const [sortState, setSortState] = useState({ key: null, direction: null });
   const [sortMenu, setSortMenu] = useState({ open: false, key: null, x: 0, y: 0 });
   const [editingWorkMasterId, setEditingWorkMasterId] = useState(null);
@@ -298,39 +297,6 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     }
   }, [exporting, formatWorkMasterDetails, sortedRows]);
 
-  const downloadDynamoJson = useCallback(async () => {
-    if (!apiBaseUrl) return;
-    if (exportingDynamoJson) return;
-    setExportingDynamoJson(true);
-    setError(null);
-    try {
-      const response = await fetch(`${apiBaseUrl}/export/dynamo-json`);
-      const payload = await handleResponse(response);
-      const text = JSON.stringify(payload, null, 2);
-      const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-      const safeProject = (apiBaseUrl.split('/project/')[1] ?? 'project').replace(/[\\/:*?"<>|]+/g, '_');
-      const filename = `dynamo_export_${safeProject}_${stamp}.json`;
-
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Dynamo JSON을 추출하지 못했습니다.';
-      setError(message);
-    } finally {
-      setExportingDynamoJson(false);
-    }
-  }, [apiBaseUrl, exportingDynamoJson]);
-
   const openSortMenu = useCallback((event, key) => {
     event.preventDefault();
     event.stopPropagation();
@@ -386,25 +352,6 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
               outline: 'none',
             }}
           />
-          <button
-            type="button"
-            onClick={downloadDynamoJson}
-            disabled={!apiBaseUrl || loading || exportingDynamoJson}
-            style={{
-              height: 34,
-              padding: '0 14px',
-              borderRadius: 10,
-              border: '1px solid #10b981',
-              background: !apiBaseUrl || loading || exportingDynamoJson ? '#bbf7d0' : '#10b981',
-              color: '#052e16',
-              fontWeight: 800,
-              cursor: !apiBaseUrl || loading || exportingDynamoJson ? 'not-allowed' : 'pointer',
-              fontSize: 12,
-            }}
-            title="프로젝트 DB 내용을 Dynamo 테스트용 JSON으로 다운로드"
-          >
-            {exportingDynamoJson ? 'JSON 생성 중...' : 'Dynamo JSON'}
-          </button>
           <button
             type="button"
             onClick={exportToExcel}
