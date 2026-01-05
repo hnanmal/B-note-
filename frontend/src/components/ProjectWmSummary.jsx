@@ -292,7 +292,24 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
                           onKeyDown={(event) => {
                             if (event.key !== 'Enter') return;
                             if (event.altKey) {
-                              // allow newline insertion in textarea
+                              event.preventDefault();
+                              const target = event.target;
+                              if (!(target instanceof HTMLTextAreaElement)) {
+                                setEditingSpec((prev) => `${prev}\n`);
+                                return;
+                              }
+                              const start = target.selectionStart ?? target.value.length;
+                              const end = target.selectionEnd ?? target.value.length;
+                              const nextValue = `${target.value.slice(0, start)}\n${target.value.slice(end)}`;
+                              setEditingSpec(nextValue);
+                              requestAnimationFrame(() => {
+                                try {
+                                  target.selectionStart = start + 1;
+                                  target.selectionEnd = start + 1;
+                                } catch {
+                                  // ignore
+                                }
+                              });
                               return;
                             }
                             event.preventDefault();
