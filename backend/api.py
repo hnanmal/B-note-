@@ -687,6 +687,19 @@ def select_project_standard_item_work_master(
     return {"selected_work_master_id": result.work_master_id if result else None}
 
 
+@router.get(
+    "/project/{project_identifier}/work-master-selections/summary",
+    response_model=schemas.WorkMasterSummaryResponse,
+    tags=["Project Data"],
+)
+def get_project_work_master_selection_summary(
+    project_identifier: str,
+    db: Session = Depends(get_project_db_session),
+):
+    rows = crud.list_selected_work_master_summary(db)
+    return {"rows": rows}
+
+
 @router.post(
     "/project/{project_identifier}/standard-items/{standard_item_id}/derive",
     response_model=schemas.StandardItem,

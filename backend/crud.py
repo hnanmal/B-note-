@@ -671,6 +671,63 @@ def select_work_master_for_standard_item(
     return selection
 
 
+def _build_standard_item_path(db: Session, item: models.StandardItem) -> str:
+    if not item:
+        return ''
+    parts: List[str] = []
+    current = item
+    visited: set[int] = set()
+    while current is not None:
+        current_id = getattr(current, 'id', None)
+        if current_id is None or current_id in visited:
+            break
+        visited.add(current_id)
+        parts.append((getattr(current, 'name', '') or '').strip())
+        parent_id = getattr(current, 'parent_id', None)
+        if not parent_id:
+            break
+        current = (
+            db.query(models.StandardItem)
+            .filter(models.StandardItem.id == parent_id)
+            .first()
+        )
+    parts = [p for p in reversed(parts) if p]
+    return ' | '.join(parts)
+
+
+def list_selected_work_master_summary(db: Session) -> List[Dict[str, Any]]:
+    selections = (
+        db.query(models.StandardItemWorkMasterSelect)
+        .options(
+            joinedload(models.StandardItemWorkMasterSelect.standard_item).joinedload(models.StandardItem.parent),
+            joinedload(models.StandardItemWorkMasterSelect.work_master),
+        )
+        .order_by(models.StandardItemWorkMasterSelect.id)
+        .all()
+    )
+
+    rows: List[Dict[str, Any]] = []
+    for sel in selections:
+        std = getattr(sel, 'standard_item', None)
+        wm = getattr(sel, 'work_master', None)
+        if not std or not wm:
+            continue
+        rows.append(
+            {
+                'standard_item_id': std.id,
+                'standard_item_name': std.name,
+                'standard_item_type': std.type,
+                'standard_item_path': _build_standard_item_path(db, std),
+                'work_master_id': wm.id,
+                'work_master_code': wm.work_master_code,
+                'gauge': wm.gauge,
+                'uom1': wm.uom1,
+                'add_spec': wm.add_spec,
+            }
+        )
+    return rows
+
+
 def list_buildings(db: Session):
     return db.query(models.BuildingList).order_by(models.BuildingList.name).all()
 

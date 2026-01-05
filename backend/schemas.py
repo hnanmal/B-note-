@@ -132,6 +132,25 @@ class StandardItem(StandardItemBase):
 class StandardItemWorkMasterSelectionRequest(BaseModel):
     work_master_id: Optional[int] = None
 
+
+class WorkMasterSummaryRow(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    standard_item_id: int
+    standard_item_name: str
+    standard_item_type: StandardItemType
+    standard_item_path: str
+
+    work_master_id: int
+    work_master_code: str
+    gauge: Optional[str] = None
+    uom1: Optional[str] = None
+    add_spec: Optional[str] = None
+
+
+class WorkMasterSummaryResponse(BaseModel):
+    rows: List[WorkMasterSummaryRow] = Field(default_factory=list)
+
 class DerivedStandardItemCreate(BaseModel):
     suffix_description: str
     work_master_id: Optional[int] = None
