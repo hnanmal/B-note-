@@ -12,6 +12,9 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
+  const [editingWorkMasterId, setEditingWorkMasterId] = useState(null);
+  const [editingSpec, setEditingSpec] = useState('');
+  const [savingWorkMasterId, setSavingWorkMasterId] = useState(null);
 
   const fetchSummary = useCallback(async () => {
     if (!apiBaseUrl) return;
@@ -28,6 +31,39 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
       setLoading(false);
     }
   }, [apiBaseUrl]);
+
+  const startSpecEdit = useCallback((row) => {
+    const wmId = row?.work_master_id ?? null;
+    if (!wmId) return;
+    setEditingWorkMasterId(wmId);
+    setEditingSpec((row?.add_spec ?? '').toString());
+  }, []);
+
+  const cancelSpecEdit = useCallback(() => {
+    setEditingWorkMasterId(null);
+    setEditingSpec('');
+  }, []);
+
+  const saveSpecEdit = useCallback(async () => {
+    if (!apiBaseUrl || !editingWorkMasterId) return;
+    setSavingWorkMasterId(editingWorkMasterId);
+    setError(null);
+    try {
+      await fetch(`${apiBaseUrl}/work-masters/${editingWorkMasterId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ add_spec: editingSpec }),
+      }).then(handleResponse);
+      setEditingWorkMasterId(null);
+      setEditingSpec('');
+      await fetchSummary();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Spec을 저장하지 못했습니다.';
+      setError(message);
+    } finally {
+      setSavingWorkMasterId(null);
+    }
+  }, [apiBaseUrl, editingSpec, editingWorkMasterId, fetchSummary]);
 
   useEffect(() => {
     fetchSummary();
@@ -192,6 +228,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
               const workMasterText = `${wmCode}${gauge ? ` | ${gauge}` : ''}${formatWorkMasterDetails(row) ? ` | ${formatWorkMasterDetails(row)}` : ''}`;
               const type = `${row?.standard_item_type ?? ''}`;
               const itemPath = row?.standard_item_path ?? '';
+              const isEditingSpec = editingWorkMasterId != null && row?.work_master_id === editingWorkMasterId;
               return (
                 <div
                   key={`${row?.standard_item_id ?? 'std'}-${row?.work_master_id ?? 'wm'}-${idx}`}
@@ -207,7 +244,76 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
                   <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', fontWeight: 700 }}>{wmCode}</div>
                   <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{gauge}</div>
                   <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{unit}</div>
-                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', whiteSpace: 'pre-wrap' }}>{spec}</div>
+                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', whiteSpace: 'pre-wrap' }}>
+                    {isEditingSpec ? (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input
+                          value={editingSpec}
+                          onChange={(e) => setEditingSpec(e.target.value)}
+                          style={{
+                            flex: 1,
+                            border: '1px solid #d1d5db',
+                            borderRadius: 8,
+                            padding: '4px 8px',
+                            fontSize: 11,
+                            minWidth: 0,
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={saveSpecEdit}
+                          disabled={savingWorkMasterId === editingWorkMasterId}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            border: '1px solid #2563eb',
+                            background: savingWorkMasterId === editingWorkMasterId ? '#93c5fd' : '#2563eb',
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: savingWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          저장
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelSpecEdit}
+                          disabled={savingWorkMasterId === editingWorkMasterId}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            border: '1px solid #cbd5f5',
+                            background: '#fff',
+                            color: '#1d4ed8',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: savingWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          취소
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startSpecEdit(row)}
+                        style={{
+                          width: '100%',
+                          border: 'none',
+                          background: 'transparent',
+                          padding: 0,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: 11,
+                          color: '#0f172a',
+                        }}
+                        title="Spec 수정"
+                      >
+                        {spec}
+                      </button>
+                    )}
+                  </div>
                   <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{workMasterText}</div>
                   <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{type}</div>
                   <div style={{ padding: '8px 10px', whiteSpace: 'pre-wrap' }}>{itemPath}</div>
