@@ -59,8 +59,14 @@ def get_work_master_by_work_master_code(db: Session, code: str):
         .first()
     )
 
+
 def get_work_master(db: Session, work_master_id: int):
-    return db.query(models.WorkMaster).filter(models.WorkMaster.id == work_master_id).first()
+    return (
+        db.query(models.WorkMaster)
+        .filter(models.WorkMaster.id == work_master_id)
+        .first()
+    )
+
 
 def _next_available_gauge(used: set[str]) -> Optional[str]:
     for letter in ascii_uppercase:
@@ -68,11 +74,11 @@ def _next_available_gauge(used: set[str]) -> Optional[str]:
             return letter
     return None
 
+
 _WORK_MASTER_COPY_COLUMNS = [
-    column.name
-    for column in models.WorkMaster.__table__.columns
-    if column.name != 'id'
+    column.name for column in models.WorkMaster.__table__.columns if column.name != "id"
 ]
+
 
 def update_work_master_fields(
     db: Session,
@@ -95,6 +101,7 @@ def create_work_master(db: Session, work_master: schemas.WorkMasterCreate):
     db.refresh(db_work_master)
     return db_work_master
 
+
 def duplicate_work_master_with_gauge(db: Session, work_master_id: int):
     work_master = get_work_master(db, work_master_id)
     if not work_master:
@@ -102,7 +109,7 @@ def duplicate_work_master_with_gauge(db: Session, work_master_id: int):
 
     base_code = work_master.work_master_code
     if not base_code:
-        raise ValueError('유효한 WorkMaster 코드를 찾을 수 없습니다.')
+        raise ValueError("유효한 WorkMaster 코드를 찾을 수 없습니다.")
 
     related = (
         db.query(models.WorkMaster)
@@ -112,14 +119,14 @@ def duplicate_work_master_with_gauge(db: Session, work_master_id: int):
 
     assigned_letters: set[str] = set()
     for entry in related:
-        letter = (entry.gauge or '').strip().upper()
+        letter = (entry.gauge or "").strip().upper()
         if len(letter) == 1 and letter in ascii_uppercase:
             assigned_letters.add(letter)
 
     if not work_master.gauge or not isinstance(work_master.gauge, str):
         available = _next_available_gauge(assigned_letters)
         if not available:
-            raise ValueError('더 이상 게이지를 추가할 수 없습니다.')
+            raise ValueError("더 이상 게이지를 추가할 수 없습니다.")
         work_master.gauge = available
         assigned_letters.add(available)
     else:
@@ -127,11 +134,13 @@ def duplicate_work_master_with_gauge(db: Session, work_master_id: int):
 
     next_letter = _next_available_gauge(assigned_letters)
     if not next_letter:
-        raise ValueError('더 이상 게이지를 추가할 수 없습니다.')
+        raise ValueError("더 이상 게이지를 추가할 수 없습니다.")
 
-    copy_attrs = {column: getattr(work_master, column) for column in _WORK_MASTER_COPY_COLUMNS}
-    copy_attrs['work_master_code'] = base_code
-    copy_attrs['gauge'] = next_letter
+    copy_attrs = {
+        column: getattr(work_master, column) for column in _WORK_MASTER_COPY_COLUMNS
+    }
+    copy_attrs["work_master_code"] = base_code
+    copy_attrs["gauge"] = next_letter
     new_work_master = models.WorkMaster(**copy_attrs)
     db.add(work_master)
     db.add(new_work_master)
@@ -146,6 +155,7 @@ def duplicate_work_master_with_gauge(db: Session, work_master_id: int):
     db.refresh(new_work_master)
     return new_work_master
 
+
 def remove_work_master_gauge(db: Session, work_master_id: int):
     work_master = get_work_master(db, work_master_id)
     if not work_master:
@@ -153,7 +163,7 @@ def remove_work_master_gauge(db: Session, work_master_id: int):
 
     code = work_master.work_master_code
     if not code:
-        raise ValueError('유효한 WorkMaster 코드를 찾을 수 없습니다.')
+        raise ValueError("유효한 WorkMaster 코드를 찾을 수 없습니다.")
 
     db.execute(
         delete(models.StandardItemWorkMasterSelect).where(
@@ -162,7 +172,8 @@ def remove_work_master_gauge(db: Session, work_master_id: int):
     )
     db.execute(
         models.standard_item_work_master_association.delete().where(
-            models.standard_item_work_master_association.c.work_master_id == work_master_id
+            models.standard_item_work_master_association.c.work_master_id
+            == work_master_id
         )
     )
     db.delete(work_master)
@@ -178,8 +189,8 @@ def remove_work_master_gauge(db: Session, work_master_id: int):
         return []
 
     def gauge_sort_key(entry: models.WorkMaster):
-        gauge_str = (entry.gauge or '').strip()
-        return (gauge_str == '', gauge_str)
+        gauge_str = (entry.gauge or "").strip()
+        return (gauge_str == "", gauge_str)
 
     sorted_remaining = sorted(remaining, key=gauge_sort_key)
     if len(sorted_remaining) <= 1:
@@ -281,10 +292,11 @@ def get_standard_items(
         _attach_standard_item_selection(item)
     return items
 
+
 def _attach_standard_item_selection(item: Optional[models.StandardItem]):
     if not item:
         return item
-    assoc = getattr(item, 'selected_work_master_assoc', None)
+    assoc = getattr(item, "selected_work_master_assoc", None)
     item.selected_work_master_id = assoc.work_master_id if assoc else None
     return item
 
@@ -313,7 +325,7 @@ def create_derived_standard_item(
     parent = get_standard_item(db, parent_id)
     if not parent:
         return None
-    cleaned_suffix = (suffix_description or '').strip()
+    cleaned_suffix = (suffix_description or "").strip()
     if not cleaned_suffix:
         return None
     derived_item = models.StandardItem(
@@ -326,9 +338,7 @@ def create_derived_standard_item(
     db.commit()
     db.refresh(derived_item)
     if work_master_id is not None:
-        assign_work_master_to_standard_item(
-            db, derived_item.id, work_master_id
-        )
+        assign_work_master_to_standard_item(db, derived_item.id, work_master_id)
         select_work_master_for_standard_item(db, derived_item.id, work_master_id)
     _copy_family_assignments_from_parent(db, parent_id, derived_item.id)
     db.refresh(derived_item)
@@ -405,7 +415,10 @@ def _normalize_sequence_value(value: Optional[str]):
 
 
 def _sync_family_calc_codes_on_sequence_change(
-    db: Session, family_item_id: int, old_sequence: Optional[str], new_sequence: Optional[str]
+    db: Session,
+    family_item_id: int,
+    old_sequence: Optional[str],
+    new_sequence: Optional[str],
 ):
     if not old_sequence or old_sequence == new_sequence:
         return
@@ -415,7 +428,7 @@ def _sync_family_calc_codes_on_sequence_change(
             models.CalcDictionaryEntry.family_list_id == family_item_id,
             models.CalcDictionaryEntry.calc_code == old_sequence,
         )
-        .update({'calc_code': new_sequence}, synchronize_session=False)
+        .update({"calc_code": new_sequence}, synchronize_session=False)
     )
 
 
@@ -447,12 +460,18 @@ def update_family_item(db: Session, item_id: int, updates: schemas.FamilyListUpd
         return None
     old_sequence = _normalize_sequence_value(db_item.sequence_number)
     data = updates.dict(exclude_none=True)
-    sequence_is_modified = 'sequence_number' in data
+    sequence_is_modified = "sequence_number" in data
     for key, value in data.items():
         setattr(db_item, key, value)
-    new_sequence = _normalize_sequence_value(db_item.sequence_number) if sequence_is_modified else old_sequence
+    new_sequence = (
+        _normalize_sequence_value(db_item.sequence_number)
+        if sequence_is_modified
+        else old_sequence
+    )
     if sequence_is_modified:
-        _sync_family_calc_codes_on_sequence_change(db, item_id, old_sequence, new_sequence)
+        _sync_family_calc_codes_on_sequence_change(
+            db, item_id, old_sequence, new_sequence
+        )
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
@@ -493,8 +512,12 @@ def replace_family_revit_types(db: Session, family_item_id: int, entries: List[d
         if not type_name:
             continue
         building_name_raw = entry.get("building_name")
-        building_name = building_name_raw.strip() if isinstance(building_name_raw, str) else None
-        normalized_entries.append({"type_name": type_name, "building_name": building_name})
+        building_name = (
+            building_name_raw.strip() if isinstance(building_name_raw, str) else None
+        )
+        normalized_entries.append(
+            {"type_name": type_name, "building_name": building_name}
+        )
 
     (
         db.query(models.FamilyRevitType)
@@ -649,7 +672,9 @@ def select_work_master_for_standard_item(
         return None
     selection = (
         db.query(models.StandardItemWorkMasterSelect)
-        .filter(models.StandardItemWorkMasterSelect.standard_item_id == standard_item_id)
+        .filter(
+            models.StandardItemWorkMasterSelect.standard_item_id == standard_item_id
+        )
         .first()
     )
     if work_master_id is None:
@@ -673,17 +698,17 @@ def select_work_master_for_standard_item(
 
 def _build_standard_item_path(db: Session, item: models.StandardItem) -> str:
     if not item:
-        return ''
+        return ""
     parts: List[str] = []
     current = item
     visited: set[int] = set()
     while current is not None:
-        current_id = getattr(current, 'id', None)
+        current_id = getattr(current, "id", None)
         if current_id is None or current_id in visited:
             break
         visited.add(current_id)
-        parts.append((getattr(current, 'name', '') or '').strip())
-        parent_id = getattr(current, 'parent_id', None)
+        parts.append((getattr(current, "name", "") or "").strip())
+        parent_id = getattr(current, "parent_id", None)
         if not parent_id:
             break
         current = (
@@ -692,39 +717,76 @@ def _build_standard_item_path(db: Session, item: models.StandardItem) -> str:
             .first()
         )
     parts = [p for p in reversed(parts) if p]
-    return ' | '.join(parts)
+    return " | ".join(parts)
 
 
 def list_selected_work_master_summary(db: Session) -> List[Dict[str, Any]]:
     selections = (
         db.query(models.StandardItemWorkMasterSelect)
         .options(
-            joinedload(models.StandardItemWorkMasterSelect.standard_item).joinedload(models.StandardItem.parent),
+            joinedload(models.StandardItemWorkMasterSelect.standard_item).joinedload(
+                models.StandardItem.parent
+            ),
             joinedload(models.StandardItemWorkMasterSelect.work_master),
         )
-        .order_by(models.StandardItemWorkMasterSelect.id)
         .all()
     )
 
     rows: List[Dict[str, Any]] = []
     for sel in selections:
-        std = getattr(sel, 'standard_item', None)
-        wm = getattr(sel, 'work_master', None)
+        std = getattr(sel, "standard_item", None)
+        wm = getattr(sel, "work_master", None)
         if not std or not wm:
             continue
         rows.append(
             {
-                'standard_item_id': std.id,
-                'standard_item_name': std.name,
-                'standard_item_type': std.type,
-                'standard_item_path': _build_standard_item_path(db, std),
-                'work_master_id': wm.id,
-                'work_master_code': wm.work_master_code,
-                'gauge': wm.gauge,
-                'uom1': wm.uom1,
-                'add_spec': wm.add_spec,
+                "standard_item_id": std.id,
+                "standard_item_name": std.name,
+                "standard_item_type": std.type,
+                "standard_item_path": _build_standard_item_path(db, std),
+                "work_master_id": wm.id,
+                "work_master_code": wm.work_master_code,
+                "discipline": wm.discipline,
+                "cat_large_code": wm.cat_large_code,
+                "cat_large_desc": wm.cat_large_desc,
+                "cat_mid_code": wm.cat_mid_code,
+                "cat_mid_desc": wm.cat_mid_desc,
+                "cat_small_code": wm.cat_small_code,
+                "cat_small_desc": wm.cat_small_desc,
+                "attr1_code": wm.attr1_code,
+                "attr1_spec": wm.attr1_spec,
+                "attr2_code": wm.attr2_code,
+                "attr2_spec": wm.attr2_spec,
+                "attr3_code": wm.attr3_code,
+                "attr3_spec": wm.attr3_spec,
+                "attr4_code": wm.attr4_code,
+                "attr4_spec": wm.attr4_spec,
+                "attr5_code": wm.attr5_code,
+                "attr5_spec": wm.attr5_spec,
+                "attr6_code": wm.attr6_code,
+                "attr6_spec": wm.attr6_spec,
+                "uom1": wm.uom1,
+                "uom2": wm.uom2,
+                "work_group_code": wm.work_group_code,
+                "new_old_code": wm.new_old_code,
+                "gauge": wm.gauge,
+                "add_spec": wm.add_spec,
             }
         )
+
+    def _gauge_key(value: Any):
+        g = (value or "").strip().upper()
+        if not g:
+            return (1, "")
+        return (0, g)
+
+    rows.sort(
+        key=lambda r: (
+            (r.get("work_master_code") or ""),
+            _gauge_key(r.get("gauge")),
+            r.get("standard_item_path") or "",
+        )
+    )
     return rows
 
 
@@ -741,7 +803,11 @@ def create_building(db: Session, building: schemas.BuildingCreate):
 
 
 def delete_building(db: Session, building_id: int):
-    building = db.query(models.BuildingList).filter(models.BuildingList.id == building_id).first()
+    building = (
+        db.query(models.BuildingList)
+        .filter(models.BuildingList.id == building_id)
+        .first()
+    )
     if not building:
         return None
     db.delete(building)
@@ -767,9 +833,8 @@ def _collect_standard_item_tree_ids(db: Session, roots: List[int]):
                 stack.append(child_id)
     return collected
 
-def create_gwm_family_assignment(
-    db: Session, family_id: int, standard_item_id: int
-):
+
+def create_gwm_family_assignment(db: Session, family_id: int, standard_item_id: int):
     existing = (
         db.query(models.GwmFamilyAssign)
         .filter(
@@ -813,8 +878,8 @@ def replace_gwm_family_assignments(
         current_assignments = list_gwm_family_assignments(db, family_id=family_id)
         existing_metadata = {
             assignment.standard_item_id: {
-                'formula': assignment.formula,
-                'description': assignment.description,
+                "formula": assignment.formula,
+                "description": assignment.description,
             }
             for assignment in current_assignments
         }
@@ -836,8 +901,8 @@ def replace_gwm_family_assignments(
             standard_item_id=std_id,
             assigned_at=now,
             created_at=now,
-            formula=existing_metadata.get(std_id, {}).get('formula'),
-            description=existing_metadata.get(std_id, {}).get('description'),
+            formula=existing_metadata.get(std_id, {}).get("formula"),
+            description=existing_metadata.get(std_id, {}).get("description"),
         )
         for std_id in expanded_ids
     ]

@@ -31,7 +31,9 @@ def get_project_db_session(project_identifier: str):
         f"sqlite:///{db_path.as_posix()}",
         connect_args={"check_same_thread": False},
     )
-    ProjectSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=project_engine)
+    ProjectSessionLocal = sessionmaker(
+        autocommit=False, autoflush=False, bind=project_engine
+    )
     db = ProjectSessionLocal()
     try:
         yield db
@@ -204,7 +206,9 @@ def update_work_master(
     payload = updates.dict(exclude_unset=True)
     if not payload:
         return db_work_master
-    return crud.update_work_master_fields(db, db_work_master=db_work_master, updates=payload)
+    return crud.update_work_master_fields(
+        db, db_work_master=db_work_master, updates=payload
+    )
 
 
 @router.get(
@@ -313,7 +317,9 @@ def update_project_work_master(
     payload = updates.dict(exclude_unset=True)
     if not payload:
         return db_work_master
-    return crud.update_work_master_fields(db, db_work_master=db_work_master, updates=payload)
+    return crud.update_work_master_fields(
+        db, db_work_master=db_work_master, updates=payload
+    )
 
 
 @router.get(
@@ -346,7 +352,9 @@ def add_project_work_master_gauge(
     if not db_work_master:
         raise HTTPException(status_code=404, detail="WorkMaster not found")
     try:
-        new_work_master = crud.duplicate_work_master_with_gauge(db, work_master_id=work_master_id)
+        new_work_master = crud.duplicate_work_master_with_gauge(
+            db, work_master_id=work_master_id
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if not new_work_master:
@@ -383,9 +391,15 @@ def _normalize_cart_payload(raw_payload):
         return value if isinstance(value, list) else []
 
     revit_types = raw_payload.get("revitTypes") or raw_payload.get("revit_types") or []
-    assignment_ids = raw_payload.get("assignmentIds") or raw_payload.get("assignment_ids") or []
-    standard_item_ids = raw_payload.get("standardItemIds") or raw_payload.get("standard_item_ids") or []
-    building_names = raw_payload.get("buildingNames") or raw_payload.get("building_names") or []
+    assignment_ids = (
+        raw_payload.get("assignmentIds") or raw_payload.get("assignment_ids") or []
+    )
+    standard_item_ids = (
+        raw_payload.get("standardItemIds") or raw_payload.get("standard_item_ids") or []
+    )
+    building_names = (
+        raw_payload.get("buildingNames") or raw_payload.get("building_names") or []
+    )
     formula = raw_payload.get("formula")
     return {
         "revit_types": _ensure_list(revit_types),
@@ -406,7 +420,9 @@ def read_project_workmaster_cart(
     db: Session = Depends(get_project_db_session),
 ):
     rows = db.execute(
-        text("SELECT id, payload, created_at FROM workmaster_cart_entries ORDER BY id DESC")
+        text(
+            "SELECT id, payload, created_at FROM workmaster_cart_entries ORDER BY id DESC"
+        )
     ).fetchall()
     entries: List[schemas.WorkMasterCartEntry] = []
     for row in rows:
@@ -417,7 +433,11 @@ def read_project_workmaster_cart(
         normalized = _normalize_cart_payload(payload)
         created_raw = row[2]
         try:
-            created_at = datetime.datetime.fromisoformat(created_raw) if created_raw else datetime.datetime.utcnow()
+            created_at = (
+                datetime.datetime.fromisoformat(created_raw)
+                if created_raw
+                else datetime.datetime.utcnow()
+            )
         except ValueError:
             created_at = datetime.datetime.utcnow()
         entries.append(
@@ -443,7 +463,9 @@ def create_project_workmaster_cart_entry(
     normalized = _normalize_cart_payload(payload.model_dump())
     now_iso = datetime.datetime.utcnow().isoformat()
     db.execute(
-        text("INSERT INTO workmaster_cart_entries (payload, created_at) VALUES (:payload, :created_at)"),
+        text(
+            "INSERT INTO workmaster_cart_entries (payload, created_at) VALUES (:payload, :created_at)"
+        ),
         {"payload": json.dumps(normalized, ensure_ascii=False), "created_at": now_iso},
     )
     db.commit()
@@ -464,7 +486,9 @@ def update_project_workmaster_cart_entry(
     db: Session = Depends(get_project_db_session),
 ):
     row = db.execute(
-        text("SELECT payload, created_at FROM workmaster_cart_entries WHERE id = :entry_id"),
+        text(
+            "SELECT payload, created_at FROM workmaster_cart_entries WHERE id = :entry_id"
+        ),
         {"entry_id": entry_id},
     ).fetchone()
     if not row:
@@ -477,13 +501,19 @@ def update_project_workmaster_cart_entry(
         current_payload["formula"] = payload.formula
     normalized = _normalize_cart_payload(current_payload)
     db.execute(
-        text("UPDATE workmaster_cart_entries SET payload = :payload WHERE id = :entry_id"),
+        text(
+            "UPDATE workmaster_cart_entries SET payload = :payload WHERE id = :entry_id"
+        ),
         {"payload": json.dumps(normalized, ensure_ascii=False), "entry_id": entry_id},
     )
     db.commit()
     created_raw = row[1]
     try:
-        created_at = datetime.datetime.fromisoformat(created_raw) if created_raw else datetime.datetime.utcnow()
+        created_at = (
+            datetime.datetime.fromisoformat(created_raw)
+            if created_raw
+            else datetime.datetime.utcnow()
+        )
     except ValueError:
         created_at = datetime.datetime.utcnow()
     return schemas.WorkMasterCartEntry(id=entry_id, created_at=created_at, **normalized)
@@ -798,7 +828,8 @@ def create_project_building(
     if existing:
         raise HTTPException(status_code=409, detail="Building already exists")
     return crud.create_building(db=db, building=building)
-    
+
+
 @router.get(
     "/project/{project_identifier}/metadata/abbr",
     response_model=schemas.ProjectMetadata,
@@ -1014,7 +1045,11 @@ def read_calc_dictionary_index(db: Session = Depends(get_db)):
     response_model=schemas.CalcDictionaryEntry,
     tags=["Calc Dictionary"],
 )
-def update_calc_dictionary_entry(entry_id: int, payload: schemas.CalcDictionaryEntryUpdate, db: Session = Depends(get_db)):
+def update_calc_dictionary_entry(
+    entry_id: int,
+    payload: schemas.CalcDictionaryEntryUpdate,
+    db: Session = Depends(get_db),
+):
     entry = crud.get_calc_dictionary_entry(db, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
@@ -1230,7 +1265,9 @@ def read_project_family_list(
     tags=["Project Data"],
 )
 def create_project_family_list_item(
-    project_identifier: str, item: schemas.FamilyListCreate, db: Session = Depends(get_project_db_session)
+    project_identifier: str,
+    item: schemas.FamilyListCreate,
+    db: Session = Depends(get_project_db_session),
 ):
     return crud.create_family_item(db, item)
 

@@ -143,18 +143,40 @@ class WorkMasterSummaryRow(BaseModel):
 
     work_master_id: int
     work_master_code: str
-    gauge: Optional[str] = None
+    discipline: Optional[str] = None
+    cat_large_code: Optional[str] = None
+    cat_large_desc: Optional[str] = None
+    cat_mid_code: Optional[str] = None
+    cat_mid_desc: Optional[str] = None
+    cat_small_code: Optional[str] = None
+    cat_small_desc: Optional[str] = None
+    attr1_code: Optional[str] = None
+    attr1_spec: Optional[str] = None
+    attr2_code: Optional[str] = None
+    attr2_spec: Optional[str] = None
+    attr3_code: Optional[str] = None
+    attr3_spec: Optional[str] = None
+    attr4_code: Optional[str] = None
+    attr4_spec: Optional[str] = None
+    attr5_code: Optional[str] = None
+    attr5_spec: Optional[str] = None
+    attr6_code: Optional[str] = None
+    attr6_spec: Optional[str] = None
     uom1: Optional[str] = None
+    uom2: Optional[str] = None
+    work_group_code: Optional[str] = None
+    new_old_code: Optional[str] = None
+    gauge: Optional[str] = None
     add_spec: Optional[str] = None
 
 
 class WorkMasterSummaryResponse(BaseModel):
     rows: List[WorkMasterSummaryRow] = Field(default_factory=list)
 
+
 class DerivedStandardItemCreate(BaseModel):
     suffix_description: str
     work_master_id: Optional[int] = None
-
 
 
 class _FamilyListWithoutRelations(BaseModel):

@@ -52,6 +52,32 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     });
   }, [query, rows]);
 
+  const formatWorkMasterDetails = useCallback((row) => {
+    const parts = [];
+    const add = (label, value) => {
+      const v = (value ?? '').toString().trim();
+      if (!v) return;
+      parts.push(`${label}=${v}`);
+    };
+
+    add('Discipline', row?.discipline);
+    add('Large', [row?.cat_large_code, row?.cat_large_desc].filter(Boolean).join(' '));
+    add('Mid', [row?.cat_mid_code, row?.cat_mid_desc].filter(Boolean).join(' '));
+    add('Small', [row?.cat_small_code, row?.cat_small_desc].filter(Boolean).join(' '));
+    add('Attr1', [row?.attr1_code, row?.attr1_spec].filter(Boolean).join(' '));
+    add('Attr2', [row?.attr2_code, row?.attr2_spec].filter(Boolean).join(' '));
+    add('Attr3', [row?.attr3_code, row?.attr3_spec].filter(Boolean).join(' '));
+    add('Attr4', [row?.attr4_code, row?.attr4_spec].filter(Boolean).join(' '));
+    add('Attr5', [row?.attr5_code, row?.attr5_spec].filter(Boolean).join(' '));
+    add('Attr6', [row?.attr6_code, row?.attr6_spec].filter(Boolean).join(' '));
+    add('UOM1', row?.uom1);
+    add('UOM2', row?.uom2);
+    add('Group', row?.work_group_code);
+    add('New/Old', row?.new_old_code);
+
+    return parts.join(' | ');
+  }, []);
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
       <div
@@ -163,7 +189,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
               const gauge = row?.gauge ?? '';
               const unit = row?.uom1 ?? '';
               const spec = row?.add_spec ?? '';
-              const workMasterText = `${wmCode}${gauge ? ` | ${gauge}` : ''}${spec ? ` | ${spec}` : ''}`;
+              const workMasterText = `${wmCode}${gauge ? ` | ${gauge}` : ''}${formatWorkMasterDetails(row) ? ` | ${formatWorkMasterDetails(row)}` : ''}`;
               const type = `${row?.standard_item_type ?? ''}`;
               const itemPath = row?.standard_item_path ?? '';
               return (
