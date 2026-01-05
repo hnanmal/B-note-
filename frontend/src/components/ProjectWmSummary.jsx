@@ -286,35 +286,19 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
                   <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', whiteSpace: 'pre-wrap' }}>
                     {isEditingSpec ? (
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <input
+                        <textarea
                           value={editingSpec}
                           onChange={(e) => setEditingSpec(e.target.value)}
                           onKeyDown={(event) => {
                             if (event.key !== 'Enter') return;
                             if (event.altKey) {
-                              event.preventDefault();
-                              const target = event.target;
-                              if (!(target instanceof HTMLInputElement)) {
-                                setEditingSpec((prev) => `${prev}\n`);
-                                return;
-                              }
-                              const start = target.selectionStart ?? target.value.length;
-                              const end = target.selectionEnd ?? target.value.length;
-                              const nextValue = `${target.value.slice(0, start)}\n${target.value.slice(end)}`;
-                              setEditingSpec(nextValue);
-                              requestAnimationFrame(() => {
-                                try {
-                                  target.selectionStart = start + 1;
-                                  target.selectionEnd = start + 1;
-                                } catch {
-                                  // ignore
-                                }
-                              });
+                              // allow newline insertion in textarea
                               return;
                             }
                             event.preventDefault();
                             saveSpecEdit();
                           }}
+                          rows={3}
                           style={{
                             flex: 1,
                             border: '1px solid #d1d5db',
@@ -322,6 +306,8 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
                             padding: '4px 8px',
                             fontSize: 11,
                             minWidth: 0,
+                            resize: 'vertical',
+                            lineHeight: 1.35,
                           }}
                         />
                         <button
