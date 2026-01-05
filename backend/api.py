@@ -745,12 +745,29 @@ def export_project_db_for_dynamo(
     """
 
     buildings = crud.list_buildings(db)
-    rows = crud.list_selected_work_master_summary(db)
+    cart_entries = read_project_workmaster_cart(project_identifier=project_identifier, db=db)
     return {
         "project_identifier": project_identifier,
         "buildings": buildings,
-        "wm_selection_summary": {"rows": rows},
+        "workmaster_cart_entries": cart_entries,
     }
+
+
+@router.get(
+    "/project/{project_identifier}/export/db-json",
+    response_model=schemas.DynamoProjectExportPayload,
+    tags=["Project Data"],
+)
+def export_project_db_json(
+    project_identifier: str,
+    db: Session = Depends(get_project_db_session),
+):
+    """Compatibility alias for the Dynamo JSON export.
+
+    Frontend uses `/export/db-json` for the Dynamo download button.
+    """
+
+    return export_project_db_for_dynamo(project_identifier=project_identifier, db=db)
 
 
 @router.post(

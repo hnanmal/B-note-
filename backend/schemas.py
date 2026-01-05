@@ -180,7 +180,8 @@ class DynamoProjectExportPayload(BaseModel):
     exported_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     project_identifier: str
     buildings: List["BuildingItem"] = Field(default_factory=list)
-    wm_selection_summary: WorkMasterSummaryResponse
+    workmaster_cart_entries: List[WorkMasterCartEntry] = Field(default_factory=list)
+    wm_selection_summary: Optional[WorkMasterSummaryResponse] = None
 
 
 
