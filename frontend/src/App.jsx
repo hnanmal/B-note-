@@ -54,6 +54,46 @@ function App() {
   const projectApiBase = isProjectEditorRoute
     ? `${API_BASE_URL}/project/${encodeURIComponent(projectRouteIdentifier)}`
     : API_BASE_URL;
+
+  const [exportingDynamoJson, setExportingDynamoJson] = useState(false);
+  const downloadDynamoJson = useCallback(async () => {
+    if (!isProjectEditorRoute || !projectRouteIdentifier) return;
+    if (!projectApiBase) return;
+    if (exportingDynamoJson) return;
+
+    setExportingDynamoJson(true);
+    try {
+      const response = await fetch(`${projectApiBase}/export/db-json`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.detail || body?.message || 'Dynamo JSON을 추출하지 못했습니다.';
+        throw new Error(message);
+      }
+      const payload = await response.json();
+      const text = JSON.stringify(payload, null, 2);
+      const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const safeProject = (projectRouteIdentifier ?? 'project').replace(/[\\/:*?"<>|]+/g, '_');
+      const filename = `dynamo_export_${safeProject}_${stamp}.json`;
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Dynamo JSON을 추출하지 못했습니다.';
+      alert(message);
+    } finally {
+      setExportingDynamoJson(false);
+    }
+  }, [exportingDynamoJson, isProjectEditorRoute, projectApiBase, projectRouteIdentifier]);
   const navLabelOverrides = {
     workmaster: isProjectEditorRoute ? '프로젝트 워크마스터 매니저' : '워크마스터 매니저',
     matching: isProjectEditorRoute ? '프로젝트 Standard Matching' : 'Team Standard Matching',
@@ -219,7 +259,30 @@ function App() {
   return (
     <div className="App" style={{ height: 'calc(100vh - 1rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
       <header className="App-header-fixed" style={headerStyle}>
-        <div className="app-title">{headerTitle}</div>
+        <div className="app-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span>{headerTitle}</span>
+          {isProjectEditorRoute && projectRouteIdentifier ? (
+            <button
+              type="button"
+              onClick={downloadDynamoJson}
+              disabled={!projectApiBase || exportingDynamoJson}
+              style={{
+                height: 28,
+                padding: '0 10px',
+                borderRadius: 10,
+                border: '1px solid #10b981',
+                background: !projectApiBase || exportingDynamoJson ? '#bbf7d0' : '#10b981',
+                color: '#052e16',
+                fontWeight: 800,
+                cursor: !projectApiBase || exportingDynamoJson ? 'not-allowed' : 'pointer',
+                fontSize: 12,
+              }}
+              title="프로젝트 DB 내용을 Dynamo 테스트용 JSON으로 다운로드"
+            >
+              {exportingDynamoJson ? 'JSON 생성 중...' : 'Dynamo JSON'}
+            </button>
+          ) : null}
+        </div>
       </header>
   <div style={{ height: 10 }} />
       <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100% - 38px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
