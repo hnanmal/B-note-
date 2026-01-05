@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 
 const handleResponse = async (response) => {
   if (response.ok) return response.json();
@@ -12,6 +13,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
+  const [exporting, setExporting] = useState(false);
   const [editingWorkMasterId, setEditingWorkMasterId] = useState(null);
   const [editingSpec, setEditingSpec] = useState('');
   const [savingWorkMasterId, setSavingWorkMasterId] = useState(null);
@@ -165,6 +167,56 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     return parts.join(' | ');
   }, []);
 
+  const exportToExcel = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const headers = ['No', 'WM Code', 'Gauge', 'Unit', 'Spec', 'Work Master', 'Type', 'Item Path'];
+      const aoa = [headers];
+
+      filteredRows.forEach((row, idx) => {
+        const wmCode = row?.work_master_code ?? '';
+        const gauge = row?.gauge ?? '';
+        const unit = row?.uom1 ?? '';
+        const spec = row?.add_spec ?? '';
+        const workMasterText = `${wmCode}${gauge ? ` | ${gauge}` : ''}${formatWorkMasterDetails(row) ? ` | ${formatWorkMasterDetails(row)}` : ''}`;
+        const type = `${row?.standard_item_type ?? ''}`;
+        const itemPath = row?.standard_item_path ?? '';
+
+        aoa.push([idx + 1, wmCode, gauge, unit, spec, workMasterText, type, itemPath]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [
+        { wch: 6 },
+        { wch: 16 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 34 },
+        { wch: 90 },
+        { wch: 18 },
+        { wch: 80 },
+      ];
+      ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'WM Summary');
+
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const filename = `WM_Summary_${stamp}.xlsx`;
+
+      XLSX.writeFile(wb, filename, { compression: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '엑셀 파일 생성 중 오류가 발생했습니다.';
+      setError(message);
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, filteredRows, formatWorkMasterDetails]);
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
       <div
@@ -203,6 +255,25 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
               outline: 'none',
             }}
           />
+          <button
+            type="button"
+            onClick={exportToExcel}
+            disabled={loading || exporting || filteredRows.length === 0}
+            style={{
+              height: 34,
+              padding: '0 14px',
+              borderRadius: 10,
+              border: '1px solid #0ea5e9',
+              background: loading || exporting || filteredRows.length === 0 ? '#bae6fd' : '#0ea5e9',
+              color: '#083344',
+              fontWeight: 800,
+              cursor: loading || exporting || filteredRows.length === 0 ? 'not-allowed' : 'pointer',
+              fontSize: 12,
+            }}
+            title="현재 화면(검색 필터 적용 결과)을 엑셀로 저장"
+          >
+            {exporting ? '엑셀 생성 중...' : '엑셀(.xlsx)'}
+          </button>
           <button
             type="button"
             onClick={fetchSummary}
