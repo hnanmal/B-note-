@@ -14,6 +14,8 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [sortState, setSortState] = useState({ key: null, direction: null });
+  const [sortMenu, setSortMenu] = useState({ open: false, key: null, x: 0, y: 0 });
   const [editingWorkMasterId, setEditingWorkMasterId] = useState(null);
   const [editingSpec, setEditingSpec] = useState('');
   const [savingWorkMasterId, setSavingWorkMasterId] = useState(null);
@@ -21,6 +23,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
   const rowRefs = useRef(new Map());
   const pendingRestoreRef = useRef(null);
   const specTextareaRef = useRef(null);
+  const sortMenuRef = useRef(null);
 
   const fetchSummary = useCallback(async () => {
     if (!apiBaseUrl) return;
@@ -86,6 +89,28 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
       }
     });
   }, [editingWorkMasterId, savingWorkMasterId]);
+
+  useEffect(() => {
+    if (!sortMenu.open) return;
+    const handleKey = (event) => {
+      if (event.key === 'Escape') {
+        setSortMenu({ open: false, key: null, x: 0, y: 0 });
+      }
+    };
+    const handlePointer = (event) => {
+      const node = sortMenuRef.current;
+      if (!node) return;
+      if (node.contains(event.target)) return;
+      setSortMenu({ open: false, key: null, x: 0, y: 0 });
+    };
+
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('mousedown', handlePointer);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('mousedown', handlePointer);
+    };
+  }, [sortMenu.open]);
 
   const cancelSpecEdit = useCallback(() => {
     setEditingWorkMasterId(null);
@@ -167,6 +192,61 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     return parts.join(' | ');
   }, []);
 
+  const sortedRows = useMemo(() => {
+    const { key, direction } = sortState || {};
+    if (!key || !direction) return filteredRows;
+
+    const dir = direction === 'desc' ? -1 : 1;
+    const normalize = (v) => (v ?? '').toString().trim();
+    const normalizeLower = (v) => normalize(v).toLowerCase();
+    const cmpStr = (a, b) => normalizeLower(a).localeCompare(normalizeLower(b), 'en', { numeric: true, sensitivity: 'base' });
+    const cmpMaybeNumber = (a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      const aIsNum = Number.isFinite(na) && normalize(a) !== '';
+      const bIsNum = Number.isFinite(nb) && normalize(b) !== '';
+      if (aIsNum && bIsNum) return na - nb;
+      return cmpStr(a, b);
+    };
+
+    const getVal = (row) => {
+      switch (key) {
+        case 'no':
+          return row?._rowIndex ?? 0;
+        case 'work_master_code':
+          return row?.work_master_code;
+        case 'gauge':
+          return row?.gauge;
+        case 'uom1':
+          return row?.uom1;
+        case 'add_spec':
+          return row?.add_spec;
+        case 'work_master':
+          return `${row?.work_master_code ?? ''} ${row?.gauge ?? ''} ${formatWorkMasterDetails(row)}`;
+        case 'standard_item_type':
+          return row?.standard_item_type;
+        case 'standard_item_path':
+          return row?.standard_item_path;
+        default:
+          return '';
+      }
+    };
+
+    const indexed = filteredRows.map((r, idx) => ({ ...r, _rowIndex: idx + 1 }));
+    indexed.sort((a, b) => {
+      const av = getVal(a);
+      const bv = getVal(b);
+
+      let c = 0;
+      if (key === 'no') c = cmpMaybeNumber(av, bv);
+      else c = cmpStr(av, bv);
+
+      if (c !== 0) return c * dir;
+      return (a._rowIndex - b._rowIndex) * dir;
+    });
+    return indexed;
+  }, [filteredRows, formatWorkMasterDetails, sortState]);
+
   const exportToExcel = useCallback(async () => {
     if (exporting) return;
     setExporting(true);
@@ -175,7 +255,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
       const headers = ['No', 'WM Code', 'Gauge', 'Unit', 'Spec', 'Work Master', 'Type', 'Item Path'];
       const aoa = [headers];
 
-      filteredRows.forEach((row, idx) => {
+      sortedRows.forEach((row, idx) => {
         const wmCode = row?.work_master_code ?? '';
         const gauge = row?.gauge ?? '';
         const unit = row?.uom1 ?? '';
@@ -215,7 +295,24 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     } finally {
       setExporting(false);
     }
-  }, [exporting, filteredRows, formatWorkMasterDetails]);
+  }, [exporting, formatWorkMasterDetails, sortedRows]);
+
+  const openSortMenu = useCallback((event, key) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setSortMenu({ open: true, key, x: rect.left, y: rect.bottom + 6 });
+  }, []);
+
+  const applySort = useCallback((key, direction) => {
+    setSortState({ key, direction });
+    setSortMenu({ open: false, key: null, x: 0, y: 0 });
+  }, []);
+
+  const clearSort = useCallback(() => {
+    setSortState({ key: null, direction: null });
+    setSortMenu({ open: false, key: null, x: 0, y: 0 });
+  }, []);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
@@ -258,16 +355,16 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
           <button
             type="button"
             onClick={exportToExcel}
-            disabled={loading || exporting || filteredRows.length === 0}
+            disabled={loading || exporting || sortedRows.length === 0}
             style={{
               height: 34,
               padding: '0 14px',
               borderRadius: 10,
               border: '1px solid #0ea5e9',
-              background: loading || exporting || filteredRows.length === 0 ? '#bae6fd' : '#0ea5e9',
+              background: loading || exporting || sortedRows.length === 0 ? '#bae6fd' : '#0ea5e9',
               color: '#083344',
               fontWeight: 800,
-              cursor: loading || exporting || filteredRows.length === 0 ? 'not-allowed' : 'pointer',
+              cursor: loading || exporting || sortedRows.length === 0 ? 'not-allowed' : 'pointer',
               fontSize: 12,
             }}
             title="현재 화면(검색 필터 적용 결과)을 엑셀로 저장"
@@ -311,7 +408,12 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
         {error ? <div style={{ fontSize: 12, color: '#b91c1c' }}>{error}</div> : null}
 
         <div style={{ fontSize: 12, color: '#475569' }}>
-          총 <b>{filteredRows.length}</b>건
+          총 <b>{sortedRows.length}</b>건
+          {sortState?.key && sortState?.direction ? (
+            <span style={{ marginLeft: 8, color: '#64748b' }}>
+              (정렬: {sortState.key} {sortState.direction === 'asc' ? '▲' : '▼'})
+            </span>
+          ) : null}
         </div>
 
         <div ref={scrollContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 12 }}>
@@ -330,19 +432,121 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
               color: '#334155',
             }}
           >
-            {['No', 'WM Code', 'Gauge', 'Unit', 'Spec', 'Work Master', 'Type', 'Item Path'].map((label) => (
-              <div key={label} style={{ padding: '8px 10px', borderRight: '1px solid #e5e7eb' }}>
-                {label}
-              </div>
-            ))}
+            {[
+              { label: 'No', key: 'no' },
+              { label: 'WM Code', key: 'work_master_code' },
+              { label: 'Gauge', key: 'gauge' },
+              { label: 'Unit', key: 'uom1' },
+              { label: 'Spec', key: 'add_spec' },
+              { label: 'Work Master', key: 'work_master' },
+              { label: 'Type', key: 'standard_item_type' },
+              { label: 'Item Path', key: 'standard_item_path' },
+            ].map((col) => {
+              const active = sortState?.key === col.key;
+              const arrow = active ? (sortState.direction === 'asc' ? ' ▲' : sortState.direction === 'desc' ? ' ▼' : '') : '';
+              return (
+                <button
+                  key={col.key}
+                  type="button"
+                  onClick={(e) => openSortMenu(e, col.key)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRight: '1px solid #e5e7eb',
+                    background: 'transparent',
+                    border: 'none',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: '#334155',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                  title="정렬 옵션"
+                >
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{col.label}{arrow}</span>
+                  <span style={{ color: '#94a3b8' }}>▾</span>
+                </button>
+              );
+            })}
           </div>
+
+          {sortMenu.open ? (
+            <div
+              ref={sortMenuRef}
+              style={{
+                position: 'fixed',
+                top: sortMenu.y,
+                left: sortMenu.x,
+                zIndex: 50,
+                background: '#fff',
+                border: '1px solid #e2e8f0',
+                borderRadius: 12,
+                boxShadow: '0 12px 28px rgba(15,23,42,0.16)',
+                padding: 6,
+                width: 180,
+                fontSize: 12,
+              }}
+            >
+              <div style={{ padding: '6px 8px', color: '#0f172a', fontWeight: 800 }}>정렬</div>
+              <button
+                type="button"
+                onClick={() => applySort(sortMenu.key, 'asc')}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#f8fafc',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  marginBottom: 4,
+                }}
+              >
+                오름차순 (A→Z)
+              </button>
+              <button
+                type="button"
+                onClick={() => applySort(sortMenu.key, 'desc')}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#f8fafc',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  marginBottom: 6,
+                }}
+              >
+                내림차순 (Z→A)
+              </button>
+              <button
+                type="button"
+                onClick={clearSort}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: '1px solid #e2e8f0',
+                  background: '#fff',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  color: '#334155',
+                }}
+              >
+                정렬 해제
+              </button>
+            </div>
+          ) : null}
 
           {loading ? (
             <div style={{ padding: 14, fontSize: 12, color: '#475467' }}>데이터를 불러오는 중입니다...</div>
-          ) : filteredRows.length === 0 ? (
+          ) : sortedRows.length === 0 ? (
             <div style={{ padding: 14, fontSize: 12, color: '#475467' }}>표시할 데이터가 없습니다.</div>
           ) : (
-            filteredRows.map((row, idx) => {
+            sortedRows.map((row, idx) => {
               const wmCode = row?.work_master_code ?? '';
               const gauge = row?.gauge ?? '';
               const unit = row?.uom1 ?? '';
