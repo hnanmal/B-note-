@@ -242,6 +242,9 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
   const [newCalcSymbolValue, setNewCalcSymbolValue] = useState('');
   const [newCalcCodeInput, setNewCalcCodeInput] = useState('');
   const [creatingCalcEntry, setCreatingCalcEntry] = useState(false);
+  const [presetCalcEntries, setPresetCalcEntries] = useState([]);
+  const [presetCalcLoading, setPresetCalcLoading] = useState(false);
+  const [selectedPresetCalcId, setSelectedPresetCalcId] = useState('');
   const [editingCalcEntryId, setEditingCalcEntryId] = useState(null);
   const [copiedCalcEntries, setCopiedCalcEntries] = useState([]);
   const [copiedFromSequence, setCopiedFromSequence] = useState('');
@@ -773,6 +776,33 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
     [selectedFamilyNode]
   );
 
+  const loadPresetCalcDictionary = useCallback(async (signal) => {
+    if (!isProjectContext) return;
+    setPresetCalcLoading(true);
+    try {
+      const response = await fetch(`${apiBaseUrl}/calc-dictionary`, signal ? { signal } : undefined);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = payload?.detail || payload?.message || '프리셋 Calc Dictionary를 불러오지 못했습니다.';
+        throw new Error(message);
+      }
+      const list = Array.isArray(payload) ? payload : [];
+      const presets = list
+        .filter((entry) => {
+          const code = safeString(entry?.calc_code).trim();
+          if (code !== '프리셋') return false;
+          const familyId = entry?.family_list_id;
+          return familyId === null || typeof familyId === 'undefined';
+        })
+        .sort((a, b) => safeString(a?.symbol_key).localeCompare(safeString(b?.symbol_key)));
+      setPresetCalcEntries(presets);
+    } catch {
+      setPresetCalcEntries([]);
+    } finally {
+      setPresetCalcLoading(false);
+    }
+  }, [apiBaseUrl, isProjectContext]);
+
   const isFamilySelected = selectedFamilyNode?.item_type === 'FAMILY';
   const cleanedCalcCode = (selectedFamilyNode?.sequence_number ?? '').trim();
   const sequenceContainsUnderscore = cleanedCalcCode.includes('_');
@@ -796,6 +826,13 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
     loadCalcDictionary(controller.signal);
     return () => controller.abort();
   }, [isCalcDictionaryAllowed, loadCalcDictionary]);
+
+  useEffect(() => {
+    if (!isProjectContext || !isCalcPanelOpen) return;
+    const controller = new AbortController();
+    loadPresetCalcDictionary(controller.signal);
+    return () => controller.abort();
+  }, [isCalcPanelOpen, isProjectContext, loadPresetCalcDictionary]);
   const isEditingCalcEntry = Boolean(editingCalcEntryId);
   const checkboxSelectionCount = selectedStdItems.size;
   const assignmentModeInfoText = assignmentMode
@@ -1173,6 +1210,52 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
         : 'Calc Dictionary 항목이 추가되었습니다.';
       setStatus({ type: 'success', message: successMessage });
       resetCalcEntryForm();
+      await loadCalcDictionary();
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        setCalcDictionaryError(error.message);
+      }
+    } finally {
+      setCreatingCalcEntry(false);
+    }
+  };
+
+  const handleCreateCalcEntryFromPreset = async () => {
+    if (!selectedFamilyNode || selectedFamilyNode.item_type !== 'FAMILY') return;
+    if (!isCalcDictionaryAllowed) {
+      setCalcDictionaryError('Sequence 번호에 언더바가 포함된 항목에서는 Calc Dictionary를 사용할 수 없습니다.');
+      return;
+    }
+    const presetId = Number(selectedPresetCalcId);
+    if (!Number.isFinite(presetId) || presetId <= 0) {
+      setCalcDictionaryError('프리셋 항목을 선택하세요.');
+      return;
+    }
+    const preset = presetCalcEntries.find((entry) => Number(entry?.id) === presetId);
+    const symbolKey = safeString(preset?.symbol_key).trim();
+    const symbolValue = safeString(preset?.symbol_value).trim();
+    if (!symbolKey || !symbolValue) {
+      setCalcDictionaryError('선택한 프리셋 항목이 올바르지 않습니다.');
+      return;
+    }
+    setCalcDictionaryError(null);
+    setCreatingCalcEntry(true);
+    try {
+      const payload = { symbol_key: symbolKey, symbol_value: symbolValue };
+      const trimmedCalcCode = newCalcCodeInput.trim();
+      if (trimmedCalcCode) payload.calc_code = trimmedCalcCode;
+      const response = await fetch(`${apiBaseUrl}/family-list/${selectedFamilyNode.id}/calc-dictionary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.detail || body?.message || '프리셋 항목을 추가하지 못했습니다.';
+        throw new Error(message);
+      }
+      setStatus({ type: 'success', message: '프리셋 Calc Dictionary 항목이 추가되었습니다.' });
+      setSelectedPresetCalcId('');
       await loadCalcDictionary();
     } catch (error) {
       if (error.name !== 'AbortError') {
@@ -2606,6 +2689,34 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
                     onChange={(e) => setNewCalcSymbolValue(e.target.value)}
                     style={{ flex: '1 1 180px', padding: 6, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 160 }}
                   />
+                  {isProjectContext && (
+                    <select
+                      value={selectedPresetCalcId}
+                      onChange={(event) => setSelectedPresetCalcId(event.target.value)}
+                      disabled={presetCalcLoading || creatingCalcEntry}
+                      style={{
+                        flex: '1 1 220px',
+                        padding: 6,
+                        borderRadius: 6,
+                        border: '1px solid #d1d5db',
+                        minWidth: 220,
+                        fontSize: 12,
+                        color: presetCalcLoading ? '#94a3b8' : '#0f172a',
+                      }}
+                    >
+                      <option value="">프리셋 선택{presetCalcLoading ? ' (로딩...)' : ''}</option>
+                      {presetCalcEntries.map((entry) => {
+                        const key = safeString(entry?.symbol_key).trim();
+                        const value = safeString(entry?.symbol_value).trim();
+                        const label = [key, value].filter(Boolean).join(' = ');
+                        return (
+                          <option key={entry.id} value={entry.id}>
+                            {label || `ID ${entry.id}`}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
                   <button
                     type="submit"
                     disabled={creatingCalcEntry || !newCalcSymbolKey.trim() || !newCalcSymbolValue.trim()}
@@ -2625,6 +2736,24 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
                       ? '수정 저장'
                       : '새 항목 추가'}
                   </button>
+                  {isProjectContext && (
+                    <button
+                      type="button"
+                      onClick={handleCreateCalcEntryFromPreset}
+                      disabled={creatingCalcEntry || !selectedPresetCalcId}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        border: '1px solid #cbd5f5',
+                        background: creatingCalcEntry || !selectedPresetCalcId ? '#e2e8f0' : '#fff',
+                        color: creatingCalcEntry || !selectedPresetCalcId ? '#94a3b8' : '#0f172a',
+                        fontSize: 12,
+                        cursor: creatingCalcEntry || !selectedPresetCalcId ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      프리셋에서 추가
+                    </button>
+                  )}
                   {isEditingCalcEntry && (
                     <button
                       type="button"
