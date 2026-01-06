@@ -1535,7 +1535,9 @@ def delete_project_calc_dictionary_entry(
     entry = crud.get_calc_dictionary_entry(db, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
-    updated = crud.update_calc_dictionary_entry(db, entry_id=entry_id, updates={"is_deleted": 1})
+    updated = crud.update_calc_dictionary_entry(
+        db, entry_id=entry_id, updates={"is_deleted": 1}
+    )
     if not updated:
         raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
     return {"message": "deleted", "id": entry_id}

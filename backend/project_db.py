@@ -227,7 +227,9 @@ def ensure_extra_tables(db_path: Path) -> None:
 
             family_notnull = int(notnull_by_name.get("family_list_id", 0) or 0)
             if family_notnull == 1:
-                cursor.execute("ALTER TABLE calc_dictionary RENAME TO calc_dictionary_old")
+                cursor.execute(
+                    "ALTER TABLE calc_dictionary RENAME TO calc_dictionary_old"
+                )
                 cursor.execute(
                     """
                     CREATE TABLE calc_dictionary (
@@ -246,7 +248,9 @@ def ensure_extra_tables(db_path: Path) -> None:
                 old_cols = cursor.fetchall()
                 old_names = {row[1] for row in old_cols}
                 calc_code_expr = "calc_code" if "calc_code" in old_names else "NULL"
-                is_deleted_expr = "COALESCE(is_deleted, 0)" if "is_deleted" in old_names else "0"
+                is_deleted_expr = (
+                    "COALESCE(is_deleted, 0)" if "is_deleted" in old_names else "0"
+                )
                 cursor.execute(
                     f"""
                     INSERT INTO calc_dictionary (id, family_list_id, calc_code, symbol_key, symbol_value, is_deleted, created_at)
@@ -256,7 +260,9 @@ def ensure_extra_tables(db_path: Path) -> None:
                 )
                 cursor.execute("DROP TABLE calc_dictionary_old")
 
-            cursor.execute("UPDATE calc_dictionary SET is_deleted = 0 WHERE is_deleted IS NULL")
+            cursor.execute(
+                "UPDATE calc_dictionary SET is_deleted = 0 WHERE is_deleted IS NULL"
+            )
             cursor.execute(
                 "UPDATE calc_dictionary SET is_deleted = 1 WHERE is_deleted = 0 AND calc_code IS NULL"
             )

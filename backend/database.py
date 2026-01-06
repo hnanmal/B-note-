@@ -64,7 +64,9 @@ def ensure_calc_dictionary_columns(engine):
         notnull_by_name = {col[1]: col[3] for col in columns}
         family_notnull = int(notnull_by_name.get("family_list_id", 0) or 0)
         if family_notnull == 1:
-            conn.execute(text("ALTER TABLE calc_dictionary RENAME TO calc_dictionary_old"))
+            conn.execute(
+                text("ALTER TABLE calc_dictionary RENAME TO calc_dictionary_old")
+            )
             conn.execute(
                 text(
                     """
@@ -81,10 +83,14 @@ def ensure_calc_dictionary_columns(engine):
                     """
                 )
             )
-            old_cols = conn.execute(text("PRAGMA table_info('calc_dictionary_old')")).fetchall()
+            old_cols = conn.execute(
+                text("PRAGMA table_info('calc_dictionary_old')")
+            ).fetchall()
             old_names = {col[1] for col in old_cols}
             calc_code_expr = "calc_code" if "calc_code" in old_names else "NULL"
-            is_deleted_expr = "COALESCE(is_deleted, 0)" if "is_deleted" in old_names else "0"
+            is_deleted_expr = (
+                "COALESCE(is_deleted, 0)" if "is_deleted" in old_names else "0"
+            )
             conn.execute(
                 text(
                     f"""
@@ -97,7 +103,9 @@ def ensure_calc_dictionary_columns(engine):
             conn.execute(text("DROP TABLE calc_dictionary_old"))
 
         # Normalize is_deleted values and keep legacy behavior: NULL calc_code rows were treated as deleted.
-        conn.execute(text("UPDATE calc_dictionary SET is_deleted = 0 WHERE is_deleted IS NULL"))
+        conn.execute(
+            text("UPDATE calc_dictionary SET is_deleted = 0 WHERE is_deleted IS NULL")
+        )
         conn.execute(
             text(
                 "UPDATE calc_dictionary SET is_deleted = 1 WHERE is_deleted = 0 AND calc_code IS NULL"
@@ -142,7 +150,7 @@ def ensure_work_master_columns(engine):
         if "gauge" not in column_names:
             conn.execute(text("ALTER TABLE work_masters ADD COLUMN gauge TEXT"))
         indexes = conn.execute(text("PRAGMA index_list('work_masters')")).fetchall()
-        if any(idx[1] == 'ix_work_masters_work_master_code' for idx in indexes):
+        if any(idx[1] == "ix_work_masters_work_master_code" for idx in indexes):
             conn.execute(text("DROP INDEX IF EXISTS ix_work_masters_work_master_code"))
 
 
@@ -150,18 +158,24 @@ def ensure_standard_item_columns(engine):
     """Ensure legacy standard_items tables have the derive_from column."""
     with engine.connect() as conn:
         try:
-            columns = conn.execute(text("PRAGMA table_info('standard_items')")).fetchall()
+            columns = conn.execute(
+                text("PRAGMA table_info('standard_items')")
+            ).fetchall()
         except OperationalError:
             return
         column_names = [col[1] for col in columns]
-        if 'derive_from' not in column_names:
-            conn.execute(text("ALTER TABLE standard_items ADD COLUMN derive_from INTEGER"))
+        if "derive_from" not in column_names:
+            conn.execute(
+                text("ALTER TABLE standard_items ADD COLUMN derive_from INTEGER")
+            )
 
 
 def ensure_family_revit_type_columns(engine):
     with engine.connect() as conn:
         try:
-            columns = conn.execute(text("PRAGMA table_info('family_revit_type')")).fetchall()
+            columns = conn.execute(
+                text("PRAGMA table_info('family_revit_type')")
+            ).fetchall()
         except OperationalError:
             columns = []
         column_names = [col[1] for col in columns]
@@ -180,5 +194,7 @@ def ensure_family_revit_type_columns(engine):
                 )
             )
             return
-        if 'building_name' not in column_names:
-            conn.execute(text("ALTER TABLE family_revit_type ADD COLUMN building_name TEXT"))
+        if "building_name" not in column_names:
+            conn.execute(
+                text("ALTER TABLE family_revit_type ADD COLUMN building_name TEXT")
+            )

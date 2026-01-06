@@ -54,7 +54,7 @@ function App() {
   const [addingCalcEntry, setAddingCalcEntry] = useState(false);
   const [newCalcEntryValues, setNewCalcEntryValues] = useState({
     family_list_id: '',
-    calc_code: '',
+    calc_code: '프리셋',
     symbol_key: '',
     symbol_value: '',
   });
@@ -292,9 +292,13 @@ function App() {
     try {
       const familyIdRaw = newCalcEntryValues.family_list_id;
       const familyId = Number(familyIdRaw);
+      const hasFamily = Number.isFinite(familyId) && familyId > 0;
+      const nextCalcCodeRaw = newCalcEntryValues.calc_code.trim();
       const payload = {
-        family_list_id: Number.isFinite(familyId) && familyId > 0 ? familyId : null,
-        calc_code: newCalcEntryValues.calc_code.trim() ? newCalcEntryValues.calc_code.trim() : null,
+        family_list_id: hasFamily ? familyId : null,
+        calc_code: hasFamily
+          ? (nextCalcCodeRaw ? nextCalcCodeRaw : null)
+          : (nextCalcCodeRaw ? nextCalcCodeRaw : '프리셋'),
         symbol_key: symbolKey,
         symbol_value: symbolValue,
       };
@@ -309,7 +313,7 @@ function App() {
         throw new Error(message);
       }
       await response.json();
-      setNewCalcEntryValues({ family_list_id: '', calc_code: '', symbol_key: '', symbol_value: '' });
+      setNewCalcEntryValues({ family_list_id: '', calc_code: '프리셋', symbol_key: '', symbol_value: '' });
       await fetchCalcDictionaryIndex();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Calc Dictionary 항목을 추가하지 못했습니다.';
@@ -904,7 +908,7 @@ function App() {
                             setNewCalcEntryValues((prev) => ({
                               ...prev,
                               family_list_id: nextId,
-                              calc_code: nextCalcCode,
+                              calc_code: nextId ? nextCalcCode : '프리셋',
                             }));
                           }}
                           disabled={familyListIndexLoading || addingCalcEntry}
