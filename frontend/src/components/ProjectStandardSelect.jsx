@@ -602,13 +602,6 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     const codeLine = workMaster.work_master_code ? `코드 ${workMaster.work_master_code}` : '코드 정보 없음';
     const gaugeValue = (workMaster.gauge ?? '').trim().toUpperCase();
     const isPrechecked = precheckedWorkMasterIds.has(Number(workMaster.id));
-    const codeTags = [
-      workMaster.cat_large_code,
-      workMaster.cat_mid_code,
-      workMaster.cat_small_code,
-    ]
-      .filter(Boolean)
-      .join(' / ');
 
     const specValue = workMasterSpecs[workMaster.id] ?? workMaster.add_spec ?? '';
     const isSpecSaving = Boolean(workMasterSpecSaving[workMaster.id]);
@@ -655,9 +648,12 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{headline}</div>
         </div>
         {categoryLabel && <div style={{ fontSize: 12, color: '#475467' }}>{categoryLabel}</div>}
-        {codeTags && <div style={{ fontSize: 11, color: '#7c3aed' }}>{codeTags}</div>}
-        {attrSummary && <div style={{ fontSize: 12, color: '#374151' }}>{attrSummary}</div>}
-        {uomLabel && <div style={{ fontSize: 12, color: '#374151' }}>UoM: {uomLabel}</div>}
+        {(attrSummary || uomLabel) && (
+          <div style={{ fontSize: 12, color: '#374151', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {attrSummary && <span>{attrSummary}</span>}
+            {uomLabel && <span>UoM: {uomLabel}</span>}
+          </div>
+        )}
           <div
             style={{
               display: 'flex',
@@ -687,19 +683,6 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
               {isPrechecked ? '(사전체크됨)' : ''}
             </span>
           </div>
-        <div
-          style={{
-            fontSize: 11,
-            color: '#475467',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 10,
-          }}
-        >
-          <span>Discipline: {workMaster.discipline ?? '—'}</span>
-          <span>Group: {workMaster.work_group_code ?? '—'}</span>
-          <span>구분: {workMaster.new_old_code ?? '—'}</span>
-        </div>
         <div
           style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
           onClick={(event) => event.stopPropagation()}
