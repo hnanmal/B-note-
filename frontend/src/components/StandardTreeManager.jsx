@@ -21,6 +21,8 @@ export default function StandardTreeManager({
     externalSelectedId = null,
     hideDerivedItems = false,
     hideDeriveControls = false,
+    showAddControls = true,
+    editDeleteMode = 'all', // 'all' | 'derived-only' | 'none'
 }) {
     const [items, setItems] = useState([]);
     const [tree, setTree] = useState([]);
@@ -692,7 +694,7 @@ export default function StandardTreeManager({
                     </div>
                 </div>
                 <div>
-                    {level < 2 && (
+                    {showAddControls && level < 2 && (
                         <button style={{ marginLeft: 8, ...smallBtn }} onClick={() => handleAdd(node.id)}>하위 생성</button>
                     )}
                     {level === 1 && (node.type ?? '').toUpperCase() === 'GWM' && (
@@ -711,8 +713,12 @@ export default function StandardTreeManager({
                             >파생생성</button>
                         )
                     )}
-                    <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => startEdit(node)}>수정</button>
-                    <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => handleDelete(node.id)}>삭제</button>
+                    {editDeleteMode !== 'none' && (editDeleteMode !== 'derived-only' || isDerived) && (
+                        <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => startEdit(node)}>수정</button>
+                    )}
+                    {editDeleteMode !== 'none' && (editDeleteMode !== 'derived-only' || isDerived) && (
+                        <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => handleDelete(node.id)}>삭제</button>
+                    )}
                 </div>
             </div>
             {!isCollapsed && shouldRenderChildren && (
@@ -733,7 +739,9 @@ export default function StandardTreeManager({
                     <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 2, paddingBottom: 8, borderBottom: '1px solid #e6e6e6' }}>
                         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                             <div>
-                                <button style={headerButtonStyle} onClick={() => handleAdd(null)}>루트 항목 추가</button>
+                                {showAddControls && (
+                                    <button style={headerButtonStyle} onClick={() => handleAdd(null)}>루트 항목 추가</button>
+                                )}
                                 <button style={{ ...headerButtonStyle, marginLeft: 4 }} onClick={refresh}>새로고침</button>
                             </div>
                             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>

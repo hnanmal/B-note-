@@ -944,6 +944,8 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
               apiBaseUrl={apiBaseUrl}
               refreshSignal={treeRefreshKey}
               externalSelectedId={selectedGwmNode?.id ?? null}
+              showAddControls={false}
+              editDeleteMode="derived-only"
               onNodeSelect={(payload) => {
                 if (payload?.node) {
                   setSelectedGwmNode(payload.node);
