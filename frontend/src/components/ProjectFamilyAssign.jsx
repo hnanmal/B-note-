@@ -1204,6 +1204,33 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     const emptyMessage = selectedFamily
       ? `${typeKey} 패밀리에 할당된 Work Master가 없습니다.`
       : '패밀리를 선택하면 목록이 여기에 표시됩니다.';
+
+    const isGwmMenu = typeKey === 'GWM';
+    const normalizeDepth = (value) => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0) return 0;
+      return Math.min(6, Math.floor(parsed));
+    };
+    const getIndentPx = (depth) => {
+      if (!isGwmMenu) return (depth ?? 0) * 10;
+      const d = normalizeDepth(depth);
+      return d * 14;
+    };
+    const getCheckboxSize = (depth) => {
+      if (!isGwmMenu) return 16;
+      const d = normalizeDepth(depth);
+      return Math.max(12, 16 - Math.min(4, d));
+    };
+    const getCheckboxOffsetPx = (depth) => {
+      if (!isGwmMenu) return 0;
+      const d = normalizeDepth(depth);
+      return Math.min(4, d) * 6;
+    };
+    const getRowFontSize = (depth, base = 10) => {
+      if (!isGwmMenu) return base;
+      const d = normalizeDepth(depth);
+      return d === 0 ? base + 1 : base;
+    };
     return (
       <div
         style={{
@@ -1259,12 +1286,15 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                 const allLabelSelected = showLabelCheckbox && labelIds.length
                   ? labelIds.every((id) => selectedAssignmentIds.includes(id))
                   : false;
+                const labelIndent = getIndentPx(depth);
+                const checkboxSize = getCheckboxSize(depth);
+                const checkboxOffset = getCheckboxOffsetPx(depth);
                 return (
                   <div
                     key={`label-${row.id}`}
                     onClick={showLabelCheckbox ? () => handleParentLabelCheckboxToggle(row) : undefined}
                     style={{
-                      fontSize: 11,
+                      fontSize: getRowFontSize(depth, 11),
                       fontWeight: 700,
                       padding: '6px 0',
                       borderBottom: '1px solid #e5e7eb',
@@ -1280,7 +1310,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
+                        justifyContent: showLabelCheckbox ? 'flex-start' : 'center',
+                        paddingLeft: showLabelCheckbox ? 10 + checkboxOffset : 0,
                       }}
                     >
                       {showLabelCheckbox && (
@@ -1290,7 +1321,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                           onChange={() => handleParentLabelCheckboxToggle(row)}
                           onClick={(event) => event.stopPropagation()}
                           aria-label={`Use ${row.item} group`}
-                          style={{ width: 16, height: 16 }}
+                          style={{ width: checkboxSize, height: checkboxSize }}
                         />
                       )}
                     </span>
@@ -1298,7 +1329,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                       style={{
                         fontWeight: 700,
                         gridColumn: '2 / span 1',
-                        paddingLeft: depth * 10,
+                        paddingLeft: labelIndent,
                       }}
                     >
                       {row.item}
@@ -1310,6 +1341,9 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                 );
               }
               const isSelected = selectedAssignmentIds.includes(row.id);
+              const itemIndent = getIndentPx(depth);
+              const checkboxSize = getCheckboxSize(depth);
+              const checkboxOffset = getCheckboxOffsetPx(depth);
               return (
                 <div
                   key={row.id}
@@ -1317,7 +1351,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '60px 1fr 100px 80px 40px',
-                    fontSize: 10,
+                    fontSize: getRowFontSize(depth, 10),
                     borderBottom: '1px solid #e5e7eb',
                     padding: '4px 0',
                     background: isSelected ? '#e0f2fe' : '#fff',
@@ -1328,7 +1362,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      justifyContent: isGwmMenu ? 'flex-start' : 'center',
+                      paddingLeft: isGwmMenu ? 10 + checkboxOffset : 0,
                     }}
                   >
                     <input
@@ -1337,11 +1372,11 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                       onChange={() => handleAssignmentCheckboxToggle(row.id)}
                       onClick={(event) => event.stopPropagation()}
                       aria-label={`Use ${row.item}`}
-                      style={{ width: 16, height: 16 }}
+                      style={{ width: checkboxSize, height: checkboxSize }}
                     />
                   </span>
                   <span>{row.discipline}</span>
-                  <span style={{ paddingLeft: depth > 0 ? depth * 10 : 0, fontWeight: depth === 0 ? 600 : 400 }}>
+                  <span style={{ paddingLeft: itemIndent, fontWeight: depth === 0 ? 700 : depth === 1 ? 600 : 400 }}>
                     {row.item}
                   </span>
                   <span>{row.detail}</span>
