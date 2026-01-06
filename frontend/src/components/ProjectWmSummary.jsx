@@ -134,14 +134,18 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
       }).then(handleResponse);
       setEditingWorkMasterId(null);
       setEditingSpec('');
-      await fetchSummary();
+      setRows((prev) => prev.map((row) => (
+        row?.work_master_id === editingWorkMasterId
+          ? { ...row, add_spec: editingSpec }
+          : row
+      )));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Spec을 저장하지 못했습니다.';
       setError(message);
     } finally {
       setSavingWorkMasterId(null);
     }
-  }, [apiBaseUrl, editingSpec, editingWorkMasterId, fetchSummary]);
+  }, [apiBaseUrl, editingSpec, editingWorkMasterId]);
 
   useEffect(() => {
     fetchSummary();

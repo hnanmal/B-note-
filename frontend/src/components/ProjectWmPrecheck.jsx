@@ -172,21 +172,25 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
     setSavingSpecWorkMasterId(editingWorkMasterId);
     setError(null);
     try {
-      await fetch(`${apiBaseUrl}/work-masters/${editingWorkMasterId}`, {
+      const updated = await fetch(`${apiBaseUrl}/work-masters/${editingWorkMasterId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ add_spec: editingSpec }),
       }).then(handleResponse);
       setEditingWorkMasterId(null);
       setEditingSpec('');
-      await fetchAll();
+      setWorkMasters((prev) => prev.map((wm) => (
+        wm?.id === editingWorkMasterId
+          ? { ...wm, ...(updated || {}), add_spec: (updated?.add_spec ?? editingSpec) }
+          : wm
+      )));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Spec을 저장하지 못했습니다.';
       setError(message);
     } finally {
       setSavingSpecWorkMasterId(null);
     }
-  }, [apiBaseUrl, editingSpec, editingWorkMasterId, fetchAll]);
+  }, [apiBaseUrl, editingSpec, editingWorkMasterId]);
 
   const filteredWorkMasters = useMemo(() => {
     return workMasters.filter(matchesMatcherFilterRules).sort(sortWorkMastersByCodeGauge);
