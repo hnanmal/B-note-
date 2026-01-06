@@ -64,6 +64,13 @@ EXTRA_TABLE_STATEMENTS = [
         created_at TEXT NOT NULL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS work_master_precheck (
+        work_master_id INTEGER PRIMARY KEY,
+        use_yn INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL
+    )
+    """,
 ]
 
 

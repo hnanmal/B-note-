@@ -12,11 +12,13 @@ import ProjectFamilyAssign from './components/ProjectFamilyAssign';
 import ProjectInteriorMatrix from './components/ProjectInteriorMatrix';
 import ProjectStandardSelect from './components/ProjectStandardSelect';
 import ProjectWmSummary from './components/ProjectWmSummary';
+import ProjectWmPrecheck from './components/ProjectWmPrecheck';
 import ProjectMain from './components/ProjectMain';
 
 const NAV_ITEMS = [
   { id: 'workmaster', label: '워크마스터 매니저', icon: '🧰' },
   { id: 'matching', label: 'Team Standard Matching', icon: '🧩' },
+  { id: 'wm-precheck', label: 'WM pre-check', icon: '✅' },
   { id: 'select', label: 'Standard Select', icon: '✨' },
   { id: 'wm-summary', label: 'WM Summary', icon: '📋' },
 ];
@@ -99,10 +101,11 @@ function App() {
     matching: isProjectEditorRoute ? '프로젝트 Standard Matching' : 'Team Standard Matching',
     select: isProjectEditorRoute ? '프로젝트 Standard Select' : 'Team Standard Select',
     'wm-summary': 'WM Summary',
+    'wm-precheck': 'WM pre-check',
   };
   const navItems = isProjectEditorRoute
     ? [{ id: 'project-main', label: 'Project Main', icon: '🏠' }, ...NAV_ITEMS]
-    : NAV_ITEMS;
+    : NAV_ITEMS.filter((item) => item.id !== 'wm-precheck');
   const activeNavItems = navItems.map((item) => ({
     ...item,
     label: navLabelOverrides[item.id] ?? item.label,
@@ -911,6 +914,10 @@ function App() {
         ) : activePage === 'select' ? (
           <div className="panel select" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
             <ProjectStandardSelect apiBaseUrl={projectApiBase} />
+          </div>
+        ) : activePage === 'wm-precheck' ? (
+          <div className="panel wm-precheck" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+            <ProjectWmPrecheck apiBaseUrl={projectApiBase} />
           </div>
         ) : activePage === 'wm-summary' ? (
           <div className="panel wm-summary" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>

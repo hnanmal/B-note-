@@ -66,6 +66,16 @@ class WorkMasterUpdate(BaseModel):
     gauge: Optional[str] = None
 
 
+class WorkMasterPrecheckState(BaseModel):
+    work_master_id: int
+    use_yn: bool
+    updated_at: Optional[str] = None
+
+
+class WorkMasterPrecheckUpdate(BaseModel):
+    use_yn: bool
+
+
 class WorkMaster(WorkMasterBase):
     model_config = ConfigDict(from_attributes=True)
 

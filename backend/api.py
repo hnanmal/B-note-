@@ -247,6 +247,72 @@ def create_project_work_master(
     return crud.create_work_master(db=db, work_master=work_master)
 
 
+# ===================
+#  WorkMaster Precheck
+# ===================
+@router.get(
+    "/project/{project_identifier}/work-masters/precheck",
+    response_model=List[schemas.WorkMasterPrecheckState],
+    tags=["Project Data"],
+)
+def read_project_work_master_precheck_states(
+    project_identifier: str,
+    db: Session = Depends(get_project_db_session),
+):
+    rows = db.execute(
+        text(
+            "SELECT work_master_id, use_yn, updated_at FROM work_master_precheck ORDER BY work_master_id"
+        )
+    ).fetchall()
+    result: List[schemas.WorkMasterPrecheckState] = []
+    for row in rows:
+        result.append(
+            schemas.WorkMasterPrecheckState(
+                work_master_id=int(row[0]),
+                use_yn=bool(row[1]),
+                updated_at=row[2],
+            )
+        )
+    return result
+
+
+@router.patch(
+    "/project/{project_identifier}/work-masters/{work_master_id}/precheck",
+    response_model=schemas.WorkMasterPrecheckState,
+    tags=["Project Data"],
+)
+def update_project_work_master_precheck_state(
+    project_identifier: str,
+    work_master_id: int,
+    updates: schemas.WorkMasterPrecheckUpdate,
+    db: Session = Depends(get_project_db_session),
+):
+    db_work_master = crud.get_work_master(db, work_master_id=work_master_id)
+    if not db_work_master:
+        raise HTTPException(status_code=404, detail="WorkMaster not found")
+
+    now = datetime.datetime.utcnow().isoformat()
+    use_value = 1 if updates.use_yn else 0
+
+    db.execute(
+        text(
+            """
+            INSERT INTO work_master_precheck (work_master_id, use_yn, updated_at)
+            VALUES (:work_master_id, :use_yn, :updated_at)
+            ON CONFLICT(work_master_id)
+            DO UPDATE SET use_yn = excluded.use_yn, updated_at = excluded.updated_at
+            """
+        ),
+        {"work_master_id": work_master_id, "use_yn": use_value, "updated_at": now},
+    )
+    db.commit()
+    return schemas.WorkMasterPrecheckState(
+        work_master_id=work_master_id,
+        use_yn=updates.use_yn,
+        updated_at=now,
+    )
+
+
 @router.post(
     "/project/{project_identifier}/work-masters/upload",
     summary="Upload and upsert Work Masters from Excel",
