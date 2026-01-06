@@ -147,16 +147,65 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     fetchSummary();
   }, [fetchSummary]);
 
+  const groupedRows = useMemo(() => {
+    const groups = new Map();
+
+    const normalizeKeyPart = (value) => (value ?? '').toString().trim();
+    const addToSet = (set, value) => {
+      const v = (value ?? '').toString().trim();
+      if (!v) return;
+      set.add(v);
+    };
+
+    rows.forEach((row) => {
+      const wmCode = normalizeKeyPart(row?.work_master_code);
+      const gauge = normalizeKeyPart(row?.gauge);
+      const key = `${wmCode}||${gauge}`;
+
+      const type = row?.standard_item_type;
+      const path = row?.standard_item_path;
+      const name = row?.standard_item_name;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          row: { ...row },
+          types: new Set(),
+          paths: new Set(),
+          names: new Set(),
+        });
+      }
+
+      const entry = groups.get(key);
+      addToSet(entry.types, type);
+      addToSet(entry.paths, path);
+      addToSet(entry.names, name);
+    });
+
+    return Array.from(groups.values()).map(({ row, types, paths, names }) => {
+      const mergedTypes = Array.from(types).join(', ');
+      const mergedPaths = Array.from(paths).join(', ');
+      const mergedNames = Array.from(names).join(', ');
+
+      return {
+        ...row,
+        standard_item_type: mergedTypes || (row?.standard_item_type ?? ''),
+        standard_item_path: mergedPaths || (row?.standard_item_path ?? ''),
+        _standard_item_names_joined: mergedNames,
+      };
+    });
+  }, [rows]);
+
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) => {
+    if (!q) return groupedRows;
+    return groupedRows.filter((row) => {
       const tokens = [
         row?.work_master_code,
         row?.gauge,
         row?.uom1,
         row?.add_spec,
         row?.standard_item_name,
+        row?._standard_item_names_joined,
         row?.standard_item_type,
         row?.standard_item_path,
       ]
@@ -164,7 +213,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
         .join(' | ');
       return tokens.includes(q);
     });
-  }, [query, rows]);
+  }, [groupedRows, query]);
 
   const formatWorkMasterDetails = useCallback((row) => {
     const parts = [];
