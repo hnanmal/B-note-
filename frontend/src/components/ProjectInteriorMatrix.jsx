@@ -195,9 +195,8 @@ const buildSectionsFromStandardItems = (items, projectAbbr = '') => {
       if (!derivedGrand.length) return null;
       const enriched = derivedGrand.map((grand) => {
         const parentName = itemMap.get(grand.derive_from)?.name;
-        const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
         const childName = (grand.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || grand.name;
-        const label = parentName ? `${parentName}${abbrPart}::${childName}` : grand.name;
+        const label = parentName ? `${parentName}::${childName}` : grand.name;
         return {
           key: `std-${grand.id}`,
           label,
@@ -247,9 +246,8 @@ const buildSectionsFromCart = (cartEntries, standardItems, projectAbbr = '') => 
     const parentName = parentId === 'uncategorized' ? 'Cart Items' : itemMap.get(parentId)?.name;
     const enriched = itemsForParent.map((child) => {
       const deriveParent = child.derive_from ? itemMap.get(child.derive_from)?.name : null;
-      const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
       const childName = (child.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || child.name;
-      const label = deriveParent ? `${deriveParent}${abbrPart}::${childName}` : child.name;
+      const label = deriveParent ? `${deriveParent}::${childName}` : child.name;
       return { key: `std-${child.id}`, label, standardItemId: child.id };
     });
     const sorted = enriched.sort((a, b) => (a.label || '').localeCompare(b.label || ''));
@@ -305,9 +303,8 @@ const mergeCartExtrasIntoSections = (baseSections, cartEntries, standardItems, p
       if (!item) return;
       if ((item.type || '').toUpperCase() !== 'SWM') return;
       const deriveParent = item.derive_from ? itemMap.get(item.derive_from)?.name : null;
-      const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
       const childName = (item.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || item.name;
-      const label = deriveParent ? `${deriveParent}${abbrPart}::${childName}` : item.name;
+      const label = deriveParent ? `${deriveParent}::${childName}` : item.name;
       extras.push({ key: `cart-${id}`, label, standardItemId: id });
     });
   });
@@ -858,7 +855,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
           padding: '0 4px',
         }}>
           <span>인터리어 매트릭스 · Building: {selectedBuilding || '—'}</span>
-          <span style={{ color: '#94a3b8' }}>더블 클릭으로 체크</span>
+          <span style={{ color: '#94a3b8' }}>클릭으로 체크</span>
         </div>
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto', borderRadius: 10, border: '1px solid #e2e8f0' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
@@ -949,7 +946,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                           return (
                             <td
                               key={`${itemKey}-${roomKey}`}
-                              onDoubleClick={() => handleToggle(itemKey, item.standardItemId, roomKey)}
+                              onClick={() => handleToggle(itemKey, item.standardItemId, roomKey)}
                               style={{
                                 borderBottom: '1px solid #f1f5f9',
                                 textAlign: 'center',
@@ -959,7 +956,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                                 minWidth: 80,
                                 color: checked ? '#0f172a' : '#94a3b8',
                               }}
-                              title="더블 클릭하여 체크/해제"
+                              title="클릭하여 체크/해제"
                             >
                               {checked ? '☑' : '☐'}
                             </td>
