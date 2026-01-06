@@ -63,9 +63,227 @@ const shouldBoldWorkMasterLabel = (label) => {
   return label === 'Mid' || label === 'Small' || label === 'Attr1' || label === 'Attr2';
 };
 
+const PrecheckRow = React.memo(function PrecheckRow({
+  wm,
+  checked,
+  saving,
+  gaugeAdding,
+  gaugeRemoving,
+  gaugeBusy,
+  loading,
+  isEditingSpec,
+  editingWorkMasterId,
+  editingSpecSeed,
+  savingSpecWorkMasterId,
+  specTextareaRef,
+  insertNewlineAtCaret,
+  onToggleUse,
+  onAddGauge,
+  onRemoveGauge,
+  onStartSpecEdit,
+  onSaveSpecEdit,
+  onCancelSpecEdit,
+  rowRefs,
+}) {
+  const wmId = wm?.id;
+  const gaugeValue = (wm?.gauge ?? '').toString().trim().toUpperCase();
+  const wmCode = (wm?.work_master_code ?? '').toString().trim();
+  const wmTitle = wmCode ? (gaugeValue ? `${wmCode}(${gaugeValue})` : wmCode) : (gaugeValue ? `(${gaugeValue})` : '코드 정보 없음');
+  const headline = wm?.cat_large_desc || wm?.cat_mid_desc || wm?.cat_small_desc || wmTitle;
+  const summaryParts = getWorkMasterSummaryParts(wm);
+  const unitLabel = [wm?.uom1, wm?.uom2].filter(Boolean).join(' / ');
+  const specValue = (wm?.add_spec ?? '').toString();
+
+  return (
+    <tr
+      key={wmId}
+      ref={(node) => {
+        if (!wmId) return;
+        if (node) rowRefs.current.set(wmId, node);
+        else rowRefs.current.delete(wmId);
+      }}
+      style={{ borderBottom: '1px solid #f1f5f9' }}
+    >
+      <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={saving}
+            onChange={() => onToggleUse(wmId)}
+          />
+          {saving ? <span style={{ fontSize: 11, color: '#6b7280' }}>Saving...</span> : null}
+        </label>
+      </td>
+      <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 800, color: '#0f172a' }}>{wmCode}</td>
+      <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 800, color: '#9333ea' }}>{gaugeValue}</span>
+          <button
+            type="button"
+            onClick={() => onAddGauge(wmId)}
+            disabled={loading || gaugeBusy}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: '1px solid #cbd5f5',
+              background: loading || gaugeBusy ? '#f1f5f9' : '#fff',
+              color: loading || gaugeBusy ? '#94a3b8' : '#0f172a',
+              cursor: loading || gaugeBusy ? 'not-allowed' : 'pointer',
+              fontSize: 11,
+              fontWeight: 800,
+            }}
+          >
+            {gaugeAdding ? '추가 중...' : '추가'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onRemoveGauge(wmId)}
+            disabled={loading || gaugeBusy || !gaugeValue}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: '1px solid #f87171',
+              background: loading || gaugeBusy || !gaugeValue ? '#fee2e2' : '#fff',
+              color: loading || gaugeBusy || !gaugeValue ? '#fca5a5' : '#dc2626',
+              cursor: loading || gaugeBusy || !gaugeValue ? 'not-allowed' : 'pointer',
+              fontSize: 11,
+              fontWeight: 800,
+            }}
+          >
+            {gaugeRemoving ? '삭제 중...' : '삭제'}
+          </button>
+        </div>
+      </td>
+      <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{unitLabel || ''}</td>
+      <td style={{ padding: '6px 10px', minWidth: 260, maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {isEditingSpec ? (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <textarea
+              ref={specTextareaRef}
+              key={editingWorkMasterId}
+              defaultValue={editingSpecSeed}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return;
+                if (event.altKey) {
+                  event.preventDefault();
+                  const target = event.target;
+                  if (target instanceof HTMLTextAreaElement) insertNewlineAtCaret(target);
+                  return;
+                }
+                event.preventDefault();
+                onSaveSpecEdit();
+              }}
+              rows={3}
+              style={{
+                flex: 1,
+                border: '1px solid #d1d5db',
+                borderRadius: 8,
+                padding: '6px 8px',
+                fontSize: 11,
+                minWidth: 0,
+                resize: 'vertical',
+                lineHeight: 1.35,
+              }}
+            />
+            <button
+              type="button"
+              onClick={onSaveSpecEdit}
+              disabled={savingSpecWorkMasterId === editingWorkMasterId}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 8,
+                border: '1px solid #2563eb',
+                background: savingSpecWorkMasterId === editingWorkMasterId ? '#93c5fd' : '#2563eb',
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: savingSpecWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
+              }}
+            >
+              저장
+            </button>
+            <button
+              type="button"
+              onClick={onCancelSpecEdit}
+              disabled={savingSpecWorkMasterId === editingWorkMasterId}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 8,
+                border: '1px solid #cbd5f5',
+                background: '#fff',
+                color: '#1d4ed8',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: savingSpecWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
+              }}
+            >
+              취소
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onStartSpecEdit(wm)}
+            style={{
+              width: '100%',
+              border: 'none',
+              background: 'transparent',
+              padding: '2px 0',
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontSize: 12,
+              color: '#0f172a',
+              display: 'block',
+              minHeight: 18,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+            title="Spec 수정"
+          >
+            {specValue ? specValue : (
+              <span style={{ color: '#94a3b8' }}>클릭하여 입력</span>
+            )}
+          </button>
+        )}
+      </td>
+      <td style={{ padding: '8px 10px', minWidth: 420 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {headline}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#9333ea', marginTop: 2 }}>
+              {wmTitle}
+            </div>
+          </div>
+          {summaryParts.length > 0 && (
+            <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.4, wordBreak: 'break-word' }}>
+              {summaryParts.map((part, index) => (
+                <span key={`${part.label}-${index}`}>
+                  {index > 0 ? ' | ' : ''}
+                  <span>{part.label}=</span>
+                  <span
+                    style={shouldBoldWorkMasterLabel(part.label)
+                      ? { fontWeight: 900, color: '#9333ea', fontSize: 12 }
+                      : { fontWeight: 400 }}
+                  >
+                    {part.value}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+});
+
 export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const [workMasters, setWorkMasters] = useState([]);
-  const [useMap, setUseMap] = useState({});
+  const useMapRef = useRef(new Map());
+  const [useMapVersion, setUseMapVersion] = useState(0);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState(null);
   const [gaugeAddingId, setGaugeAddingId] = useState(null);
@@ -107,13 +325,14 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
       const list = Array.isArray(wmData) ? wmData : [];
       setWorkMasters(list);
 
-      const nextMap = {};
+      const nextMap = new Map();
       (Array.isArray(precheckData) ? precheckData : []).forEach((row) => {
         const id = Number(row?.work_master_id);
         if (!Number.isFinite(id)) return;
-        nextMap[id] = Boolean(row?.use_yn);
+        nextMap.set(id, Boolean(row?.use_yn));
       });
-      setUseMap(nextMap);
+      useMapRef.current = nextMap;
+      setUseMapVersion((v) => v + 1);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'WM pre-check 데이터를 불러오지 못했습니다.';
       setError(message);
@@ -215,15 +434,10 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
     return workMasters.filter(matchesMatcherFilterRules).sort(sortWorkMastersByCodeGauge);
   }, [workMasters]);
 
-  const isChecked = useCallback(
-    (workMasterId) => {
-      if (Object.prototype.hasOwnProperty.call(useMap, workMasterId)) {
-        return Boolean(useMap[workMasterId]);
-      }
-      return false;
-    },
-    [useMap]
-  );
+  const isChecked = useCallback((workMasterId) => {
+    if (workMasterId == null) return false;
+    return Boolean(useMapRef.current.get(workMasterId));
+  }, [useMapVersion]);
 
   const handleAddGauge = useCallback(async (workMasterId) => {
     if (!apiBaseUrl) return;
@@ -271,12 +485,10 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
         method: 'POST',
       }).then(handleResponse);
       setWorkMasters((prev) => prev.filter((wm) => wm?.id !== workMasterId));
-      setUseMap((prev) => {
-        if (!Object.prototype.hasOwnProperty.call(prev, workMasterId)) return prev;
-        const next = { ...prev };
-        delete next[workMasterId];
-        return next;
-      });
+      if (useMapRef.current.has(workMasterId)) {
+        useMapRef.current.delete(workMasterId);
+        setUseMapVersion((v) => v + 1);
+      }
       if (editingWorkMasterId === workMasterId) {
         setEditingWorkMasterId(null);
         setEditingSpecSeed('');
@@ -308,7 +520,8 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
       const previous = isChecked(workMasterId);
       const next = !previous;
 
-      setUseMap((prevMap) => ({ ...prevMap, [workMasterId]: next }));
+      useMapRef.current.set(workMasterId, next);
+      setUseMapVersion((v) => v + 1);
       setSavingId(workMasterId);
       setError(null);
 
@@ -319,7 +532,8 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
           body: JSON.stringify({ use_yn: next }),
         }).then(handleResponse);
       } catch (err) {
-        setUseMap((prevMap) => ({ ...prevMap, [workMasterId]: previous }));
+        useMapRef.current.set(workMasterId, previous);
+        setUseMapVersion((v) => v + 1);
         const message = err instanceof Error ? err.message : '저장하지 못했습니다.';
         setError(message);
       } finally {
@@ -397,203 +611,30 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
           <tbody>
             {filteredWorkMasters.map((wm) => {
               const wmId = wm?.id;
-              const checked = isChecked(wmId);
-              const saving = savingId === wmId;
-              const gaugeValue = (wm?.gauge ?? '').toString().trim().toUpperCase();
-              const gaugeAdding = gaugeAddingId === wmId;
-              const gaugeRemoving = gaugeRemovingId === wmId;
-              const gaugeBusy = gaugeAddingId != null || gaugeRemovingId != null;
-              const wmCode = (wm?.work_master_code ?? '').toString().trim();
-              const wmTitle = wmCode ? (gaugeValue ? `${wmCode}(${gaugeValue})` : wmCode) : (gaugeValue ? `(${gaugeValue})` : '코드 정보 없음');
-              const headline =
-                wm?.cat_large_desc || wm?.cat_mid_desc || wm?.cat_small_desc || wmTitle;
-              const summaryParts = getWorkMasterSummaryParts(wm);
-              const unitLabel = [wm?.uom1, wm?.uom2].filter(Boolean).join(' / ');
-              const specValue = (wm?.add_spec ?? '').toString();
-              const isEditingSpec = editingWorkMasterId != null && wmId === editingWorkMasterId;
               return (
-                <tr
+                <PrecheckRow
                   key={wmId}
-                  ref={(node) => {
-                    if (!wmId) return;
-                    if (node) rowRefs.current.set(wmId, node);
-                    else rowRefs.current.delete(wmId);
-                  }}
-                  style={{ borderBottom: '1px solid #f1f5f9' }}
-                >
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: saving ? 'not-allowed' : 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={saving}
-                        onChange={() => toggleUse(wmId)}
-                      />
-                      {saving ? <span style={{ fontSize: 11, color: '#6b7280' }}>Saving...</span> : null}
-                    </label>
-                  </td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 800, color: '#0f172a' }}>{wmCode}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 800, color: '#9333ea' }}>{gaugeValue}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleAddGauge(wmId)}
-                        disabled={loading || gaugeBusy}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: 6,
-                          border: '1px solid #cbd5f5',
-                          background: loading || gaugeBusy ? '#f1f5f9' : '#fff',
-                          color: loading || gaugeBusy ? '#94a3b8' : '#0f172a',
-                          cursor: loading || gaugeBusy ? 'not-allowed' : 'pointer',
-                          fontSize: 11,
-                          fontWeight: 800,
-                        }}
-                      >
-                        {gaugeAdding ? '추가 중...' : '추가'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveGauge(wmId)}
-                        disabled={loading || gaugeBusy || !gaugeValue}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: 6,
-                          border: '1px solid #f87171',
-                          background: loading || gaugeBusy || !gaugeValue ? '#fee2e2' : '#fff',
-                          color: loading || gaugeBusy || !gaugeValue ? '#fca5a5' : '#dc2626',
-                          cursor: loading || gaugeBusy || !gaugeValue ? 'not-allowed' : 'pointer',
-                          fontSize: 11,
-                          fontWeight: 800,
-                        }}
-                      >
-                        {gaugeRemoving ? '삭제 중...' : '삭제'}
-                      </button>
-                    </div>
-                  </td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{unitLabel || ''}</td>
-                  <td style={{ padding: '6px 10px', minWidth: 260, maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                    {isEditingSpec ? (
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <textarea
-                          ref={specTextareaRef}
-                          key={editingWorkMasterId}
-                          defaultValue={editingSpecSeed}
-                          onKeyDown={(event) => {
-                            if (event.key !== 'Enter') return;
-                            if (event.altKey) {
-                              event.preventDefault();
-                              const target = event.target;
-                              if (target instanceof HTMLTextAreaElement) insertNewlineAtCaret(target);
-                              return;
-                            }
-                            event.preventDefault();
-                            saveSpecEdit();
-                          }}
-                          rows={3}
-                          style={{
-                            flex: 1,
-                            border: '1px solid #d1d5db',
-                            borderRadius: 8,
-                            padding: '6px 8px',
-                            fontSize: 11,
-                            minWidth: 0,
-                            resize: 'vertical',
-                            lineHeight: 1.35,
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={saveSpecEdit}
-                          disabled={savingSpecWorkMasterId === editingWorkMasterId}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: 8,
-                            border: '1px solid #2563eb',
-                            background: savingSpecWorkMasterId === editingWorkMasterId ? '#93c5fd' : '#2563eb',
-                            color: '#fff',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            cursor: savingSpecWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          저장
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelSpecEdit}
-                          disabled={savingSpecWorkMasterId === editingWorkMasterId}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: 8,
-                            border: '1px solid #cbd5f5',
-                            background: '#fff',
-                            color: '#1d4ed8',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            cursor: savingSpecWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          취소
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => startSpecEdit(wm)}
-                        style={{
-                          width: '100%',
-                          border: 'none',
-                          background: 'transparent',
-                          padding: '2px 0',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          fontSize: 12,
-                          color: '#0f172a',
-                          display: 'block',
-                          minHeight: 18,
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
-                        }}
-                        title="Spec 수정"
-                      >
-                        {specValue ? specValue : (
-                          <span style={{ color: '#94a3b8' }}>클릭하여 입력</span>
-                        )}
-                      </button>
-                    )}
-                  </td>
-                  <td style={{ padding: '8px 10px', minWidth: 420 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {headline}
-                        </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#9333ea', marginTop: 2 }}>
-                          {wmTitle}
-                        </div>
-                      </div>
-                      {summaryParts.length > 0 && (
-                        <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.4, wordBreak: 'break-word' }}>
-                          {summaryParts.map((part, index) => (
-                            <span key={`${part.label}-${index}`}>
-                              {index > 0 ? ' | ' : ''}
-                              <span>{part.label}=</span>
-                              <span
-                                style={shouldBoldWorkMasterLabel(part.label)
-                                  ? { fontWeight: 900, color: '#9333ea', fontSize: 12 }
-                                  : { fontWeight: 400 }}
-                              >
-                                {part.value}
-                              </span>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                  wm={wm}
+                  checked={isChecked(wmId)}
+                  saving={savingId === wmId}
+                  gaugeAdding={gaugeAddingId === wmId}
+                  gaugeRemoving={gaugeRemovingId === wmId}
+                  gaugeBusy={gaugeAddingId != null || gaugeRemovingId != null}
+                  loading={loading}
+                  isEditingSpec={editingWorkMasterId != null && wmId === editingWorkMasterId}
+                  editingWorkMasterId={editingWorkMasterId}
+                  editingSpecSeed={editingSpecSeed}
+                  savingSpecWorkMasterId={savingSpecWorkMasterId}
+                  specTextareaRef={specTextareaRef}
+                  insertNewlineAtCaret={insertNewlineAtCaret}
+                  onToggleUse={toggleUse}
+                  onAddGauge={handleAddGauge}
+                  onRemoveGauge={handleRemoveGauge}
+                  onStartSpecEdit={startSpecEdit}
+                  onSaveSpecEdit={saveSpecEdit}
+                  onCancelSpecEdit={cancelSpecEdit}
+                  rowRefs={rowRefs}
+                />
               );
             })}
 
