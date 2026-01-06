@@ -547,7 +547,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                               <span>{part.label}=</span>
                               <span
                                 style={shouldBoldWorkMasterLabel(part.label)
-                                  ? { fontWeight: 900, color: '#1d4ed8', fontSize: 12 }
+                                  ? { fontWeight: 900, color: '#9333ea', fontSize: 12 }
                                   : { fontWeight: 400 }}
                               >
                                 {part.value}
