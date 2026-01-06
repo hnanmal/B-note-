@@ -880,7 +880,7 @@ def export_project_db_for_dynamo(
 
         family_list_ids_for_entry = []
         seen_family_list_ids = set()
-        for aid in (entry.assignment_ids or []):
+        for aid in entry.assignment_ids or []:
             try:
                 aid_int = int(aid)
             except (TypeError, ValueError):
