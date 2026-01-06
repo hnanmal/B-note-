@@ -127,7 +127,7 @@ def _resolve_path(file_name: str) -> Path:
 
 
 def resolve_project_db_path(identifier: str) -> Path:
-    candidate_file = identifier if identifier.endswith('.db') else f"{identifier}.db"
+    candidate_file = identifier if identifier.endswith(".db") else f"{identifier}.db"
     return _resolve_path(candidate_file)
 
 
@@ -186,27 +186,31 @@ def ensure_extra_tables(db_path: Path) -> None:
             cursor.execute(stmt)
         cursor.execute("PRAGMA table_info(family_revit_type)")
         frt_columns = {row[1] for row in cursor.fetchall()}
-        if 'building_name' not in frt_columns:
-            cursor.execute("ALTER TABLE family_revit_type ADD COLUMN building_name TEXT")
+        if "building_name" not in frt_columns:
+            cursor.execute(
+                "ALTER TABLE family_revit_type ADD COLUMN building_name TEXT"
+            )
         cursor.execute("PRAGMA table_info(work_masters)")
         wm_columns = {row[1] for row in cursor.fetchall()}
-        if 'add_spec' not in wm_columns:
+        if "add_spec" not in wm_columns:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN add_spec TEXT")
-        if 'gauge' not in wm_columns:
+        if "gauge" not in wm_columns:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN gauge TEXT")
         cursor.execute("PRAGMA table_info(project_metadata)")
         meta_columns = {row[1] for row in cursor.fetchall()}
-        if 'pjt_abbr' not in meta_columns:
+        if "pjt_abbr" not in meta_columns:
             cursor.execute("ALTER TABLE project_metadata ADD COLUMN pjt_abbr TEXT")
-        if 'pjt_description' not in meta_columns:
-            cursor.execute("ALTER TABLE project_metadata ADD COLUMN pjt_description TEXT")
+        if "pjt_description" not in meta_columns:
+            cursor.execute(
+                "ALTER TABLE project_metadata ADD COLUMN pjt_description TEXT"
+            )
         cursor.execute("PRAGMA table_info(standard_items)")
         std_columns = {row[1] for row in cursor.fetchall()}
-        if 'derive_from' not in std_columns:
+        if "derive_from" not in std_columns:
             cursor.execute("ALTER TABLE standard_items ADD COLUMN derive_from INTEGER")
         cursor.execute("PRAGMA index_list('work_masters')")
         indexes = {row[1] for row in cursor.fetchall()}
-        if 'ix_work_masters_work_master_code' in indexes:
+        if "ix_work_masters_work_master_code" in indexes:
             cursor.execute("DROP INDEX IF EXISTS ix_work_masters_work_master_code")
         conn.commit()
     finally:
@@ -295,7 +299,9 @@ def read_project_metadata(db_path: Path) -> Dict[str, Optional[str]]:
         conn.close()
 
 
-def update_project_metadata(db_path: Path, updates: Dict[str, Optional[str]]) -> Dict[str, Optional[str]]:
+def update_project_metadata(
+    db_path: Path, updates: Dict[str, Optional[str]]
+) -> Dict[str, Optional[str]]:
     ensure_extra_tables(db_path)
     conn = sqlite3.connect(db_path.as_posix())
     try:
@@ -305,7 +311,9 @@ def update_project_metadata(db_path: Path, updates: Dict[str, Optional[str]]) ->
         current_abbr = row[3]
         current_desc = row[4]
         next_abbr = updates["pjt_abbr"] if "pjt_abbr" in updates else current_abbr
-        next_desc = updates["pjt_description"] if "pjt_description" in updates else current_desc
+        next_desc = (
+            updates["pjt_description"] if "pjt_description" in updates else current_desc
+        )
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE project_metadata SET pjt_abbr = ?, pjt_description = ? WHERE id = ?",
