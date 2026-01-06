@@ -68,6 +68,7 @@ const groupWorkMastersByCode = (workMasters) => {
 export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBaseUrl = API_BASE_URL }) {
     const [standardItems, setStandardItems] = useState([]);
     const [workMasters, setWorkMasters] = useState([]);
+    const [precheckedWorkMasterIds, setPrecheckedWorkMasterIds] = useState(() => new Set());
     const [assignedSet, setAssignedSet] = useState(new Set());
     const [persistedAssignedSet, setPersistedAssignedSet] = useState(new Set());
     const [message, setMessage] = useState('');
@@ -112,15 +113,27 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
 
     const fetchData = useCallback(async () => {
         try {
+            const precheckPromise = fetch(`${apiBaseUrl}/work-masters/precheck`)
+                .then((res) => (res.ok ? res.json() : null))
+                .catch(() => null);
+
             const [stdRes, wmRes] = await Promise.all([
                 fetch(`${apiBaseUrl}/standard-items/`),
                 fetch(`${apiBaseUrl}/work-masters/`),
             ]);
             if (!stdRes.ok) throw new Error('표준 항목을 가져오는 데 실패했습니다');
             if (!wmRes.ok) throw new Error('워크마스터 데이터를 가져오는 데 실패했습니다');
-            const [stdData, wmData] = await Promise.all([stdRes.json(), wmRes.json()]);
+            const [stdData, wmData, precheckData] = await Promise.all([stdRes.json(), wmRes.json(), precheckPromise]);
             setStandardItems(stdData);
             setWorkMasters(wmData);
+
+            const nextPrechecked = new Set();
+            (Array.isArray(precheckData) ? precheckData : []).forEach((row) => {
+                const id = Number(row?.work_master_id);
+                if (!Number.isFinite(id)) return;
+                if (Boolean(row?.use_yn)) nextPrechecked.add(id);
+            });
+            setPrecheckedWorkMasterIds(nextPrechecked);
         } catch (e) {
             setMessage(e.message || '데이터 로드에 실패했습니다');
         }
@@ -472,13 +485,25 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
                                                 </div>
                                                 {group.variants.map(w => {
                                                     const attrs = [w.attr1_spec, w.attr2_spec, w.attr3_spec, w.attr4_spec, w.attr5_spec, w.attr6_spec].filter(Boolean).join(' | ');
+                                                    const gaugeLabel = (w.gauge || '').trim().toUpperCase();
+                                                    const isPrechecked = precheckedWorkMasterIds.has(w.id);
                                                     return (
                                                         <div key={w.id} style={{ display: 'flex', alignItems: 'flex-start', padding: '8px 6px', borderBottom: '1px solid #f5f5f5' }}>
                                                             <div style={{ marginTop: 6 }}>
                                                                 <input type="checkbox" checked={assignedSet.has(w.id)} onChange={() => toggleAssignLocal(w.id)} />
                                                             </div>
                                                             <div style={{ marginLeft: 10, flex: 1 }}>
-                                                                <div style={{ fontWeight: 700 }}>{formatWorkMasterCode(w)}</div>
+                                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                                                                    <span style={{ fontWeight: 800, color: '#0f172a' }}>{(w.work_master_code || '').trim() || '코드 정보 없음'}</span>
+                                                                    {gaugeLabel ? (
+                                                                        <span style={{ fontWeight: 800, color: '#9333ea' }}>{gaugeLabel}</span>
+                                                                    ) : (
+                                                                        <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>기본</span>
+                                                                    )}
+                                                                    {isPrechecked && (
+                                                                        <span style={{ fontSize: 11, color: '#9333ea', fontWeight: 800 }}>사전체크됨</span>
+                                                                    )}
+                                                                </div>
                                                                 <div style={{ fontSize: 13, color: '#444', marginTop: 4 }}>{[w.cat_mid_desc, w.cat_small_desc].filter(Boolean).join(' / ')}</div>
                                                                 {attrs && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{attrs}{w.uom1 ? ` | UoM: ${w.uom1}` : ''}</div>}
                                                                 {!attrs && w.uom1 && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>UoM: {w.uom1}</div>}

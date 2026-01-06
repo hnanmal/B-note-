@@ -6,6 +6,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [dbWorkMasters, setDbWorkMasters] = useState([]);
   const [dbWorkMastersLoading, setDbWorkMastersLoading] = useState(false);
   const [dbWorkMastersError, setDbWorkMastersError] = useState(null);
+  const [precheckedWorkMasterIds, setPrecheckedWorkMasterIds] = useState(() => new Set());
   const [selectedWorkMasterId, setSelectedWorkMasterId] = useState(null);
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [selectionError, setSelectionError] = useState(null);
@@ -30,6 +31,37 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const isProjectContext = apiBaseUrl.includes('/project/');
   const isDerivedSelection = Boolean(selectedGwmNode?.derive_from);
   const isSwm = (selectedGwmNode?.type ?? '').toUpperCase() === 'SWM';
+
+  useEffect(() => {
+    if (!isProjectContext || !apiBaseUrl) {
+      setPrecheckedWorkMasterIds(new Set());
+      return undefined;
+    }
+
+    let cancelled = false;
+    fetch(`${apiBaseUrl}/work-masters/precheck`)
+      .then((res) => {
+        if (!res.ok) return [];
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const next = new Set();
+        (Array.isArray(data) ? data : []).forEach((row) => {
+          const id = Number(row?.work_master_id);
+          if (!Number.isFinite(id)) return;
+          if (Boolean(row?.use_yn)) next.add(id);
+        });
+        setPrecheckedWorkMasterIds(next);
+      })
+      .catch(() => {
+        if (!cancelled) setPrecheckedWorkMasterIds(new Set());
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, isProjectContext, workMasterReloadKey]);
 
   const sortWorkMasters = (workMasters) => {
     const clones = Array.isArray(workMasters) ? [...workMasters] : [];
@@ -569,6 +601,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     const uomLabel = [workMaster.uom1, workMaster.uom2].filter(Boolean).join(' / ');
     const codeLine = workMaster.work_master_code ? `코드 ${workMaster.work_master_code}` : '코드 정보 없음';
     const gaugeValue = (workMaster.gauge ?? '').trim().toUpperCase();
+    const isPrechecked = precheckedWorkMasterIds.has(Number(workMaster.id));
     const codeTags = [
       workMaster.cat_large_code,
       workMaster.cat_mid_code,
@@ -650,6 +683,9 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             >
               {gaugeValue || ' '}
             </span>
+            {isPrechecked && (
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#9333ea' }}>사전체크됨</span>
+            )}
           </div>
         <div
           style={{
