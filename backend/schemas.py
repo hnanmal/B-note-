@@ -73,6 +73,14 @@ class WorkMaster(WorkMasterBase):
     standard_items: List[_StandardItemWithoutRelations] = []
 
 
+class WorkMasterBrief(BaseModel):
+    """Small WorkMaster shape for exports."""
+
+    id: int
+    work_master_code: str
+    gauge: Optional[str] = None
+
+
 # WorkMaster cart schemas
 class WorkMasterCartEntryBase(BaseModel):
     revit_types: List[str]
@@ -97,6 +105,7 @@ class WorkMasterCartEntry(WorkMasterCartEntryBase):
     created_at: datetime.datetime
     assignment_labels: List[str] = Field(default_factory=list)
     standard_item_names: List[str] = Field(default_factory=list)
+    work_masters: List[WorkMasterBrief] = Field(default_factory=list)
 
 
 # StandardItem Schemas

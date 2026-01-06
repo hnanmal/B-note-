@@ -796,6 +796,29 @@ def export_project_db_for_dynamo(
         for item in items:
             standard_item_name_by_id[item.id] = item.name
 
+    selected_work_master_by_standard_item_id = {}
+    if standard_item_ids:
+        rows = (
+            db.query(
+                models.StandardItemWorkMasterSelect.standard_item_id,
+                models.WorkMaster.id,
+                models.WorkMaster.work_master_code,
+                models.WorkMaster.gauge,
+            )
+            .join(
+                models.WorkMaster,
+                models.WorkMaster.id == models.StandardItemWorkMasterSelect.work_master_id,
+            )
+            .filter(models.StandardItemWorkMasterSelect.standard_item_id.in_(standard_item_ids))
+            .all()
+        )
+        for standard_item_id, work_master_id, work_master_code, gauge in rows:
+            selected_work_master_by_standard_item_id[int(standard_item_id)] = {
+                "id": int(work_master_id),
+                "work_master_code": work_master_code,
+                "gauge": gauge,
+            }
+
     for entry in cart_entries:
         entry.assignment_labels = [
             assignment_label_by_id.get(int(aid), f"assignment:{aid}")
@@ -804,6 +827,12 @@ def export_project_db_for_dynamo(
         entry.standard_item_names = [
             standard_item_name_by_id.get(int(sid), f"standard_item:{sid}")
             for sid in (entry.standard_item_ids or [])
+        ]
+        entry.work_masters = [
+            schemas.WorkMasterBrief(**wm)
+            for sid in (entry.standard_item_ids or [])
+            for wm in [selected_work_master_by_standard_item_id.get(int(sid))]
+            if wm
         ]
     return {
         "project_identifier": project_identifier,
