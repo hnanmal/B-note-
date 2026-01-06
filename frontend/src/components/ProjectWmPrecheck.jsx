@@ -1,5 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+const isDebugPrecheckEnabled = () => {
+  try {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('debugPrecheck') === '1') return true;
+    if (window.localStorage?.getItem('debugPrecheck') === '1') return true;
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+const DEBUG_PRECHECK_TIMING =
+  (typeof import.meta !== 'undefined' ? Boolean(import.meta?.env?.DEV) : false) ||
+  isDebugPrecheckEnabled();
+
 const handleResponse = async (response) => {
   if (response.ok) return response.json();
   const payload = await response.json().catch(() => null);
@@ -133,18 +149,28 @@ const PrecheckRow = React.memo(function PrecheckRow({
     onUseSavingChange?.(1);
     onError?.(null);
 
+    const startedAt = performance.now();
     try {
       setUseInMap?.(wmId, next);
-      await fetch(`${apiBaseUrl}/work-masters/${wmId}/precheck`, {
+      const response = await fetch(`${apiBaseUrl}/work-masters/${wmId}/precheck`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ use_yn: next }),
-      }).then(handleResponse);
+      });
+      await handleResponse(response);
+      if (DEBUG_PRECHECK_TIMING) {
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        console.log(`[WM pre-check] precheck PATCH ok (${elapsedMs}ms)`, { wmId, use_yn: next, status: response.status });
+      }
     } catch (err) {
       setChecked(previous);
       setUseInMap?.(wmId, previous);
       const message = err instanceof Error ? err.message : '저장하지 못했습니다.';
       onError?.(message);
+      if (DEBUG_PRECHECK_TIMING) {
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        console.log(`[WM pre-check] precheck PATCH failed (${elapsedMs}ms)`, { wmId, use_yn: next, error: message });
+      }
     } finally {
       setSavingUse(false);
       onUseSavingChange?.(-1);
@@ -233,7 +259,12 @@ const PrecheckRow = React.memo(function PrecheckRow({
         if (node) rowRefs.current.set(wmId, node);
         else rowRefs.current.delete(wmId);
       }}
-      style={{ borderBottom: '1px solid #f1f5f9' }}
+      style={{
+        borderBottom: '1px solid #f1f5f9',
+        contentVisibility: 'auto',
+        containIntrinsicSize: '1px 120px',
+        contain: 'layout style paint',
+      }}
     >
       <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: savingUse ? 'not-allowed' : 'pointer' }}>
