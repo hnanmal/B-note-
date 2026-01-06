@@ -17,13 +17,27 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
   const [sortState, setSortState] = useState({ key: null, direction: null });
   const [sortMenu, setSortMenu] = useState({ open: false, key: null, x: 0, y: 0 });
   const [editingWorkMasterId, setEditingWorkMasterId] = useState(null);
-  const [editingSpec, setEditingSpec] = useState('');
+  const [editingSpecSeed, setEditingSpecSeed] = useState('');
   const [savingWorkMasterId, setSavingWorkMasterId] = useState(null);
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef(new Map());
   const pendingRestoreRef = useRef(null);
   const specTextareaRef = useRef(null);
   const sortMenuRef = useRef(null);
+
+  const insertNewlineAtCaret = useCallback((target) => {
+    const start = target.selectionStart ?? target.value.length;
+    const end = target.selectionEnd ?? target.value.length;
+    target.value = `${target.value.slice(0, start)}\n${target.value.slice(end)}`;
+    requestAnimationFrame(() => {
+      try {
+        target.selectionStart = start + 1;
+        target.selectionEnd = start + 1;
+      } catch {
+        // ignore
+      }
+    });
+  }, []);
 
   const fetchSummary = useCallback(async () => {
     if (!apiBaseUrl) return;
@@ -70,7 +84,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     const wmId = row?.work_master_id ?? null;
     if (!wmId) return;
     setEditingWorkMasterId(wmId);
-    setEditingSpec((row?.add_spec ?? '').toString());
+    setEditingSpecSeed((row?.add_spec ?? '').toString());
   }, []);
 
   useEffect(() => {
@@ -114,11 +128,12 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
 
   const cancelSpecEdit = useCallback(() => {
     setEditingWorkMasterId(null);
-    setEditingSpec('');
+    setEditingSpecSeed('');
   }, []);
 
   const saveSpecEdit = useCallback(async () => {
     if (!apiBaseUrl || !editingWorkMasterId) return;
+    const nextSpec = (specTextareaRef.current?.value ?? editingSpecSeed).toString();
     const container = scrollContainerRef.current;
     pendingRestoreRef.current = {
       scrollTop: container ? container.scrollTop : 0,
@@ -130,13 +145,13 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
       await fetch(`${apiBaseUrl}/work-masters/${editingWorkMasterId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ add_spec: editingSpec }),
+        body: JSON.stringify({ add_spec: nextSpec }),
       }).then(handleResponse);
       setEditingWorkMasterId(null);
-      setEditingSpec('');
+      setEditingSpecSeed('');
       setRows((prev) => prev.map((row) => (
         row?.work_master_id === editingWorkMasterId
-          ? { ...row, add_spec: editingSpec }
+          ? { ...row, add_spec: nextSpec }
           : row
       )));
     } catch (err) {
@@ -145,7 +160,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     } finally {
       setSavingWorkMasterId(null);
     }
-  }, [apiBaseUrl, editingSpec, editingWorkMasterId]);
+  }, [apiBaseUrl, editingSpecSeed, editingWorkMasterId]);
 
   useEffect(() => {
     fetchSummary();
@@ -644,29 +659,14 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <textarea
                           ref={specTextareaRef}
-                          value={editingSpec}
-                          onChange={(e) => setEditingSpec(e.target.value)}
+                          key={editingWorkMasterId}
+                          defaultValue={editingSpecSeed}
                           onKeyDown={(event) => {
                             if (event.key !== 'Enter') return;
                             if (event.altKey) {
                               event.preventDefault();
                               const target = event.target;
-                              if (!(target instanceof HTMLTextAreaElement)) {
-                                setEditingSpec((prev) => `${prev}\n`);
-                                return;
-                              }
-                              const start = target.selectionStart ?? target.value.length;
-                              const end = target.selectionEnd ?? target.value.length;
-                              const nextValue = `${target.value.slice(0, start)}\n${target.value.slice(end)}`;
-                              setEditingSpec(nextValue);
-                              requestAnimationFrame(() => {
-                                try {
-                                  target.selectionStart = start + 1;
-                                  target.selectionEnd = start + 1;
-                                } catch {
-                                  // ignore
-                                }
-                              });
+                              if (target instanceof HTMLTextAreaElement) insertNewlineAtCaret(target);
                               return;
                             }
                             event.preventDefault();
