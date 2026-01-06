@@ -49,6 +49,16 @@ function App() {
     symbol_value: '',
   });
   const [savingCalcEntryId, setSavingCalcEntryId] = useState(null);
+  const [familyListIndex, setFamilyListIndex] = useState([]);
+  const [familyListIndexLoading, setFamilyListIndexLoading] = useState(false);
+  const [addingCalcEntry, setAddingCalcEntry] = useState(false);
+  const [newCalcEntryValues, setNewCalcEntryValues] = useState({
+    family_list_id: '',
+    calc_code: '',
+    symbol_key: '',
+    symbol_value: '',
+  });
+  const [deletingCalcEntryId, setDeletingCalcEntryId] = useState(null);
   const containerRef = useRef(null);
   const SIDEBAR_OPEN_WIDTH = 180;
   const SIDEBAR_COLLAPSED_WIDTH = 64;
@@ -215,10 +225,14 @@ function App() {
     setSavingCalcEntryId(editingCalcEntryId);
     setCalcDictionaryError(null);
     try {
+      const payload = {
+        ...editingCalcEntryValues,
+        calc_code: editingCalcEntryValues.calc_code.trim() ? editingCalcEntryValues.calc_code : null,
+      };
       const response = await fetch(`${projectApiBase}/calc-dictionary/${editingCalcEntryId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingCalcEntryValues),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
@@ -236,10 +250,111 @@ function App() {
     }
   }, [editingCalcEntryId, editingCalcEntryValues, fetchCalcDictionaryIndex, projectApiBase]);
 
+  const fetchFamilyListIndex = useCallback(async () => {
+    setFamilyListIndexLoading(true);
+    try {
+      const response = await fetch(`${projectApiBase}/family-list/`);
+      if (!response.ok) throw new Error('Family List를 불러오지 못했습니다.');
+      const payload = await response.json().catch(() => []);
+      const list = Array.isArray(payload) ? payload : [];
+      list.sort((a, b) => {
+        const seqA = (a?.sequence_number ?? '').toString();
+        const seqB = (b?.sequence_number ?? '').toString();
+        if (seqA && seqB && seqA !== seqB) return seqA.localeCompare(seqB);
+        if (seqA && !seqB) return -1;
+        if (!seqA && seqB) return 1;
+        const nameA = (a?.name ?? '').toString();
+        const nameB = (b?.name ?? '').toString();
+        return nameA.localeCompare(nameB);
+      });
+      setFamilyListIndex(list);
+    } catch {
+      setFamilyListIndex([]);
+    } finally {
+      setFamilyListIndexLoading(false);
+    }
+  }, [projectApiBase]);
+
+  const handleNewCalcEntryFieldChange = useCallback((field, value) => {
+    setNewCalcEntryValues((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const addCalcDictionaryEntry = useCallback(async () => {
+    if (addingCalcEntry) return;
+    const familyId = Number(newCalcEntryValues.family_list_id);
+    if (!Number.isFinite(familyId) || familyId <= 0) {
+      setCalcDictionaryError('Family 항목을 선택하세요.');
+      return;
+    }
+    const symbolKey = newCalcEntryValues.symbol_key.trim();
+    const symbolValue = newCalcEntryValues.symbol_value.trim();
+    if (!symbolKey || !symbolValue) {
+      setCalcDictionaryError('Symbol Key/Value는 필수입니다.');
+      return;
+    }
+    setAddingCalcEntry(true);
+    setCalcDictionaryError(null);
+    try {
+      const payload = {
+        calc_code: newCalcEntryValues.calc_code.trim() ? newCalcEntryValues.calc_code.trim() : null,
+        symbol_key: symbolKey,
+        symbol_value: symbolValue,
+      };
+      const response = await fetch(`${projectApiBase}/family-list/${familyId}/calc-dictionary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.detail || body?.message || 'Calc Dictionary 항목을 추가하지 못했습니다.';
+        throw new Error(message);
+      }
+      await response.json();
+      setNewCalcEntryValues({ family_list_id: '', calc_code: '', symbol_key: '', symbol_value: '' });
+      await fetchCalcDictionaryIndex();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Calc Dictionary 항목을 추가하지 못했습니다.';
+      setCalcDictionaryError(message);
+    } finally {
+      setAddingCalcEntry(false);
+    }
+  }, [addingCalcEntry, fetchCalcDictionaryIndex, newCalcEntryValues, projectApiBase]);
+
+  const deleteCalcDictionaryEntry = useCallback(async (entryId) => {
+    if (!entryId) return;
+    if (deletingCalcEntryId) return;
+    setDeletingCalcEntryId(entryId);
+    setCalcDictionaryError(null);
+    try {
+      const response = await fetch(`${projectApiBase}/calc-dictionary/${entryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calc_code: null }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.detail || body?.message || 'Calc Code를 삭제하지 못했습니다.';
+        throw new Error(message);
+      }
+      await response.json();
+      if (editingCalcEntryId === entryId) {
+        setEditingCalcEntryId(null);
+      }
+      await fetchCalcDictionaryIndex();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Calc Code를 삭제하지 못했습니다.';
+      setCalcDictionaryError(message);
+    } finally {
+      setDeletingCalcEntryId(null);
+    }
+  }, [deletingCalcEntryId, editingCalcEntryId, fetchCalcDictionaryIndex, projectApiBase]);
+
   useEffect(() => {
     if (activePage !== 'calcDictionary') return;
     fetchCalcDictionaryIndex();
-  }, [activePage, fetchCalcDictionaryIndex]);
+    fetchFamilyListIndex();
+  }, [activePage, fetchCalcDictionaryIndex, fetchFamilyListIndex]);
 
   useEffect(() => {
     if (activePage !== 'calcDictionary' && editingCalcEntryId) {
@@ -748,18 +863,121 @@ function App() {
                   flexDirection: 'column',
                 }}
               >
+                {(() => {
+                  const visibleEntries = (calcDictionaryEntries || []).filter((entry) => {
+                    const code = (entry?.calc_code ?? '').toString().trim();
+                    return Boolean(code);
+                  });
+
+                  const selectedFamilyId = Number(newCalcEntryValues.family_list_id);
+                  const selectedFamily = Number.isFinite(selectedFamilyId)
+                    ? familyListIndex.find((item) => Number(item?.id) === selectedFamilyId)
+                    : null;
+                  const selectedSequence = selectedFamily?.sequence_number ?? '';
+                  const selectedType = selectedFamily?.item_type ?? '';
+
+                  return (
+                    <>
                 {calcDictionaryLoading ? (
                   <div style={{ fontSize: 12, color: '#0f172a' }}>
                     전체 Calc Dictionary를 불러오는 중입니다...
                   </div>
                 ) : calcDictionaryError ? (
                   <div style={{ fontSize: 12, color: '#b91c1c' }}>{calcDictionaryError}</div>
-                ) : calcDictionaryEntries.length === 0 ? (
+                ) : visibleEntries.length === 0 ? (
                   <div style={{ fontSize: 12, color: '#64748b' }}>
                     등록된 Calc Dictionary 항목이 없습니다.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'hidden' }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '120px 1fr 90px 1fr 1fr 1fr 140px',
+                        gap: 12,
+                        fontSize: 11,
+                        color: '#0f172a',
+                        padding: '8px 0',
+                        borderBottom: '1px solid #e5e7eb',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span style={{ color: '#64748b' }}>{selectedSequence || '—'}</span>
+                      <span>
+                        <select
+                          value={newCalcEntryValues.family_list_id}
+                          onChange={(event) => {
+                            const nextId = event.target.value;
+                            const nextItem = familyListIndex.find((item) => String(item?.id) === String(nextId));
+                            const nextCalcCode = (nextItem?.sequence_number ?? '').toString().trim();
+                            setNewCalcEntryValues((prev) => ({
+                              ...prev,
+                              family_list_id: nextId,
+                              calc_code: nextCalcCode,
+                            }));
+                          }}
+                          disabled={familyListIndexLoading || addingCalcEntry}
+                          style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 11 }}
+                        >
+                          <option value="">Family 선택</option>
+                          {familyListIndex.map((item) => {
+                            const id = item?.id;
+                            const label = [item?.sequence_number, item?.name].filter(Boolean).join(' / ');
+                            return (
+                              <option key={id} value={id}>
+                                {label || `ID ${id}`}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </span>
+                      <span style={{ color: '#64748b' }}>{selectedType || '—'}</span>
+                      <span>
+                        <input
+                          value={newCalcEntryValues.calc_code}
+                          onChange={(event) => handleNewCalcEntryFieldChange('calc_code', event.target.value)}
+                          disabled={addingCalcEntry}
+                          placeholder="Calc Code"
+                          style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 11 }}
+                        />
+                      </span>
+                      <span>
+                        <input
+                          value={newCalcEntryValues.symbol_key}
+                          onChange={(event) => handleNewCalcEntryFieldChange('symbol_key', event.target.value)}
+                          disabled={addingCalcEntry}
+                          placeholder="Symbol Key"
+                          style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 11 }}
+                        />
+                      </span>
+                      <span>
+                        <input
+                          value={newCalcEntryValues.symbol_value}
+                          onChange={(event) => handleNewCalcEntryFieldChange('symbol_value', event.target.value)}
+                          disabled={addingCalcEntry}
+                          placeholder="Symbol Value"
+                          style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 11 }}
+                        />
+                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={addCalcDictionaryEntry}
+                          disabled={addingCalcEntry || familyListIndexLoading}
+                          style={{
+                            padding: '2px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #2563eb',
+                            background: addingCalcEntry ? '#93c5fd' : '#2563eb',
+                            color: '#fff',
+                            fontSize: 11,
+                            cursor: addingCalcEntry || familyListIndexLoading ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {addingCalcEntry ? '추가 중...' : '추가'}
+                        </button>
+                      </div>
+                    </div>
                     <div
                       style={{
                         display: 'grid',
@@ -781,7 +999,7 @@ function App() {
                       <span style={{ textAlign: 'right' }}>작업</span>
                     </div>
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {calcDictionaryEntries.map((entry) => {
+                      {visibleEntries.map((entry) => {
                         const isEditing = editingCalcEntryId === entry.id;
                         return (
                           <div
@@ -868,20 +1086,39 @@ function App() {
                                   </button>
                                 </>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => startEditingCalcEntry(entry)}
-                                  style={{
-                                    padding: '2px 10px',
-                                    borderRadius: 4,
-                                    border: '1px solid #cbd5f5',
-                                    background: '#fff',
-                                    fontSize: 11,
-                                    cursor: 'pointer',
-                                  }}
-                                >
-                                  수정
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditingCalcEntry(entry)}
+                                    disabled={Boolean(deletingCalcEntryId)}
+                                    style={{
+                                      padding: '2px 10px',
+                                      borderRadius: 4,
+                                      border: '1px solid #cbd5f5',
+                                      background: '#fff',
+                                      fontSize: 11,
+                                      cursor: deletingCalcEntryId ? 'not-allowed' : 'pointer',
+                                    }}
+                                  >
+                                    수정
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteCalcDictionaryEntry(entry.id)}
+                                    disabled={deletingCalcEntryId === entry.id}
+                                    style={{
+                                      padding: '2px 10px',
+                                      borderRadius: 4,
+                                      border: '1px solid #ef4444',
+                                      background: deletingCalcEntryId === entry.id ? '#fecaca' : '#fff',
+                                      color: '#b91c1c',
+                                      fontSize: 11,
+                                      cursor: deletingCalcEntryId === entry.id ? 'not-allowed' : 'pointer',
+                                    }}
+                                  >
+                                    {deletingCalcEntryId === entry.id ? '삭제 중...' : '삭제'}
+                                  </button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -890,6 +1127,9 @@ function App() {
                     </div>
                   </div>
                 )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
