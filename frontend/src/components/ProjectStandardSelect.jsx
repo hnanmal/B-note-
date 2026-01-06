@@ -683,9 +683,9 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             >
               {gaugeValue || ' '}
             </span>
-            {isPrechecked && (
-              <span style={{ fontSize: 11, fontWeight: 800, color: '#9333ea' }}>사전체크됨</span>
-            )}
+            <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: '#dc2626' }}>
+              {isPrechecked ? '(사전체크됨)' : ''}
+            </span>
           </div>
         <div
           style={{

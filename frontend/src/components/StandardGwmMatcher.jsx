@@ -500,9 +500,9 @@ export default function StandardGwmMatcher({ selectedNode, onTreeRefresh, apiBas
                                                                     ) : (
                                                                         <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>기본</span>
                                                                     )}
-                                                                    {isPrechecked && (
-                                                                        <span style={{ fontSize: 11, color: '#9333ea', fontWeight: 800 }}>사전체크됨</span>
-                                                                    )}
+                                                                    <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: '#dc2626' }}>
+                                                                        {isPrechecked ? '(사전체크됨)' : ''}
+                                                                    </span>
                                                                 </div>
                                                                 <div style={{ fontSize: 13, color: '#444', marginTop: 4 }}>{[w.cat_mid_desc, w.cat_small_desc].filter(Boolean).join(' / ')}</div>
                                                                 {attrs && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{attrs}{w.uom1 ? ` | UoM: ${w.uom1}` : ''}</div>}
