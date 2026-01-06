@@ -2012,6 +2012,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
               externalCheckboxSelection={Array.from(selectedStdItems)}
               apiBaseUrl={apiBaseUrl}
               onItemsChange={setStandardItems}
+              showAddControls={!isProjectContext}
               hideDeriveControls={isProjectContext}
               editDeleteMode={isProjectContext ? 'none' : 'all'}
             />
