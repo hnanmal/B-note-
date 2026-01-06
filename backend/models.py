@@ -202,10 +202,11 @@ class CalcDictionaryEntry(Base):
     __tablename__ = "calc_dictionary"
 
     id = Column(Integer, primary_key=True, index=True)
-    family_list_id = Column(Integer, ForeignKey("family_list.id"), nullable=False)
+    family_list_id = Column(Integer, ForeignKey("family_list.id"), nullable=True)
     calc_code = Column(String, nullable=True)
     symbol_key = Column(String, nullable=False)
     symbol_value = Column(String, nullable=False)
+    is_deleted = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     family_list_item = relationship(

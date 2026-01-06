@@ -46,9 +46,63 @@ def ensure_calc_dictionary_columns(engine):
             ).fetchall()
         except OperationalError:
             return
+        if not columns:
+            return
         column_names = [col[1] for col in columns]
         if "calc_code" not in column_names:
             conn.execute(text("ALTER TABLE calc_dictionary ADD COLUMN calc_code TEXT"))
+
+        # Ensure soft-delete flag.
+        if "is_deleted" not in column_names:
+            conn.execute(
+                text(
+                    "ALTER TABLE calc_dictionary ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0"
+                )
+            )
+
+        # Make family_list_id nullable (SQLite requires rebuild).
+        notnull_by_name = {col[1]: col[3] for col in columns}
+        family_notnull = int(notnull_by_name.get("family_list_id", 0) or 0)
+        if family_notnull == 1:
+            conn.execute(text("ALTER TABLE calc_dictionary RENAME TO calc_dictionary_old"))
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE calc_dictionary (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        family_list_id INTEGER,
+                        calc_code TEXT,
+                        symbol_key TEXT NOT NULL,
+                        symbol_value TEXT NOT NULL,
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(family_list_id) REFERENCES family_list(id)
+                    )
+                    """
+                )
+            )
+            old_cols = conn.execute(text("PRAGMA table_info('calc_dictionary_old')")).fetchall()
+            old_names = {col[1] for col in old_cols}
+            calc_code_expr = "calc_code" if "calc_code" in old_names else "NULL"
+            is_deleted_expr = "COALESCE(is_deleted, 0)" if "is_deleted" in old_names else "0"
+            conn.execute(
+                text(
+                    f"""
+                    INSERT INTO calc_dictionary (id, family_list_id, calc_code, symbol_key, symbol_value, is_deleted, created_at)
+                    SELECT id, family_list_id, {calc_code_expr}, symbol_key, symbol_value, {is_deleted_expr}, created_at
+                    FROM calc_dictionary_old
+                    """
+                )
+            )
+            conn.execute(text("DROP TABLE calc_dictionary_old"))
+
+        # Normalize is_deleted values and keep legacy behavior: NULL calc_code rows were treated as deleted.
+        conn.execute(text("UPDATE calc_dictionary SET is_deleted = 0 WHERE is_deleted IS NULL"))
+        conn.execute(
+            text(
+                "UPDATE calc_dictionary SET is_deleted = 1 WHERE is_deleted = 0 AND calc_code IS NULL"
+            )
+        )
 
 
 def ensure_gwm_family_assign_columns(engine):

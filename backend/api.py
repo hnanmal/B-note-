@@ -1482,6 +1482,24 @@ def read_project_calc_dictionary(
     return crud.list_all_calc_dictionary_entries(db)
 
 
+@router.post(
+    "/project/{project_identifier}/calc-dictionary",
+    response_model=schemas.CalcDictionaryEntry,
+    tags=["Project Data"],
+)
+def create_project_calc_dictionary_entry(
+    project_identifier: str,
+    payload: schemas.ProjectCalcDictionaryEntryCreate,
+    db: Session = Depends(get_project_db_session),
+):
+    family_id = payload.family_list_id
+    if family_id is not None:
+        family_item = crud.get_family_item(db, family_id)
+        if not family_item:
+            raise HTTPException(status_code=404, detail="FamilyList item not found")
+    return crud.create_project_calc_dictionary_entry(db, payload)
+
+
 @router.patch(
     "/project/{project_identifier}/calc-dictionary/{entry_id}",
     response_model=schemas.CalcDictionaryEntry,
@@ -1503,6 +1521,24 @@ def update_project_calc_dictionary_entry(
     if not updated:
         raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
     return updated
+
+
+@router.delete(
+    "/project/{project_identifier}/calc-dictionary/{entry_id}",
+    tags=["Project Data"],
+)
+def delete_project_calc_dictionary_entry(
+    project_identifier: str,
+    entry_id: int,
+    db: Session = Depends(get_project_db_session),
+):
+    entry = crud.get_calc_dictionary_entry(db, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    updated = crud.update_calc_dictionary_entry(db, entry_id=entry_id, updates={"is_deleted": 1})
+    if not updated:
+        raise HTTPException(status_code=404, detail="Calc dictionary entry not found")
+    return {"message": "deleted", "id": entry_id}
 
 
 @router.post(

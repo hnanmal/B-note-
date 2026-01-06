@@ -281,11 +281,6 @@ function App() {
 
   const addCalcDictionaryEntry = useCallback(async () => {
     if (addingCalcEntry) return;
-    const familyId = Number(newCalcEntryValues.family_list_id);
-    if (!Number.isFinite(familyId) || familyId <= 0) {
-      setCalcDictionaryError('Family 항목을 선택하세요.');
-      return;
-    }
     const symbolKey = newCalcEntryValues.symbol_key.trim();
     const symbolValue = newCalcEntryValues.symbol_value.trim();
     if (!symbolKey || !symbolValue) {
@@ -295,12 +290,15 @@ function App() {
     setAddingCalcEntry(true);
     setCalcDictionaryError(null);
     try {
+      const familyIdRaw = newCalcEntryValues.family_list_id;
+      const familyId = Number(familyIdRaw);
       const payload = {
+        family_list_id: Number.isFinite(familyId) && familyId > 0 ? familyId : null,
         calc_code: newCalcEntryValues.calc_code.trim() ? newCalcEntryValues.calc_code.trim() : null,
         symbol_key: symbolKey,
         symbol_value: symbolValue,
       };
-      const response = await fetch(`${projectApiBase}/family-list/${familyId}/calc-dictionary`, {
+      const response = await fetch(`${projectApiBase}/calc-dictionary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -327,14 +325,10 @@ function App() {
     setDeletingCalcEntryId(entryId);
     setCalcDictionaryError(null);
     try {
-      const response = await fetch(`${projectApiBase}/calc-dictionary/${entryId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ calc_code: null }),
-      });
+      const response = await fetch(`${projectApiBase}/calc-dictionary/${entryId}`, { method: 'DELETE' });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        const message = body?.detail || body?.message || 'Calc Code를 삭제하지 못했습니다.';
+        const message = body?.detail || body?.message || 'Calc Dictionary 항목을 삭제하지 못했습니다.';
         throw new Error(message);
       }
       await response.json();
@@ -343,7 +337,7 @@ function App() {
       }
       await fetchCalcDictionaryIndex();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Calc Code를 삭제하지 못했습니다.';
+      const message = error instanceof Error ? error.message : 'Calc Dictionary 항목을 삭제하지 못했습니다.';
       setCalcDictionaryError(message);
     } finally {
       setDeletingCalcEntryId(null);
@@ -864,10 +858,7 @@ function App() {
                 }}
               >
                 {(() => {
-                  const visibleEntries = (calcDictionaryEntries || []).filter((entry) => {
-                    const code = (entry?.calc_code ?? '').toString().trim();
-                    return Boolean(code);
-                  });
+                  const visibleEntries = calcDictionaryEntries || [];
 
                   const selectedFamilyId = Number(newCalcEntryValues.family_list_id);
                   const selectedFamily = Number.isFinite(selectedFamilyId)

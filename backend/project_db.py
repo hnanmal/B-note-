@@ -212,6 +212,54 @@ def ensure_extra_tables(db_path: Path) -> None:
         indexes = {row[1] for row in cursor.fetchall()}
         if "ix_work_masters_work_master_code" in indexes:
             cursor.execute("DROP INDEX IF EXISTS ix_work_masters_work_master_code")
+
+        # calc_dictionary migrations
+        cursor.execute("PRAGMA table_info(calc_dictionary)")
+        calc_cols = cursor.fetchall()
+        if calc_cols:
+            col_names = {row[1] for row in calc_cols}
+            notnull_by_name = {row[1]: row[3] for row in calc_cols}
+            if "is_deleted" not in col_names:
+                cursor.execute(
+                    "ALTER TABLE calc_dictionary ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0"
+                )
+                col_names.add("is_deleted")
+
+            family_notnull = int(notnull_by_name.get("family_list_id", 0) or 0)
+            if family_notnull == 1:
+                cursor.execute("ALTER TABLE calc_dictionary RENAME TO calc_dictionary_old")
+                cursor.execute(
+                    """
+                    CREATE TABLE calc_dictionary (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        family_list_id INTEGER,
+                        calc_code TEXT,
+                        symbol_key TEXT NOT NULL,
+                        symbol_value TEXT NOT NULL,
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        FOREIGN KEY(family_list_id) REFERENCES family_list(id)
+                    )
+                    """
+                )
+                cursor.execute("PRAGMA table_info(calc_dictionary_old)")
+                old_cols = cursor.fetchall()
+                old_names = {row[1] for row in old_cols}
+                calc_code_expr = "calc_code" if "calc_code" in old_names else "NULL"
+                is_deleted_expr = "COALESCE(is_deleted, 0)" if "is_deleted" in old_names else "0"
+                cursor.execute(
+                    f"""
+                    INSERT INTO calc_dictionary (id, family_list_id, calc_code, symbol_key, symbol_value, is_deleted, created_at)
+                    SELECT id, family_list_id, {calc_code_expr}, symbol_key, symbol_value, {is_deleted_expr}, created_at
+                    FROM calc_dictionary_old
+                    """
+                )
+                cursor.execute("DROP TABLE calc_dictionary_old")
+
+            cursor.execute("UPDATE calc_dictionary SET is_deleted = 0 WHERE is_deleted IS NULL")
+            cursor.execute(
+                "UPDATE calc_dictionary SET is_deleted = 1 WHERE is_deleted = 0 AND calc_code IS NULL"
+            )
         conn.commit()
     finally:
         conn.close()

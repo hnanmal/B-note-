@@ -260,9 +260,14 @@ class CalcDictionaryEntryCreate(CalcDictionaryEntryBase):
     pass
 
 
+class ProjectCalcDictionaryEntryCreate(CalcDictionaryEntryBase):
+    family_list_id: Optional[int] = None
+
+
 class CalcDictionaryEntryUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    family_list_id: Optional[int] = None
     calc_code: Optional[str] = None
     symbol_key: Optional[str] = None
     symbol_value: Optional[str] = None
@@ -272,7 +277,7 @@ class CalcDictionaryEntry(CalcDictionaryEntryBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    family_list_id: int
+    family_list_id: Optional[int] = None
     created_at: datetime.datetime
     family_item: Optional[_FamilyListWithoutRelations] = None
 
@@ -280,7 +285,7 @@ class CalcDictionaryEntry(CalcDictionaryEntryBase):
 class CalcDictionarySymbol(BaseModel):
     """Minimal calc_dictionary entry for exports (cart row context)."""
 
-    family_list_id: int
+    family_list_id: Optional[int] = None
     family_name: Optional[str] = None
     calc_code: Optional[str] = None
     symbol_key: str

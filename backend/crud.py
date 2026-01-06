@@ -491,6 +491,7 @@ def list_calc_dictionary_entries(db: Session, family_item_id: int):
     return (
         db.query(models.CalcDictionaryEntry)
         .filter(models.CalcDictionaryEntry.family_list_id == family_item_id)
+        .filter(models.CalcDictionaryEntry.is_deleted == 0)
         .order_by(models.CalcDictionaryEntry.symbol_key)
         .all()
     )
@@ -551,6 +552,7 @@ def list_all_calc_dictionary_entries(db: Session):
     return (
         db.query(models.CalcDictionaryEntry)
         .options(joinedload(models.CalcDictionaryEntry.family_list_item))
+        .filter(models.CalcDictionaryEntry.is_deleted == 0)
         .order_by(models.CalcDictionaryEntry.created_at.desc())
         .all()
     )
@@ -581,6 +583,7 @@ def sync_calc_dictionary_with_common_inputs(db: Session) -> int:
     entries = (
         db.query(models.CalcDictionaryEntry)
         .filter(models.CalcDictionaryEntry.symbol_key.isnot(None))
+        .filter(models.CalcDictionaryEntry.is_deleted == 0)
         .all()
     )
     updated = 0
@@ -611,6 +614,23 @@ def create_calc_dictionary_entry(
         calc_code=entry_in.calc_code,
         symbol_key=entry_in.symbol_key,
         symbol_value=entry_in.symbol_value,
+        is_deleted=0,
+    )
+    db.add(db_entry)
+    db.commit()
+    db.refresh(db_entry)
+    return db_entry
+
+
+def create_project_calc_dictionary_entry(
+    db: Session, entry_in: schemas.ProjectCalcDictionaryEntryCreate
+):
+    db_entry = models.CalcDictionaryEntry(
+        family_list_id=entry_in.family_list_id,
+        calc_code=entry_in.calc_code,
+        symbol_key=entry_in.symbol_key,
+        symbol_value=entry_in.symbol_value,
+        is_deleted=0,
     )
     db.add(db_entry)
     db.commit()
