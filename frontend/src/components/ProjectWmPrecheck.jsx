@@ -81,6 +81,7 @@ const shouldBoldWorkMasterLabel = (label) => {
 
 const PrecheckRow = React.memo(function PrecheckRow({
   wm,
+  isSelectedInStandardSelect,
   apiBaseUrl,
   loading,
   refreshToken,
@@ -276,7 +277,18 @@ const PrecheckRow = React.memo(function PrecheckRow({
           />
         </label>
       </td>
-      <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 800, color: '#0f172a' }}>{wmCode}</td>
+      <td
+        style={{
+          padding: '6px 10px',
+          whiteSpace: 'nowrap',
+          fontWeight: 800,
+          color: isSelectedInStandardSelect ? '#4c1d95' : '#0f172a',
+          background: isSelectedInStandardSelect ? '#ede9fe' : 'transparent',
+        }}
+        title={isSelectedInStandardSelect ? 'Standard Select에서 선택된 WorkMaster' : undefined}
+      >
+        {wmCode}
+      </td>
       <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontWeight: 800, color: '#9333ea' }}>{gaugeValue}</span>
@@ -446,6 +458,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const useMapRef = useRef(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedWorkMasterIds, setSelectedWorkMasterIds] = useState(() => new Set());
 
   const pendingRenderMeasureRef = useRef(null);
 
@@ -483,10 +496,31 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
     setError(null);
     const startedAt = DEBUG_PRECHECK_TIMING ? performance.now() : 0;
     try {
+      const isProjectContext = apiBaseUrl.includes('/project/');
       const [wmData, precheckData] = await Promise.all([
         fetch(`${apiBaseUrl}/work-masters/`).then(handleResponse),
         fetch(`${apiBaseUrl}/work-masters/precheck`).then(handleResponse),
       ]);
+
+      // Selected WorkMasters (from Project Standard Select)
+      if (isProjectContext) {
+        fetch(`${apiBaseUrl}/standard-items/`)
+          .then(handleResponse)
+          .then((items) => {
+            const next = new Set();
+            (Array.isArray(items) ? items : []).forEach((item) => {
+              const id = Number(item?.selected_work_master_id);
+              if (Number.isFinite(id) && id > 0) next.add(id);
+            });
+            setSelectedWorkMasterIds(next);
+            if (DEBUG_PRECHECK_TIMING) {
+              console.log('[WM pre-check] selected workmasters', { selected: next.size });
+            }
+          })
+          .catch(() => setSelectedWorkMasterIds(new Set()));
+      } else {
+        setSelectedWorkMasterIds(new Set());
+      }
 
       if (DEBUG_PRECHECK_TIMING) {
         const elapsedMs = Math.round(performance.now() - startedAt);
@@ -809,6 +843,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                 <PrecheckRow
                   key={wmId}
                   wm={wm}
+                  isSelectedInStandardSelect={Boolean(wmId != null && selectedWorkMasterIds.has(wmId))}
                   apiBaseUrl={apiBaseUrl}
                   loading={loading}
                   refreshToken={refreshToken}
