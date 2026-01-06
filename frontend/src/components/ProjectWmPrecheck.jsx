@@ -35,6 +35,30 @@ const sortWorkMastersByCodeGauge = (a, b) => {
   return gaugeA.localeCompare(gaugeB);
 };
 
+const formatWorkMasterSummary = (wm) => {
+  const parts = [];
+  const add = (label, value) => {
+    const v = (value ?? '').toString().trim();
+    if (!v) return;
+    parts.push(`${label}=${v}`);
+  };
+
+  add('Discipline', wm?.discipline);
+  add('Large', [wm?.cat_large_code, wm?.cat_large_desc].filter(Boolean).join(' '));
+  add('Mid', [wm?.cat_mid_code, wm?.cat_mid_desc].filter(Boolean).join(' '));
+  add('Small', [wm?.cat_small_code, wm?.cat_small_desc].filter(Boolean).join(' '));
+  add('Attr1', [wm?.attr1_code, wm?.attr1_spec].filter(Boolean).join(' '));
+  add('Attr2', [wm?.attr2_code, wm?.attr2_spec].filter(Boolean).join(' '));
+  add('Attr3', [wm?.attr3_code, wm?.attr3_spec].filter(Boolean).join(' '));
+  add('Attr4', [wm?.attr4_code, wm?.attr4_spec].filter(Boolean).join(' '));
+  add('Attr5', [wm?.attr5_code, wm?.attr5_spec].filter(Boolean).join(' '));
+  add('Attr6', [wm?.attr6_code, wm?.attr6_spec].filter(Boolean).join(' '));
+  add('Group', wm?.work_group_code);
+  add('New/Old', wm?.new_old_code);
+
+  return parts.join(' | ');
+};
+
 export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const [workMasters, setWorkMasters] = useState([]);
   const [useMap, setUseMap] = useState({});
@@ -162,33 +186,11 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const columns = useMemo(
     () => [
       { key: 'use', label: 'Use' },
-      { key: 'work_master_code', label: 'WM Code' },
+      { key: 'wm_code', label: 'WM Code' },
       { key: 'gauge', label: 'Gauge' },
-      { key: 'gauge_actions', label: 'Gauge Actions' },
-      { key: 'discipline', label: 'Discipline' },
-      { key: 'cat_large_code', label: 'Large Code' },
-      { key: 'cat_large_desc', label: 'Large Desc' },
-      { key: 'cat_mid_code', label: 'Mid Code' },
-      { key: 'cat_mid_desc', label: 'Mid Desc' },
-      { key: 'cat_small_code', label: 'Small Code' },
-      { key: 'cat_small_desc', label: 'Small Desc' },
-      { key: 'attr1_code', label: 'Attr1 Code' },
-      { key: 'attr1_spec', label: 'Attr1 Spec' },
-      { key: 'attr2_code', label: 'Attr2 Code' },
-      { key: 'attr2_spec', label: 'Attr2 Spec' },
-      { key: 'attr3_code', label: 'Attr3 Code' },
-      { key: 'attr3_spec', label: 'Attr3 Spec' },
-      { key: 'attr4_code', label: 'Attr4 Code' },
-      { key: 'attr4_spec', label: 'Attr4 Spec' },
-      { key: 'attr5_code', label: 'Attr5 Code' },
-      { key: 'attr5_spec', label: 'Attr5 Spec' },
-      { key: 'attr6_code', label: 'Attr6 Code' },
-      { key: 'attr6_spec', label: 'Attr6 Spec' },
-      { key: 'uom1', label: 'UOM1' },
-      { key: 'uom2', label: 'UOM2' },
-      { key: 'work_group_code', label: 'Group Code' },
-      { key: 'new_old_code', label: 'New/Old' },
-      { key: 'add_spec', label: 'Add Spec' },
+      { key: 'unit', label: 'Unit' },
+      { key: 'spec', label: 'Spec' },
+      { key: 'work_master', label: 'Work Master' },
     ],
     []
   );
@@ -255,6 +257,13 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
               const gaugeAdding = gaugeAddingId === wmId;
               const gaugeRemoving = gaugeRemovingId === wmId;
               const gaugeBusy = gaugeAddingId != null || gaugeRemovingId != null;
+              const wmCode = (wm?.work_master_code ?? '').toString().trim();
+              const wmTitle = wmCode ? (gaugeValue ? `${wmCode}(${gaugeValue})` : wmCode) : (gaugeValue ? `(${gaugeValue})` : '코드 정보 없음');
+              const headline =
+                wm?.cat_large_desc || wm?.cat_mid_desc || wm?.cat_small_desc || wmTitle;
+              const summary = formatWorkMasterSummary(wm);
+              const unitLabel = [wm?.uom1, wm?.uom2].filter(Boolean).join(' / ');
+              const specValue = (wm?.add_spec ?? '').toString();
               return (
                 <tr key={wmId} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
@@ -268,10 +277,10 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                       {saving ? <span style={{ fontSize: 11, color: '#6b7280' }}>Saving...</span> : null}
                     </label>
                   </td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 700 }}>{wm?.work_master_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{gaugeValue}</td>
+                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 800, color: '#0f172a' }}>{wmCode}</td>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 800, color: '#9333ea' }}>{gaugeValue}</span>
                       <button
                         type="button"
                         onClick={() => handleAddGauge(wmId)}
@@ -284,10 +293,10 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                           color: loading || gaugeBusy ? '#94a3b8' : '#0f172a',
                           cursor: loading || gaugeBusy ? 'not-allowed' : 'pointer',
                           fontSize: 11,
-                          fontWeight: 700,
+                          fontWeight: 800,
                         }}
                       >
-                        {gaugeAdding ? '추가 중...' : '게이지 추가'}
+                        {gaugeAdding ? '추가 중...' : '추가'}
                       </button>
                       <button
                         type="button"
@@ -301,37 +310,32 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                           color: loading || gaugeBusy || !gaugeValue ? '#fca5a5' : '#dc2626',
                           cursor: loading || gaugeBusy || !gaugeValue ? 'not-allowed' : 'pointer',
                           fontSize: 11,
-                          fontWeight: 700,
+                          fontWeight: 800,
                         }}
                       >
-                        {gaugeRemoving ? '삭제 중...' : '게이지 삭제'}
+                        {gaugeRemoving ? '삭제 중...' : '삭제'}
                       </button>
                     </div>
                   </td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.discipline ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.cat_large_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.cat_large_desc ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.cat_mid_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.cat_mid_desc ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.cat_small_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.cat_small_desc ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr1_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr1_spec ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr2_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr2_spec ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr3_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr3_spec ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr4_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr4_spec ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr5_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr5_spec ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr6_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.attr6_spec ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.uom1 ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.uom2 ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.work_group_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.new_old_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.add_spec ?? ''}</td>
+                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{unitLabel || ''}</td>
+                  <td style={{ padding: '6px 10px', minWidth: 260, maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{specValue}</td>
+                  <td style={{ padding: '8px 10px', minWidth: 420 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {headline}
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#9333ea', marginTop: 2 }}>
+                          {wmTitle}
+                        </div>
+                      </div>
+                      {summary && (
+                        <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                          {summary}
+                        </div>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               );
             })}
