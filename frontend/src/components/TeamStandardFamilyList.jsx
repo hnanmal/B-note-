@@ -219,6 +219,7 @@ const buildAssignedSubtree = (nodes, assignedRoots, ancestorMap, metadata) => {
 
 export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
   const isProjectContext = typeof apiBaseUrl === 'string' && apiBaseUrl.includes('/project/');
+  const [hideDerivedInStdTree, setHideDerivedInStdTree] = useState(() => isProjectContext);
   const [familyItems, setFamilyItems] = useState([]);
   const [filterType, setFilterType] = useState('ALL');
   const [status, setStatus] = useState(null);
@@ -1985,22 +1986,42 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
             }}
           >
             <span style={{ fontSize: 13, fontWeight: 600, color: '#475467' }}>Standard GWM Tree</span>
-            <button
-              type="button"
-              onClick={() => setIsStdTreeOpen((prev) => !prev)}
-              style={{
-                padding: '4px 10px',
-                borderRadius: 6,
-                border: '1px solid #cbd5f5',
-                background: isStdTreeOpen ? '#eff6ff' : '#fff',
-                color: isStdTreeOpen ? '#1d4ed8' : '#0f172a',
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              {isStdTreeOpen ? '닫기' : '열기'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {isProjectContext && (
+                <button
+                  type="button"
+                  onClick={() => setHideDerivedInStdTree((prev) => !prev)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    border: '1px solid #cbd5f5',
+                    background: hideDerivedInStdTree ? '#eff6ff' : '#fff',
+                    color: hideDerivedInStdTree ? '#1d4ed8' : '#0f172a',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {hideDerivedInStdTree ? '파생 숨김' : '파생 표시'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsStdTreeOpen((prev) => !prev)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  border: '1px solid #cbd5f5',
+                  background: isStdTreeOpen ? '#eff6ff' : '#fff',
+                  color: isStdTreeOpen ? '#1d4ed8' : '#0f172a',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {isStdTreeOpen ? '닫기' : '열기'}
+              </button>
+            </div>
           </div>
           <div
             style={{ flex: 1, minHeight: 0, display: isStdTreeOpen ? 'flex' : 'none', flexDirection: 'column' }}
@@ -2015,6 +2036,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
               showAddControls={!isProjectContext}
               hideDeriveControls={isProjectContext}
               editDeleteMode={isProjectContext ? 'none' : 'all'}
+              hideDerivedItems={isProjectContext && hideDerivedInStdTree}
             />
           </div>
           {!isStdTreeOpen && (
