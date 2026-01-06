@@ -767,6 +767,8 @@ def export_project_db_for_dynamo(
     )
 
     assignment_label_by_id = {}
+    assignment_family_list_id_by_id = {}
+    family_name_by_family_list_id = {}
     if assignment_ids:
         assigns = (
             db.query(models.GwmFamilyAssign)
@@ -776,6 +778,16 @@ def export_project_db_for_dynamo(
         for a in assigns:
             family_name = getattr(getattr(a, "family_list_item", None), "name", None)
             standard_name = getattr(getattr(a, "standard_item", None), "name", None)
+            family_list_id = getattr(a, "family_list_id", None)
+            if family_list_id is not None:
+                try:
+                    family_list_id_int = int(family_list_id)
+                except (TypeError, ValueError):
+                    family_list_id_int = None
+                if family_list_id_int is not None:
+                    assignment_family_list_id_by_id[a.id] = family_list_id_int
+                    if family_name:
+                        family_name_by_family_list_id[family_list_id_int] = family_name
             if family_name and standard_name:
                 label = f"{family_name} / {standard_name}"
             elif standard_name:
@@ -807,9 +819,14 @@ def export_project_db_for_dynamo(
             )
             .join(
                 models.WorkMaster,
-                models.WorkMaster.id == models.StandardItemWorkMasterSelect.work_master_id,
+                models.WorkMaster.id
+                == models.StandardItemWorkMasterSelect.work_master_id,
             )
-            .filter(models.StandardItemWorkMasterSelect.standard_item_id.in_(standard_item_ids))
+            .filter(
+                models.StandardItemWorkMasterSelect.standard_item_id.in_(
+                    standard_item_ids
+                )
+            )
             .all()
         )
         for standard_item_id, work_master_id, work_master_code, gauge in rows:
@@ -818,6 +835,32 @@ def export_project_db_for_dynamo(
                 "work_master_code": work_master_code,
                 "gauge": gauge,
             }
+
+    calc_dictionary_entries_by_family_list_id = {}
+    family_list_ids = sorted({fid for fid in assignment_family_list_id_by_id.values()})
+    if family_list_ids:
+        calc_entries = (
+            db.query(models.CalcDictionaryEntry)
+            .filter(models.CalcDictionaryEntry.family_list_id.in_(family_list_ids))
+            .order_by(
+                models.CalcDictionaryEntry.family_list_id,
+                models.CalcDictionaryEntry.symbol_key,
+            )
+            .all()
+        )
+        for entry in calc_entries:
+            fid = int(getattr(entry, "family_list_id", 0) or 0)
+            if not fid:
+                continue
+            calc_dictionary_entries_by_family_list_id.setdefault(fid, []).append(
+                schemas.CalcDictionarySymbol(
+                    family_list_id=fid,
+                    family_name=family_name_by_family_list_id.get(fid),
+                    calc_code=getattr(entry, "calc_code", None),
+                    symbol_key=getattr(entry, "symbol_key", ""),
+                    symbol_value=getattr(entry, "symbol_value", ""),
+                )
+            )
 
     for entry in cart_entries:
         entry.assignment_labels = [
@@ -833,6 +876,25 @@ def export_project_db_for_dynamo(
             for sid in (entry.standard_item_ids or [])
             for wm in [selected_work_master_by_standard_item_id.get(int(sid))]
             if wm
+        ]
+
+        family_list_ids_for_entry = []
+        seen_family_list_ids = set()
+        for aid in (entry.assignment_ids or []):
+            try:
+                aid_int = int(aid)
+            except (TypeError, ValueError):
+                continue
+            fid = assignment_family_list_id_by_id.get(aid_int)
+            if not fid or fid in seen_family_list_ids:
+                continue
+            seen_family_list_ids.add(fid)
+            family_list_ids_for_entry.append(fid)
+
+        entry.calc_dictionary_entries = [
+            calc_entry
+            for fid in family_list_ids_for_entry
+            for calc_entry in calc_dictionary_entries_by_family_list_id.get(fid, [])
         ]
     return {
         "project_identifier": project_identifier,

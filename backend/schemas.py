@@ -106,6 +106,7 @@ class WorkMasterCartEntry(WorkMasterCartEntryBase):
     assignment_labels: List[str] = Field(default_factory=list)
     standard_item_names: List[str] = Field(default_factory=list)
     work_masters: List[WorkMasterBrief] = Field(default_factory=list)
+    calc_dictionary_entries: List["CalcDictionarySymbol"] = Field(default_factory=list)
 
 
 # StandardItem Schemas
@@ -264,6 +265,16 @@ class CalcDictionaryEntry(CalcDictionaryEntryBase):
     family_list_id: int
     created_at: datetime.datetime
     family_item: Optional[_FamilyListWithoutRelations] = None
+
+
+class CalcDictionarySymbol(BaseModel):
+    """Minimal calc_dictionary entry for exports (cart row context)."""
+
+    family_list_id: int
+    family_name: Optional[str] = None
+    calc_code: Optional[str] = None
+    symbol_key: str
+    symbol_value: str
 
 
 class FamilyRevitTypeBase(BaseModel):
@@ -450,3 +461,4 @@ User.model_rebuild()
 FamilyListItem.model_rebuild()
 CalcDictionaryEntry.model_rebuild()
 FamilyRevitType.model_rebuild()
+WorkMasterCartEntry.model_rebuild()
