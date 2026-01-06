@@ -40,6 +40,8 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const [useMap, setUseMap] = useState({});
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState(null);
+  const [gaugeAddingId, setGaugeAddingId] = useState(null);
+  const [gaugeRemovingId, setGaugeRemovingId] = useState(null);
   const [error, setError] = useState(null);
 
   const fetchAll = useCallback(async () => {
@@ -83,10 +85,50 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
       if (Object.prototype.hasOwnProperty.call(useMap, workMasterId)) {
         return Boolean(useMap[workMasterId]);
       }
-      return true;
+      return false;
     },
     [useMap]
   );
+
+  const handleAddGauge = useCallback(async (workMasterId) => {
+    if (!apiBaseUrl) return;
+    if (!workMasterId) return;
+    if (gaugeAddingId != null || gaugeRemovingId != null) return;
+
+    setGaugeAddingId(workMasterId);
+    setError(null);
+    try {
+      await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/add-gauge`, {
+        method: 'POST',
+      }).then(handleResponse);
+      await fetchAll();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '게이지 항목을 생성할 수 없습니다.';
+      setError(message);
+    } finally {
+      setGaugeAddingId(null);
+    }
+  }, [apiBaseUrl, fetchAll, gaugeAddingId, gaugeRemovingId]);
+
+  const handleRemoveGauge = useCallback(async (workMasterId) => {
+    if (!apiBaseUrl) return;
+    if (!workMasterId) return;
+    if (gaugeAddingId != null || gaugeRemovingId != null) return;
+
+    setGaugeRemovingId(workMasterId);
+    setError(null);
+    try {
+      await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/remove-gauge`, {
+        method: 'POST',
+      }).then(handleResponse);
+      await fetchAll();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '게이지를 삭제할 수 없습니다.';
+      setError(message);
+    } finally {
+      setGaugeRemovingId(null);
+    }
+  }, [apiBaseUrl, fetchAll, gaugeAddingId, gaugeRemovingId]);
 
   const toggleUse = useCallback(
     async (workMasterId) => {
@@ -122,6 +164,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
       { key: 'use', label: 'Use' },
       { key: 'work_master_code', label: 'WM Code' },
       { key: 'gauge', label: 'Gauge' },
+      { key: 'gauge_actions', label: 'Gauge Actions' },
       { key: 'discipline', label: 'Discipline' },
       { key: 'cat_large_code', label: 'Large Code' },
       { key: 'cat_large_desc', label: 'Large Desc' },
@@ -208,6 +251,10 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
               const wmId = wm?.id;
               const checked = isChecked(wmId);
               const saving = savingId === wmId;
+              const gaugeValue = (wm?.gauge ?? '').toString().trim().toUpperCase();
+              const gaugeAdding = gaugeAddingId === wmId;
+              const gaugeRemoving = gaugeRemovingId === wmId;
+              const gaugeBusy = gaugeAddingId != null || gaugeRemovingId != null;
               return (
                 <tr key={wmId} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
@@ -222,7 +269,45 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                     </label>
                   </td>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 700 }}>{wm?.work_master_code ?? ''}</td>
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{(wm?.gauge ?? '').toString().trim().toUpperCase()}</td>
+                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{gaugeValue}</td>
+                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => handleAddGauge(wmId)}
+                        disabled={loading || gaugeBusy}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          border: '1px solid #cbd5f5',
+                          background: loading || gaugeBusy ? '#f1f5f9' : '#fff',
+                          color: loading || gaugeBusy ? '#94a3b8' : '#0f172a',
+                          cursor: loading || gaugeBusy ? 'not-allowed' : 'pointer',
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {gaugeAdding ? '추가 중...' : '게이지 추가'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGauge(wmId)}
+                        disabled={loading || gaugeBusy || !gaugeValue}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          border: '1px solid #f87171',
+                          background: loading || gaugeBusy || !gaugeValue ? '#fee2e2' : '#fff',
+                          color: loading || gaugeBusy || !gaugeValue ? '#fca5a5' : '#dc2626',
+                          cursor: loading || gaugeBusy || !gaugeValue ? 'not-allowed' : 'pointer',
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {gaugeRemoving ? '삭제 중...' : '게이지 삭제'}
+                      </button>
+                    </div>
+                  </td>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.discipline ?? ''}</td>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.cat_large_code ?? ''}</td>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{wm?.cat_large_desc ?? ''}</td>
