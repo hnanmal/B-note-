@@ -815,7 +815,9 @@ def export_project_db_for_dynamo(
                         family_name_by_family_list_id[family_list_id_int] = family_name
 
     standard_item_name_by_id = {}
-    standard_item_ids_to_load = sorted(set(standard_item_ids) | set(assignment_standard_item_ids))
+    standard_item_ids_to_load = sorted(
+        set(standard_item_ids) | set(assignment_standard_item_ids)
+    )
     if standard_item_ids_to_load:
         items = (
             db.query(models.StandardItem)
@@ -831,10 +833,16 @@ def export_project_db_for_dynamo(
             {
                 int(pid)
                 for pid in (derive_from_by_id.values() or [])
-                if pid is not None and (isinstance(pid, int) or (isinstance(pid, str) and str(pid).isdigit()))
+                if pid is not None
+                and (
+                    isinstance(pid, int)
+                    or (isinstance(pid, str) and str(pid).isdigit())
+                )
             }
         )
-        missing_parent_ids = [pid for pid in parent_ids if pid not in standard_item_name_by_id]
+        missing_parent_ids = [
+            pid for pid in parent_ids if pid not in standard_item_name_by_id
+        ]
         if missing_parent_ids:
             parent_items = (
                 db.query(models.StandardItem)
@@ -860,9 +868,9 @@ def export_project_db_for_dynamo(
                 formatted_name_by_id[item_id] = name
                 continue
             if pjt_abbr:
-                formatted_name_by_id[item_id] = f"{parent_name} [{pjt_abbr}]:: {name}"
+                formatted_name_by_id[item_id] = f"{parent_name} [{pjt_abbr}]::{name}"
             else:
-                formatted_name_by_id[item_id] = f"{parent_name}:: {name}"
+                formatted_name_by_id[item_id] = f"{parent_name}::{name}"
 
         standard_item_name_by_id = formatted_name_by_id
 
