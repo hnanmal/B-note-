@@ -963,7 +963,13 @@ function App() {
             >
               <div style={{ flex: 1, overflow: 'auto', padding: '0 0 0 8px', minWidth: 0 }}>
                 {activePage === 'matching' ? (
-                  <StandardTreeManager onNodeSelect={setSelectedNode} refreshSignal={treeRefreshKey} apiBaseUrl={projectApiBase} />
+                  <StandardTreeManager
+                    onNodeSelect={setSelectedNode}
+                    refreshSignal={treeRefreshKey}
+                    apiBaseUrl={projectApiBase}
+                    hideDerivedItems
+                    hideDeriveControls
+                  />
                 ) : (
                   <WorkMasterManager apiBaseUrl={projectApiBase} selectedFamilyNode={selectedNode?.node} />
                 )}

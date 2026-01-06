@@ -19,6 +19,8 @@ export default function StandardTreeManager({
     apiBaseUrl = API_BASE_URL,
     onItemsChange = () => {},
     externalSelectedId = null,
+    hideDerivedItems = false,
+    hideDeriveControls = false,
 }) {
     const [items, setItems] = useState([]);
     const [tree, setTree] = useState([]);
@@ -97,6 +99,9 @@ export default function StandardTreeManager({
             if (effectiveFilterType === 'GWM') return (i.type ?? '').toUpperCase() === 'GWM';
             if (effectiveFilterType === 'SWM') return (i.type ?? '').toUpperCase() === 'SWM';
             return true;
+        }).filter((i) => {
+            if (!hideDerivedItems) return true;
+            return !i?.derive_from;
         });
         const map = {};
         filtered.forEach(i => { map[i.id] = { ...i, children: [] }; });
@@ -144,7 +149,7 @@ export default function StandardTreeManager({
         });
 
         setTree(roots);
-    }, [items, filterType, swmMode]);
+    }, [items, filterType, swmMode, hideDerivedItems]);
 
     const itemById = useMemo(() => {
         const map = new Map();
@@ -691,16 +696,20 @@ export default function StandardTreeManager({
                         <button style={{ marginLeft: 8, ...smallBtn }} onClick={() => handleAdd(node.id)}>추가</button>
                     )}
                     {level === 1 && (node.type ?? '').toUpperCase() === 'GWM' && (
-                        <button
-                            style={{ marginLeft: 6, ...smallBtn }}
-                            onClick={() => handleDeriveGwmLevel1(node)}
-                        >파생생성</button>
+                        !hideDeriveControls && (
+                            <button
+                                style={{ marginLeft: 6, ...smallBtn }}
+                                onClick={() => handleDeriveGwmLevel1(node)}
+                            >파생생성</button>
+                        )
                     )}
                     {level === 2 && (node.type ?? '').toUpperCase() !== 'GWM' && !isDerived && (
-                        <button
-                            style={{ marginLeft: 6, ...smallBtn }}
-                            onClick={() => handleDerive(node, level)}
-                        >파생생성</button>
+                        !hideDeriveControls && (
+                            <button
+                                style={{ marginLeft: 6, ...smallBtn }}
+                                onClick={() => handleDerive(node, level)}
+                            >파생생성</button>
+                        )
                     )}
                     <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => startEdit(node)}>수정</button>
                     <button style={{ marginLeft: 6, ...smallBtn }} onClick={() => handleDelete(node.id)}>삭제</button>
