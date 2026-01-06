@@ -73,12 +73,26 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const [error, setError] = useState(null);
 
   const [editingWorkMasterId, setEditingWorkMasterId] = useState(null);
-  const [editingSpec, setEditingSpec] = useState('');
+  const [editingSpecSeed, setEditingSpecSeed] = useState('');
   const [savingSpecWorkMasterId, setSavingSpecWorkMasterId] = useState(null);
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef(new Map());
   const pendingRestoreRef = useRef(null);
   const specTextareaRef = useRef(null);
+
+  const insertNewlineAtCaret = useCallback((target) => {
+    const start = target.selectionStart ?? target.value.length;
+    const end = target.selectionEnd ?? target.value.length;
+    target.value = `${target.value.slice(0, start)}\n${target.value.slice(end)}`;
+    requestAnimationFrame(() => {
+      try {
+        target.selectionStart = start + 1;
+        target.selectionEnd = start + 1;
+      } catch {
+        // ignore
+      }
+    });
+  }, []);
 
   const fetchAll = useCallback(async () => {
     if (!apiBaseUrl) return;
@@ -141,12 +155,12 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
     const wmId = wm?.id ?? null;
     if (!wmId) return;
     setEditingWorkMasterId(wmId);
-    setEditingSpec((wm?.add_spec ?? '').toString());
+    setEditingSpecSeed((wm?.add_spec ?? '').toString());
   }, []);
 
   const cancelSpecEdit = useCallback(() => {
     setEditingWorkMasterId(null);
-    setEditingSpec('');
+    setEditingSpecSeed('');
   }, []);
 
   useEffect(() => {
@@ -168,6 +182,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
 
   const saveSpecEdit = useCallback(async () => {
     if (!apiBaseUrl || !editingWorkMasterId) return;
+    const nextSpec = (specTextareaRef.current?.value ?? editingSpecSeed).toString();
     const container = scrollContainerRef.current;
     pendingRestoreRef.current = {
       scrollTop: container ? container.scrollTop : 0,
@@ -179,13 +194,13 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
       const updated = await fetch(`${apiBaseUrl}/work-masters/${editingWorkMasterId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ add_spec: editingSpec }),
+        body: JSON.stringify({ add_spec: nextSpec }),
       }).then(handleResponse);
       setEditingWorkMasterId(null);
-      setEditingSpec('');
+      setEditingSpecSeed('');
       setWorkMasters((prev) => prev.map((wm) => (
         wm?.id === editingWorkMasterId
-          ? { ...wm, ...(updated || {}), add_spec: (updated?.add_spec ?? editingSpec) }
+          ? { ...wm, ...(updated || {}), add_spec: (updated?.add_spec ?? nextSpec) }
           : wm
       )));
     } catch (err) {
@@ -194,7 +209,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
     } finally {
       setSavingSpecWorkMasterId(null);
     }
-  }, [apiBaseUrl, editingSpec, editingWorkMasterId]);
+  }, [apiBaseUrl, editingSpecSeed, editingWorkMasterId]);
 
   const filteredWorkMasters = useMemo(() => {
     return workMasters.filter(matchesMatcherFilterRules).sort(sortWorkMastersByCodeGauge);
@@ -218,22 +233,36 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
     setGaugeAddingId(workMasterId);
     setError(null);
     try {
-      await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/add-gauge`, {
+      const created = await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/add-gauge`, {
         method: 'POST',
       }).then(handleResponse);
-      await fetchAll();
+
+      const updatedOriginal = await fetch(`${apiBaseUrl}/work-masters/${workMasterId}`).then(handleResponse);
+
+      if (updatedOriginal?.id) {
+        setWorkMasters((prev) => prev.map((wm) => (wm?.id === updatedOriginal.id ? updatedOriginal : wm)));
+      }
+      if (created?.id) {
+        setWorkMasters((prev) => {
+          const exists = prev.some((wm) => wm?.id === created.id);
+          return exists ? prev : [...prev, created];
+        });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : '게이지 항목을 생성할 수 없습니다.';
       setError(message);
     } finally {
       setGaugeAddingId(null);
     }
-  }, [apiBaseUrl, fetchAll, gaugeAddingId, gaugeRemovingId]);
+  }, [apiBaseUrl, gaugeAddingId, gaugeRemovingId]);
 
   const handleRemoveGauge = useCallback(async (workMasterId) => {
     if (!apiBaseUrl) return;
     if (!workMasterId) return;
     if (gaugeAddingId != null || gaugeRemovingId != null) return;
+
+    const target = workMasters.find((wm) => wm?.id === workMasterId);
+    const targetCode = (target?.work_master_code ?? '').toString().trim();
 
     setGaugeRemovingId(workMasterId);
     setError(null);
@@ -241,14 +270,35 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
       await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/remove-gauge`, {
         method: 'POST',
       }).then(handleResponse);
-      await fetchAll();
+      setWorkMasters((prev) => prev.filter((wm) => wm?.id !== workMasterId));
+      setUseMap((prev) => {
+        if (!Object.prototype.hasOwnProperty.call(prev, workMasterId)) return prev;
+        const next = { ...prev };
+        delete next[workMasterId];
+        return next;
+      });
+      if (editingWorkMasterId === workMasterId) {
+        setEditingWorkMasterId(null);
+        setEditingSpecSeed('');
+      }
+
+      if (targetCode) {
+        const refreshed = await fetch(`${apiBaseUrl}/work-masters/?search=${encodeURIComponent(targetCode)}`).then(handleResponse);
+        const refreshedGroup = (Array.isArray(refreshed) ? refreshed : []).filter((wm) => (
+          (wm?.work_master_code ?? '').toString().trim() === targetCode
+        ));
+        setWorkMasters((prev) => {
+          const others = prev.filter((wm) => (wm?.work_master_code ?? '').toString().trim() !== targetCode);
+          return [...others, ...refreshedGroup];
+        });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : '게이지를 삭제할 수 없습니다.';
       setError(message);
     } finally {
       setGaugeRemovingId(null);
     }
-  }, [apiBaseUrl, fetchAll, gaugeAddingId, gaugeRemovingId]);
+  }, [apiBaseUrl, editingWorkMasterId, gaugeAddingId, gaugeRemovingId, workMasters]);
 
   const toggleUse = useCallback(
     async (workMasterId) => {
@@ -428,29 +478,14 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <textarea
                           ref={specTextareaRef}
-                          value={editingSpec}
-                          onChange={(e) => setEditingSpec(e.target.value)}
+                          key={editingWorkMasterId}
+                          defaultValue={editingSpecSeed}
                           onKeyDown={(event) => {
                             if (event.key !== 'Enter') return;
                             if (event.altKey) {
                               event.preventDefault();
                               const target = event.target;
-                              if (!(target instanceof HTMLTextAreaElement)) {
-                                setEditingSpec((prev) => `${prev}\n`);
-                                return;
-                              }
-                              const start = target.selectionStart ?? target.value.length;
-                              const end = target.selectionEnd ?? target.value.length;
-                              const nextValue = `${target.value.slice(0, start)}\n${target.value.slice(end)}`;
-                              setEditingSpec(nextValue);
-                              requestAnimationFrame(() => {
-                                try {
-                                  target.selectionStart = start + 1;
-                                  target.selectionEnd = start + 1;
-                                } catch {
-                                  // ignore
-                                }
-                              });
+                              if (target instanceof HTMLTextAreaElement) insertNewlineAtCaret(target);
                               return;
                             }
                             event.preventDefault();
