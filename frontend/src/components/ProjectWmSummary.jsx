@@ -713,15 +713,17 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
                           width: '100%',
                           border: 'none',
                           background: 'transparent',
-                          padding: 0,
+                          padding: '2px 0',
                           textAlign: 'left',
                           cursor: 'pointer',
                           fontSize: 11,
                           color: '#0f172a',
+                          display: 'block',
+                          minHeight: 16,
                         }}
                         title="Spec 수정"
                       >
-                        {spec}
+                        {spec ? spec : <span style={{ color: '#94a3b8' }}>클릭하여 입력</span>}
                       </button>
                     )}
                   </div>

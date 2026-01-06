@@ -503,17 +503,21 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                           width: '100%',
                           border: 'none',
                           background: 'transparent',
-                          padding: 0,
+                          padding: '2px 0',
                           textAlign: 'left',
                           cursor: 'pointer',
                           fontSize: 12,
                           color: '#0f172a',
+                          display: 'block',
+                          minHeight: 18,
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
                         }}
                         title="Spec 수정"
                       >
-                        {specValue}
+                        {specValue ? specValue : (
+                          <span style={{ color: '#94a3b8' }}>클릭하여 입력</span>
+                        )}
                       </button>
                     )}
                   </td>
