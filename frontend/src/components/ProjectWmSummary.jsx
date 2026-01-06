@@ -8,6 +8,161 @@ const handleResponse = async (response) => {
   throw new Error(message);
 };
 
+const SummaryRow = React.memo(function SummaryRow({
+  row,
+  index,
+  getWorkMasterDetailParts,
+  shouldBoldWorkMasterLabel,
+  isEditingSpec,
+  isSaving,
+  editingWorkMasterId,
+  editingSpecSeed,
+  specTextareaRef,
+  insertNewlineAtCaret,
+  onStartSpecEdit,
+  onSaveSpecEdit,
+  onCancelSpecEdit,
+  rowRefs,
+}) {
+  const wmCode = row?.work_master_code ?? '';
+  const gauge = row?.gauge ?? '';
+  const unit = row?.uom1 ?? '';
+  const spec = row?.add_spec ?? '';
+  const detailParts = getWorkMasterDetailParts(row);
+  const type = `${row?.standard_item_type ?? ''}`;
+  const itemPath = row?.standard_item_path ?? '';
+
+  return (
+    <div
+      ref={(node) => {
+        const key = row?.work_master_id;
+        if (!key) return;
+        if (node) rowRefs.current.set(key, node);
+        else rowRefs.current.delete(key);
+      }}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '52px 160px 64px 70px 240px 1fr 200px 1fr',
+        borderBottom: '1px solid #f1f5f9',
+        fontSize: 11,
+        color: '#0f172a',
+      }}
+    >
+      <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{index + 1}</div>
+      <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', fontWeight: 700 }}>{wmCode}</div>
+      <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{gauge}</div>
+      <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{unit}</div>
+      <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', whiteSpace: 'pre-wrap' }}>
+        {isEditingSpec ? (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <textarea
+              ref={specTextareaRef}
+              key={editingWorkMasterId}
+              defaultValue={editingSpecSeed}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return;
+                if (event.altKey) {
+                  event.preventDefault();
+                  const target = event.target;
+                  if (target instanceof HTMLTextAreaElement) insertNewlineAtCaret(target);
+                  return;
+                }
+                event.preventDefault();
+                onSaveSpecEdit();
+              }}
+              rows={3}
+              style={{
+                flex: 1,
+                border: '1px solid #d1d5db',
+                borderRadius: 8,
+                padding: '4px 8px',
+                fontSize: 11,
+                minWidth: 0,
+                resize: 'vertical',
+                lineHeight: 1.35,
+              }}
+            />
+            <button
+              type="button"
+              onClick={onSaveSpecEdit}
+              disabled={isSaving}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 8,
+                border: '1px solid #2563eb',
+                background: isSaving ? '#93c5fd' : '#2563eb',
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              저장
+            </button>
+            <button
+              type="button"
+              onClick={onCancelSpecEdit}
+              disabled={isSaving}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 8,
+                border: '1px solid #cbd5f5',
+                background: '#fff',
+                color: '#1d4ed8',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              취소
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onStartSpecEdit(row)}
+            style={{
+              width: '100%',
+              border: 'none',
+              background: 'transparent',
+              padding: '2px 0',
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontSize: 11,
+              color: '#0f172a',
+              display: 'block',
+              minHeight: 16,
+            }}
+            title="Spec 수정"
+          >
+            {spec ? spec : <span style={{ color: '#94a3b8' }}>클릭하여 입력</span>}
+          </button>
+        )}
+      </div>
+      <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        <span>{wmCode}</span>
+        {gauge ? <span>{` | ${gauge}`}</span> : null}
+        {detailParts.length > 0 ? <span>{' | '}</span> : null}
+        {detailParts.map((part, i) => (
+          <span key={`${part.label}-${i}`}>
+            {i > 0 ? ' | ' : ''}
+            <span>{part.label}=</span>
+            <span
+              style={shouldBoldWorkMasterLabel(part.label)
+                ? { fontWeight: 900, color: '#9333ea', fontSize: 12 }
+                : { fontWeight: 400 }}
+            >
+              {part.value}
+            </span>
+          </span>
+        ))}
+      </div>
+      <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{type}</div>
+      <div style={{ padding: '8px 10px', whiteSpace: 'pre-wrap' }}>{itemPath}</div>
+    </div>
+  );
+});
+
 export default function ProjectWmSummary({ apiBaseUrl }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -625,143 +780,26 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
             <div style={{ padding: 14, fontSize: 12, color: '#475467' }}>표시할 데이터가 없습니다.</div>
           ) : (
             sortedRows.map((row, idx) => {
-              const wmCode = row?.work_master_code ?? '';
-              const gauge = row?.gauge ?? '';
-              const unit = row?.uom1 ?? '';
-              const spec = row?.add_spec ?? '';
-              const detailParts = getWorkMasterDetailParts(row);
-              const type = `${row?.standard_item_type ?? ''}`;
-              const itemPath = row?.standard_item_path ?? '';
               const isEditingSpec = editingWorkMasterId != null && row?.work_master_id === editingWorkMasterId;
+              const isSaving = savingWorkMasterId === editingWorkMasterId;
               return (
-                <div
+                <SummaryRow
                   key={`${row?.standard_item_id ?? 'std'}-${row?.work_master_id ?? 'wm'}-${idx}`}
-                  ref={(node) => {
-                    const key = row?.work_master_id;
-                    if (!key) return;
-                    if (node) rowRefs.current.set(key, node);
-                    else rowRefs.current.delete(key);
-                  }}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '52px 160px 64px 70px 240px 1fr 200px 1fr',
-                    borderBottom: '1px solid #f1f5f9',
-                    fontSize: 11,
-                    color: '#0f172a',
-                  }}
-                >
-                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{idx + 1}</div>
-                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', fontWeight: 700 }}>{wmCode}</div>
-                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{gauge}</div>
-                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{unit}</div>
-                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', whiteSpace: 'pre-wrap' }}>
-                    {isEditingSpec ? (
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <textarea
-                          ref={specTextareaRef}
-                          key={editingWorkMasterId}
-                          defaultValue={editingSpecSeed}
-                          onKeyDown={(event) => {
-                            if (event.key !== 'Enter') return;
-                            if (event.altKey) {
-                              event.preventDefault();
-                              const target = event.target;
-                              if (target instanceof HTMLTextAreaElement) insertNewlineAtCaret(target);
-                              return;
-                            }
-                            event.preventDefault();
-                            saveSpecEdit();
-                          }}
-                          rows={3}
-                          style={{
-                            flex: 1,
-                            border: '1px solid #d1d5db',
-                            borderRadius: 8,
-                            padding: '4px 8px',
-                            fontSize: 11,
-                            minWidth: 0,
-                            resize: 'vertical',
-                            lineHeight: 1.35,
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={saveSpecEdit}
-                          disabled={savingWorkMasterId === editingWorkMasterId}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: 8,
-                            border: '1px solid #2563eb',
-                            background: savingWorkMasterId === editingWorkMasterId ? '#93c5fd' : '#2563eb',
-                            color: '#fff',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            cursor: savingWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          저장
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelSpecEdit}
-                          disabled={savingWorkMasterId === editingWorkMasterId}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: 8,
-                            border: '1px solid #cbd5f5',
-                            background: '#fff',
-                            color: '#1d4ed8',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            cursor: savingWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          취소
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => startSpecEdit(row)}
-                        style={{
-                          width: '100%',
-                          border: 'none',
-                          background: 'transparent',
-                          padding: '2px 0',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          fontSize: 11,
-                          color: '#0f172a',
-                          display: 'block',
-                          minHeight: 16,
-                        }}
-                        title="Spec 수정"
-                      >
-                        {spec ? spec : <span style={{ color: '#94a3b8' }}>클릭하여 입력</span>}
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                    <span>{wmCode}</span>
-                    {gauge ? <span>{` | ${gauge}`}</span> : null}
-                    {detailParts.length > 0 ? <span>{' | '}</span> : null}
-                    {detailParts.map((part, index) => (
-                      <span key={`${part.label}-${index}`}>
-                        {index > 0 ? ' | ' : ''}
-                        <span>{part.label}=</span>
-                        <span
-                          style={shouldBoldWorkMasterLabel(part.label)
-                                  ? { fontWeight: 900, color: '#9333ea', fontSize: 12 }
-                            : { fontWeight: 400 }}
-                        >
-                          {part.value}
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{type}</div>
-                  <div style={{ padding: '8px 10px', whiteSpace: 'pre-wrap' }}>{itemPath}</div>
-                </div>
+                  row={row}
+                  index={idx}
+                  getWorkMasterDetailParts={getWorkMasterDetailParts}
+                  shouldBoldWorkMasterLabel={shouldBoldWorkMasterLabel}
+                  isEditingSpec={isEditingSpec}
+                  isSaving={isSaving}
+                  editingWorkMasterId={editingWorkMasterId}
+                  editingSpecSeed={editingSpecSeed}
+                  specTextareaRef={specTextareaRef}
+                  insertNewlineAtCaret={insertNewlineAtCaret}
+                  onStartSpecEdit={startSpecEdit}
+                  onSaveSpecEdit={saveSpecEdit}
+                  onCancelSpecEdit={cancelSpecEdit}
+                  rowRefs={rowRefs}
+                />
               );
             })
           )}
