@@ -745,7 +745,66 @@ def export_project_db_for_dynamo(
     """
 
     buildings = crud.list_buildings(db)
-    cart_entries = read_project_workmaster_cart(project_identifier=project_identifier, db=db)
+    cart_entries = read_project_workmaster_cart(
+        project_identifier=project_identifier, db=db
+    )
+
+    assignment_ids = sorted(
+        {
+            int(aid)
+            for entry in cart_entries
+            for aid in (getattr(entry, "assignment_ids", None) or [])
+            if isinstance(aid, int) or (isinstance(aid, str) and aid.isdigit())
+        }
+    )
+    standard_item_ids = sorted(
+        {
+            int(sid)
+            for entry in cart_entries
+            for sid in (getattr(entry, "standard_item_ids", None) or [])
+            if isinstance(sid, int) or (isinstance(sid, str) and sid.isdigit())
+        }
+    )
+
+    assignment_label_by_id = {}
+    if assignment_ids:
+        assigns = (
+            db.query(models.GwmFamilyAssign)
+            .filter(models.GwmFamilyAssign.id.in_(assignment_ids))
+            .all()
+        )
+        for a in assigns:
+            family_name = getattr(getattr(a, "family_list_item", None), "name", None)
+            standard_name = getattr(getattr(a, "standard_item", None), "name", None)
+            if family_name and standard_name:
+                label = f"{family_name} / {standard_name}"
+            elif standard_name:
+                label = standard_name
+            elif family_name:
+                label = family_name
+            else:
+                label = f"assignment:{a.id}"
+            assignment_label_by_id[a.id] = label
+
+    standard_item_name_by_id = {}
+    if standard_item_ids:
+        items = (
+            db.query(models.StandardItem)
+            .filter(models.StandardItem.id.in_(standard_item_ids))
+            .all()
+        )
+        for item in items:
+            standard_item_name_by_id[item.id] = item.name
+
+    for entry in cart_entries:
+        entry.assignment_labels = [
+            assignment_label_by_id.get(int(aid), f"assignment:{aid}")
+            for aid in (entry.assignment_ids or [])
+        ]
+        entry.standard_item_names = [
+            standard_item_name_by_id.get(int(sid), f"standard_item:{sid}")
+            for sid in (entry.standard_item_ids or [])
+        ]
     return {
         "project_identifier": project_identifier,
         "buildings": buildings,

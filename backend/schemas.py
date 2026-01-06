@@ -95,6 +95,8 @@ class WorkMasterCartEntry(WorkMasterCartEntryBase):
 
     id: int
     created_at: datetime.datetime
+    assignment_labels: List[str] = Field(default_factory=list)
+    standard_item_names: List[str] = Field(default_factory=list)
 
 
 # StandardItem Schemas
@@ -182,7 +184,6 @@ class DynamoProjectExportPayload(BaseModel):
     buildings: List["BuildingItem"] = Field(default_factory=list)
     workmaster_cart_entries: List[WorkMasterCartEntry] = Field(default_factory=list)
     wm_selection_summary: Optional[WorkMasterSummaryResponse] = None
-
 
 
 class DerivedStandardItemCreate(BaseModel):
