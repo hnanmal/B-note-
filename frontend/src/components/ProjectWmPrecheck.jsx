@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const handleResponse = async (response) => {
   if (response.ok) return response.json();
@@ -68,6 +68,14 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const [gaugeRemovingId, setGaugeRemovingId] = useState(null);
   const [error, setError] = useState(null);
 
+  const [editingWorkMasterId, setEditingWorkMasterId] = useState(null);
+  const [editingSpec, setEditingSpec] = useState('');
+  const [savingSpecWorkMasterId, setSavingSpecWorkMasterId] = useState(null);
+  const scrollContainerRef = useRef(null);
+  const rowRefs = useRef(new Map());
+  const pendingRestoreRef = useRef(null);
+  const specTextareaRef = useRef(null);
+
   const fetchAll = useCallback(async () => {
     if (!apiBaseUrl) return;
     setLoading(true);
@@ -99,6 +107,86 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    const pending = pendingRestoreRef.current;
+    if (!pending) return;
+    if (loading) return;
+
+    pendingRestoreRef.current = null;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const restore = () => {
+      if (pending?.workMasterId != null) {
+        const node = rowRefs.current.get(pending.workMasterId);
+        if (node && node.scrollIntoView) {
+          node.scrollIntoView({ block: 'center' });
+          return;
+        }
+      }
+      if (typeof pending?.scrollTop === 'number') {
+        container.scrollTop = pending.scrollTop;
+      }
+    };
+
+    requestAnimationFrame(() => requestAnimationFrame(restore));
+  }, [loading, workMasters]);
+
+  const startSpecEdit = useCallback((wm) => {
+    const wmId = wm?.id ?? null;
+    if (!wmId) return;
+    setEditingWorkMasterId(wmId);
+    setEditingSpec((wm?.add_spec ?? '').toString());
+  }, []);
+
+  const cancelSpecEdit = useCallback(() => {
+    setEditingWorkMasterId(null);
+    setEditingSpec('');
+  }, []);
+
+  useEffect(() => {
+    if (editingWorkMasterId == null) return;
+    if (savingSpecWorkMasterId != null) return;
+    const node = specTextareaRef.current;
+    if (!node) return;
+    requestAnimationFrame(() => {
+      try {
+        node.focus();
+        const len = node.value?.length ?? 0;
+        node.selectionStart = len;
+        node.selectionEnd = len;
+      } catch {
+        // ignore
+      }
+    });
+  }, [editingWorkMasterId, savingSpecWorkMasterId]);
+
+  const saveSpecEdit = useCallback(async () => {
+    if (!apiBaseUrl || !editingWorkMasterId) return;
+    const container = scrollContainerRef.current;
+    pendingRestoreRef.current = {
+      scrollTop: container ? container.scrollTop : 0,
+      workMasterId: editingWorkMasterId,
+    };
+    setSavingSpecWorkMasterId(editingWorkMasterId);
+    setError(null);
+    try {
+      await fetch(`${apiBaseUrl}/work-masters/${editingWorkMasterId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ add_spec: editingSpec }),
+      }).then(handleResponse);
+      setEditingWorkMasterId(null);
+      setEditingSpec('');
+      await fetchAll();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Spec을 저장하지 못했습니다.';
+      setError(message);
+    } finally {
+      setSavingSpecWorkMasterId(null);
+    }
+  }, [apiBaseUrl, editingSpec, editingWorkMasterId, fetchAll]);
 
   const filteredWorkMasters = useMemo(() => {
     return workMasters.filter(matchesMatcherFilterRules).sort(sortWorkMastersByCodeGauge);
@@ -228,7 +316,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
         </div>
       )}
 
-      <div style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+      <div ref={scrollContainerRef} style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
             <tr>
@@ -264,8 +352,17 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
               const summary = formatWorkMasterSummary(wm);
               const unitLabel = [wm?.uom1, wm?.uom2].filter(Boolean).join(' / ');
               const specValue = (wm?.add_spec ?? '').toString();
+              const isEditingSpec = editingWorkMasterId != null && wmId === editingWorkMasterId;
               return (
-                <tr key={wmId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr
+                  key={wmId}
+                  ref={(node) => {
+                    if (!wmId) return;
+                    if (node) rowRefs.current.set(wmId, node);
+                    else rowRefs.current.delete(wmId);
+                  }}
+                  style={{ borderBottom: '1px solid #f1f5f9' }}
+                >
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
                     <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: saving ? 'not-allowed' : 'pointer' }}>
                       <input
@@ -318,7 +415,108 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                     </div>
                   </td>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{unitLabel || ''}</td>
-                  <td style={{ padding: '6px 10px', minWidth: 260, maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{specValue}</td>
+                  <td style={{ padding: '6px 10px', minWidth: 260, maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {isEditingSpec ? (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <textarea
+                          ref={specTextareaRef}
+                          value={editingSpec}
+                          onChange={(e) => setEditingSpec(e.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Enter') return;
+                            if (event.altKey) {
+                              event.preventDefault();
+                              const target = event.target;
+                              if (!(target instanceof HTMLTextAreaElement)) {
+                                setEditingSpec((prev) => `${prev}\n`);
+                                return;
+                              }
+                              const start = target.selectionStart ?? target.value.length;
+                              const end = target.selectionEnd ?? target.value.length;
+                              const nextValue = `${target.value.slice(0, start)}\n${target.value.slice(end)}`;
+                              setEditingSpec(nextValue);
+                              requestAnimationFrame(() => {
+                                try {
+                                  target.selectionStart = start + 1;
+                                  target.selectionEnd = start + 1;
+                                } catch {
+                                  // ignore
+                                }
+                              });
+                              return;
+                            }
+                            event.preventDefault();
+                            saveSpecEdit();
+                          }}
+                          rows={3}
+                          style={{
+                            flex: 1,
+                            border: '1px solid #d1d5db',
+                            borderRadius: 8,
+                            padding: '6px 8px',
+                            fontSize: 11,
+                            minWidth: 0,
+                            resize: 'vertical',
+                            lineHeight: 1.35,
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={saveSpecEdit}
+                          disabled={savingSpecWorkMasterId === editingWorkMasterId}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            border: '1px solid #2563eb',
+                            background: savingSpecWorkMasterId === editingWorkMasterId ? '#93c5fd' : '#2563eb',
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: savingSpecWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          저장
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelSpecEdit}
+                          disabled={savingSpecWorkMasterId === editingWorkMasterId}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            border: '1px solid #cbd5f5',
+                            background: '#fff',
+                            color: '#1d4ed8',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: savingSpecWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          취소
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startSpecEdit(wm)}
+                        style={{
+                          width: '100%',
+                          border: 'none',
+                          background: 'transparent',
+                          padding: 0,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          color: '#0f172a',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                        }}
+                        title="Spec 수정"
+                      >
+                        {specValue}
+                      </button>
+                    )}
+                  </td>
                   <td style={{ padding: '8px 10px', minWidth: 420 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <div style={{ minWidth: 0 }}>
