@@ -749,6 +749,16 @@ def export_project_db_for_dynamo(
         project_identifier=project_identifier, db=db
     )
 
+    pjt_abbr = None
+    try:
+        pjt_abbr_row = db.execute(
+            text("SELECT pjt_abbr FROM project_metadata ORDER BY id LIMIT 1")
+        ).fetchone()
+        if pjt_abbr_row and pjt_abbr_row[0]:
+            pjt_abbr = str(pjt_abbr_row[0]).strip() or None
+    except Exception:
+        pjt_abbr = None
+
     assignment_ids = sorted(
         {
             int(aid)
@@ -769,6 +779,9 @@ def export_project_db_for_dynamo(
     assignment_label_by_id = {}
     assignment_family_list_id_by_id = {}
     family_name_by_family_list_id = {}
+    assignment_standard_item_ids = set()
+    assignment_family_name_by_id = {}
+    assignment_standard_item_id_by_id = {}
     if assignment_ids:
         assigns = (
             db.query(models.GwmFamilyAssign)
@@ -777,7 +790,19 @@ def export_project_db_for_dynamo(
         )
         for a in assigns:
             family_name = getattr(getattr(a, "family_list_item", None), "name", None)
-            standard_name = getattr(getattr(a, "standard_item", None), "name", None)
+            standard_item_id = getattr(a, "standard_item_id", None)
+            if standard_item_id is not None:
+                try:
+                    assignment_standard_item_ids.add(int(standard_item_id))
+                except (TypeError, ValueError):
+                    pass
+            if family_name:
+                assignment_family_name_by_id[a.id] = family_name
+            if standard_item_id is not None:
+                try:
+                    assignment_standard_item_id_by_id[a.id] = int(standard_item_id)
+                except (TypeError, ValueError):
+                    pass
             family_list_id = getattr(a, "family_list_id", None)
             if family_list_id is not None:
                 try:
@@ -788,25 +813,76 @@ def export_project_db_for_dynamo(
                     assignment_family_list_id_by_id[a.id] = family_list_id_int
                     if family_name:
                         family_name_by_family_list_id[family_list_id_int] = family_name
-            if family_name and standard_name:
-                label = f"{family_name} / {standard_name}"
-            elif standard_name:
-                label = standard_name
-            elif family_name:
-                label = family_name
-            else:
-                label = f"assignment:{a.id}"
-            assignment_label_by_id[a.id] = label
 
     standard_item_name_by_id = {}
-    if standard_item_ids:
+    standard_item_ids_to_load = sorted(set(standard_item_ids) | set(assignment_standard_item_ids))
+    if standard_item_ids_to_load:
         items = (
             db.query(models.StandardItem)
-            .filter(models.StandardItem.id.in_(standard_item_ids))
+            .filter(models.StandardItem.id.in_(standard_item_ids_to_load))
             .all()
         )
+        derive_from_by_id = {}
         for item in items:
-            standard_item_name_by_id[item.id] = item.name
+            standard_item_name_by_id[int(item.id)] = item.name
+            derive_from_by_id[int(item.id)] = getattr(item, "derive_from", None)
+
+        parent_ids = sorted(
+            {
+                int(pid)
+                for pid in (derive_from_by_id.values() or [])
+                if pid is not None and (isinstance(pid, int) or (isinstance(pid, str) and str(pid).isdigit()))
+            }
+        )
+        missing_parent_ids = [pid for pid in parent_ids if pid not in standard_item_name_by_id]
+        if missing_parent_ids:
+            parent_items = (
+                db.query(models.StandardItem)
+                .filter(models.StandardItem.id.in_(missing_parent_ids))
+                .all()
+            )
+            for parent in parent_items:
+                standard_item_name_by_id[int(parent.id)] = parent.name
+
+        formatted_name_by_id = {}
+        for item_id, name in list(standard_item_name_by_id.items()):
+            derive_from = derive_from_by_id.get(item_id)
+            if derive_from is None:
+                formatted_name_by_id[item_id] = name
+                continue
+            try:
+                parent_id = int(derive_from)
+            except (TypeError, ValueError):
+                formatted_name_by_id[item_id] = name
+                continue
+            parent_name = standard_item_name_by_id.get(parent_id)
+            if not parent_name:
+                formatted_name_by_id[item_id] = name
+                continue
+            if pjt_abbr:
+                formatted_name_by_id[item_id] = f"{parent_name} [{pjt_abbr}]:: {name}"
+            else:
+                formatted_name_by_id[item_id] = f"{parent_name}:: {name}"
+
+        standard_item_name_by_id = formatted_name_by_id
+
+    if assignment_ids:
+        for aid in assignment_ids:
+            family_name = assignment_family_name_by_id.get(aid)
+            standard_item_id = assignment_standard_item_id_by_id.get(aid)
+            standard_name = (
+                standard_item_name_by_id.get(standard_item_id)
+                if standard_item_id is not None
+                else None
+            )
+            if family_name and standard_name:
+                assignment_label_by_id[aid] = f"{family_name} / {standard_name}"
+            elif standard_name:
+                assignment_label_by_id[aid] = standard_name
+            elif family_name:
+                assignment_label_by_id[aid] = family_name
+            else:
+                assignment_label_by_id[aid] = f"assignment:{aid}"
 
     selected_work_master_by_standard_item_id = {}
     if standard_item_ids:
