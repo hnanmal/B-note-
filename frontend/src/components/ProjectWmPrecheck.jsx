@@ -447,6 +447,15 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const pendingRenderMeasureRef = useRef(null);
+
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const scrollRafRef = useRef(0);
+
+  const ROW_HEIGHT_ESTIMATE = 120;
+  const OVERSCAN = 10;
+
   const [refreshToken, setRefreshToken] = useState(0);
   const [useSavingCount, setUseSavingCount] = useState(0);
   const scrollContainerRef = useRef(null);
@@ -472,11 +481,22 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
     if (!apiBaseUrl) return;
     setLoading(true);
     setError(null);
+    const startedAt = DEBUG_PRECHECK_TIMING ? performance.now() : 0;
     try {
       const [wmData, precheckData] = await Promise.all([
         fetch(`${apiBaseUrl}/work-masters/`).then(handleResponse),
         fetch(`${apiBaseUrl}/work-masters/precheck`).then(handleResponse),
       ]);
+
+      if (DEBUG_PRECHECK_TIMING) {
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        console.log('[WM pre-check] fetchAll ok', {
+          elapsedMs,
+          workMasters: Array.isArray(wmData) ? wmData.length : 0,
+          precheckRows: Array.isArray(precheckData) ? precheckData.length : 0,
+        });
+      }
+
       const nextMap = new Map();
       (Array.isArray(precheckData) ? precheckData : []).forEach((row) => {
         const id = Number(row?.work_master_id);
@@ -486,6 +506,9 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
       useMapRef.current = nextMap;
 
       const list = Array.isArray(wmData) ? wmData : [];
+      if (DEBUG_PRECHECK_TIMING) {
+        pendingRenderMeasureRef.current = { startedAt: performance.now(), rowCount: list.length };
+      }
       setWorkMasters(list);
       setRefreshToken((t) => t + 1);
     } catch (err) {
@@ -501,29 +524,43 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   }, [fetchAll]);
 
   useEffect(() => {
-    const pending = pendingRestoreRef.current;
-    if (!pending) return;
-    if (loading) return;
-
-    pendingRestoreRef.current = null;
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const restore = () => {
-      if (pending?.workMasterId != null) {
-        const node = rowRefs.current.get(pending.workMasterId);
-        if (node && node.scrollIntoView) {
-          node.scrollIntoView({ block: 'center' });
-          return;
-        }
-      }
-      if (typeof pending?.scrollTop === 'number') {
-        container.scrollTop = pending.scrollTop;
-      }
+    const updateViewport = () => {
+      setViewportHeight(container.clientHeight || 0);
     };
 
-    requestAnimationFrame(() => requestAnimationFrame(restore));
-  }, [loading, workMasters]);
+    const handleScroll = () => {
+      if (scrollRafRef.current) return;
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollRafRef.current = 0;
+        setScrollTop(container.scrollTop || 0);
+      });
+    };
+
+    updateViewport();
+    setScrollTop(container.scrollTop || 0);
+    container.addEventListener('scroll', handleScroll, { passive: true });
+
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => updateViewport());
+      ro.observe(container);
+    } else {
+      window.addEventListener('resize', updateViewport);
+    }
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (ro) ro.disconnect();
+      else window.removeEventListener('resize', updateViewport);
+      if (scrollRafRef.current) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = 0;
+      }
+    };
+  }, []);
 
   const queueScrollRestore = useCallback((workMasterId) => {
     const container = scrollContainerRef.current;
@@ -534,8 +571,83 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   }, []);
 
   const filteredWorkMasters = useMemo(() => {
-    return workMasters.filter(matchesMatcherFilterRules).sort(sortWorkMastersByCodeGauge);
+    if (!DEBUG_PRECHECK_TIMING) {
+      return workMasters.filter(matchesMatcherFilterRules).sort(sortWorkMastersByCodeGauge);
+    }
+    const startedAt = performance.now();
+    const result = workMasters.filter(matchesMatcherFilterRules).sort(sortWorkMastersByCodeGauge);
+    const elapsedMs = Math.round(performance.now() - startedAt);
+    console.log('[WM pre-check] filter/sort', { elapsedMs, total: workMasters.length, filtered: result.length });
+    return result;
   }, [workMasters]);
+
+  const filteredIndexById = useMemo(() => {
+    const map = new Map();
+    filteredWorkMasters.forEach((wm, index) => {
+      if (wm?.id != null) map.set(wm.id, index);
+    });
+    return map;
+  }, [filteredWorkMasters]);
+
+  const windowed = useMemo(() => {
+    const total = filteredWorkMasters.length;
+    if (!total) {
+      return { total: 0, start: 0, end: 0, topPad: 0, bottomPad: 0, rows: [] };
+    }
+    const rowH = ROW_HEIGHT_ESTIMATE;
+    const viewH = viewportHeight || 0;
+    const st = scrollTop || 0;
+    const start = Math.max(0, Math.floor(st / rowH) - OVERSCAN);
+    const end = Math.min(total, Math.ceil((st + viewH) / rowH) + OVERSCAN);
+    return {
+      total,
+      start,
+      end,
+      topPad: start * rowH,
+      bottomPad: Math.max(0, (total - end) * rowH),
+      rows: filteredWorkMasters.slice(start, end),
+    };
+  }, [filteredWorkMasters, scrollTop, viewportHeight]);
+
+  useEffect(() => {
+    const pending = pendingRestoreRef.current;
+    if (!pending) return;
+    if (loading) return;
+
+    pendingRestoreRef.current = null;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const restore = () => {
+      if (pending?.workMasterId != null) {
+        const idx = filteredIndexById.get(pending.workMasterId);
+        if (idx != null) {
+          const target = Math.max(0, idx * ROW_HEIGHT_ESTIMATE - ROW_HEIGHT_ESTIMATE * 2);
+          container.scrollTop = target;
+          return;
+        }
+      }
+      if (typeof pending?.scrollTop === 'number') {
+        container.scrollTop = pending.scrollTop;
+      }
+    };
+
+    requestAnimationFrame(() => requestAnimationFrame(restore));
+  }, [filteredIndexById, loading, refreshToken, workMasters]);
+
+  useEffect(() => {
+    if (!DEBUG_PRECHECK_TIMING) return;
+    if (loading) return;
+    const pending = pendingRenderMeasureRef.current;
+    if (!pending) return;
+    pendingRenderMeasureRef.current = null;
+    const elapsedMs = Math.round(performance.now() - pending.startedAt);
+    console.log('[WM pre-check] render commit', {
+      elapsedMs,
+      workMasters: pending.rowCount,
+      filtered: filteredWorkMasters.length,
+    });
+  }, [filteredWorkMasters.length, loading, refreshToken]);
 
   const setUseInMap = useCallback((workMasterId, next) => {
     if (workMasterId == null) return;
@@ -683,7 +795,15 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
             </tr>
           </thead>
           <tbody>
-            {filteredWorkMasters.map((wm) => {
+            {windowed.topPad > 0 && (
+              <tr aria-hidden="true">
+                <td colSpan={columns.length} style={{ padding: 0, borderBottom: 'none' }}>
+                  <div style={{ height: windowed.topPad }} />
+                </td>
+              </tr>
+            )}
+
+            {windowed.rows.map((wm) => {
               const wmId = wm?.id;
               return (
                 <PrecheckRow
@@ -706,6 +826,14 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                 />
               );
             })}
+
+            {windowed.bottomPad > 0 && (
+              <tr aria-hidden="true">
+                <td colSpan={columns.length} style={{ padding: 0, borderBottom: 'none' }}>
+                  <div style={{ height: windowed.bottomPad }} />
+                </td>
+              </tr>
+            )}
 
             {!loading && filteredWorkMasters.length === 0 && (
               <tr>
