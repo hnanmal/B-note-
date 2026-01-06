@@ -65,24 +65,18 @@ const shouldBoldWorkMasterLabel = (label) => {
 
 const PrecheckRow = React.memo(function PrecheckRow({
   wm,
-  checked,
-  saving,
-  gaugeAdding,
-  gaugeRemoving,
-  gaugeBusy,
+  apiBaseUrl,
   loading,
-  isEditingSpec,
-  editingWorkMasterId,
-  editingSpecSeed,
-  savingSpecWorkMasterId,
-  specTextareaRef,
+  refreshToken,
+  initialChecked,
+  queueScrollRestore,
+  updateWorkMasterLocal,
+  addGauge,
+  removeGauge,
+  setUseInMap,
+  deleteUseFromMap,
   insertNewlineAtCaret,
-  onToggleUse,
-  onAddGauge,
-  onRemoveGauge,
-  onStartSpecEdit,
-  onSaveSpecEdit,
-  onCancelSpecEdit,
+  onError,
   rowRefs,
 }) {
   const wmId = wm?.id;
@@ -93,6 +87,140 @@ const PrecheckRow = React.memo(function PrecheckRow({
   const summaryParts = getWorkMasterSummaryParts(wm);
   const unitLabel = [wm?.uom1, wm?.uom2].filter(Boolean).join(' / ');
   const specValue = (wm?.add_spec ?? '').toString();
+
+  const [checked, setChecked] = useState(() => Boolean(initialChecked));
+  const [savingUse, setSavingUse] = useState(false);
+  const [gaugeAdding, setGaugeAdding] = useState(false);
+  const [gaugeRemoving, setGaugeRemoving] = useState(false);
+
+  const [isEditingSpec, setIsEditingSpec] = useState(false);
+  const [editingSpecSeed, setEditingSpecSeed] = useState('');
+  const [specEditSession, setSpecEditSession] = useState(0);
+  const [savingSpec, setSavingSpec] = useState(false);
+  const specTextareaRef = useRef(null);
+
+  useEffect(() => {
+    setChecked(Boolean(initialChecked));
+  }, [initialChecked, refreshToken]);
+
+  useEffect(() => {
+    if (!isEditingSpec) return;
+    if (savingSpec) return;
+    const node = specTextareaRef.current;
+    if (!node) return;
+    requestAnimationFrame(() => {
+      try {
+        node.focus();
+        const len = node.value?.length ?? 0;
+        node.selectionStart = len;
+        node.selectionEnd = len;
+      } catch {
+        // ignore
+      }
+    });
+  }, [isEditingSpec, savingSpec, specEditSession]);
+
+  const toggleUse = useCallback(async () => {
+    if (!apiBaseUrl) return;
+    if (!wmId) return;
+    if (savingUse) return;
+
+    const previous = checked;
+    const next = !previous;
+    setChecked(next);
+    setSavingUse(true);
+    onError?.(null);
+
+    try {
+      setUseInMap?.(wmId, next);
+      await fetch(`${apiBaseUrl}/work-masters/${wmId}/precheck`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ use_yn: next }),
+      }).then(handleResponse);
+    } catch (err) {
+      setChecked(previous);
+      setUseInMap?.(wmId, previous);
+      const message = err instanceof Error ? err.message : '저장하지 못했습니다.';
+      onError?.(message);
+    } finally {
+      setSavingUse(false);
+    }
+  }, [apiBaseUrl, checked, onError, savingUse, setUseInMap, wmId]);
+
+  const startSpecEdit = useCallback(() => {
+    if (!wmId) return;
+    setIsEditingSpec(true);
+    setEditingSpecSeed((wm?.add_spec ?? '').toString());
+    setSpecEditSession((s) => s + 1);
+    onError?.(null);
+  }, [onError, wm, wmId]);
+
+  const cancelSpecEdit = useCallback(() => {
+    setIsEditingSpec(false);
+    setEditingSpecSeed('');
+    onError?.(null);
+  }, [onError]);
+
+  const saveSpecEdit = useCallback(async () => {
+    if (!apiBaseUrl) return;
+    if (!wmId) return;
+    if (savingSpec) return;
+
+    const nextSpec = (specTextareaRef.current?.value ?? editingSpecSeed).toString();
+    queueScrollRestore?.(wmId);
+    setSavingSpec(true);
+    onError?.(null);
+
+    try {
+      const updated = await fetch(`${apiBaseUrl}/work-masters/${wmId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ add_spec: nextSpec }),
+      }).then(handleResponse);
+
+      setIsEditingSpec(false);
+      setEditingSpecSeed('');
+      updateWorkMasterLocal?.(wmId, { ...(updated || {}), add_spec: (updated?.add_spec ?? nextSpec) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Spec을 저장하지 못했습니다.';
+      onError?.(message);
+    } finally {
+      setSavingSpec(false);
+    }
+  }, [apiBaseUrl, editingSpecSeed, onError, queueScrollRestore, savingSpec, updateWorkMasterLocal, wmId]);
+
+  const handleAddGauge = useCallback(async () => {
+    if (!wmId) return;
+    if (gaugeAdding || gaugeRemoving) return;
+    setGaugeAdding(true);
+    onError?.(null);
+    try {
+      await addGauge?.(wmId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '게이지 항목을 생성할 수 없습니다.';
+      onError?.(message);
+    } finally {
+      setGaugeAdding(false);
+    }
+  }, [addGauge, gaugeAdding, gaugeRemoving, onError, wmId]);
+
+  const handleRemoveGauge = useCallback(async () => {
+    if (!wmId) return;
+    if (gaugeAdding || gaugeRemoving) return;
+    if (!gaugeValue) return;
+    setGaugeRemoving(true);
+    onError?.(null);
+    try {
+      await removeGauge?.(wmId, wmCode);
+      deleteUseFromMap?.(wmId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '게이지를 삭제할 수 없습니다.';
+      onError?.(message);
+    } finally {
+      setGaugeRemoving(false);
+    }
+  }, [deleteUseFromMap, gaugeAdding, gaugeRemoving, gaugeValue, onError, removeGauge, wmCode, wmId]);
 
   return (
     <tr
@@ -105,14 +233,14 @@ const PrecheckRow = React.memo(function PrecheckRow({
       style={{ borderBottom: '1px solid #f1f5f9' }}
     >
       <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: savingUse ? 'not-allowed' : 'pointer' }}>
           <input
             type="checkbox"
             checked={checked}
-            disabled={saving}
-            onChange={() => onToggleUse(wmId)}
+            disabled={savingUse}
+            onChange={toggleUse}
           />
-          {saving ? <span style={{ fontSize: 11, color: '#6b7280' }}>Saving...</span> : null}
+          {savingUse ? <span style={{ fontSize: 11, color: '#6b7280' }}>Saving...</span> : null}
         </label>
       </td>
       <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 800, color: '#0f172a' }}>{wmCode}</td>
@@ -121,15 +249,15 @@ const PrecheckRow = React.memo(function PrecheckRow({
           <span style={{ fontWeight: 800, color: '#9333ea' }}>{gaugeValue}</span>
           <button
             type="button"
-            onClick={() => onAddGauge(wmId)}
-            disabled={loading || gaugeBusy}
+            onClick={handleAddGauge}
+            disabled={loading || gaugeAdding || gaugeRemoving}
             style={{
               padding: '4px 10px',
               borderRadius: 6,
               border: '1px solid #cbd5f5',
-              background: loading || gaugeBusy ? '#f1f5f9' : '#fff',
-              color: loading || gaugeBusy ? '#94a3b8' : '#0f172a',
-              cursor: loading || gaugeBusy ? 'not-allowed' : 'pointer',
+              background: loading || gaugeAdding || gaugeRemoving ? '#f1f5f9' : '#fff',
+              color: loading || gaugeAdding || gaugeRemoving ? '#94a3b8' : '#0f172a',
+              cursor: loading || gaugeAdding || gaugeRemoving ? 'not-allowed' : 'pointer',
               fontSize: 11,
               fontWeight: 800,
             }}
@@ -138,15 +266,15 @@ const PrecheckRow = React.memo(function PrecheckRow({
           </button>
           <button
             type="button"
-            onClick={() => onRemoveGauge(wmId)}
-            disabled={loading || gaugeBusy || !gaugeValue}
+            onClick={handleRemoveGauge}
+            disabled={loading || gaugeAdding || gaugeRemoving || !gaugeValue}
             style={{
               padding: '4px 10px',
               borderRadius: 6,
               border: '1px solid #f87171',
-              background: loading || gaugeBusy || !gaugeValue ? '#fee2e2' : '#fff',
-              color: loading || gaugeBusy || !gaugeValue ? '#fca5a5' : '#dc2626',
-              cursor: loading || gaugeBusy || !gaugeValue ? 'not-allowed' : 'pointer',
+              background: loading || gaugeAdding || gaugeRemoving || !gaugeValue ? '#fee2e2' : '#fff',
+              color: loading || gaugeAdding || gaugeRemoving || !gaugeValue ? '#fca5a5' : '#dc2626',
+              cursor: loading || gaugeAdding || gaugeRemoving || !gaugeValue ? 'not-allowed' : 'pointer',
               fontSize: 11,
               fontWeight: 800,
             }}
@@ -161,7 +289,7 @@ const PrecheckRow = React.memo(function PrecheckRow({
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <textarea
               ref={specTextareaRef}
-              key={editingWorkMasterId}
+              key={specEditSession}
               defaultValue={editingSpecSeed}
               onKeyDown={(event) => {
                 if (event.key !== 'Enter') return;
@@ -172,7 +300,7 @@ const PrecheckRow = React.memo(function PrecheckRow({
                   return;
                 }
                 event.preventDefault();
-                onSaveSpecEdit();
+                saveSpecEdit();
               }}
               rows={3}
               style={{
@@ -188,25 +316,25 @@ const PrecheckRow = React.memo(function PrecheckRow({
             />
             <button
               type="button"
-              onClick={onSaveSpecEdit}
-              disabled={savingSpecWorkMasterId === editingWorkMasterId}
+              onClick={saveSpecEdit}
+              disabled={savingSpec}
               style={{
                 padding: '4px 10px',
                 borderRadius: 8,
                 border: '1px solid #2563eb',
-                background: savingSpecWorkMasterId === editingWorkMasterId ? '#93c5fd' : '#2563eb',
+                background: savingSpec ? '#93c5fd' : '#2563eb',
                 color: '#fff',
                 fontSize: 11,
                 fontWeight: 700,
-                cursor: savingSpecWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
+                cursor: savingSpec ? 'not-allowed' : 'pointer',
               }}
             >
               저장
             </button>
             <button
               type="button"
-              onClick={onCancelSpecEdit}
-              disabled={savingSpecWorkMasterId === editingWorkMasterId}
+              onClick={cancelSpecEdit}
+              disabled={savingSpec}
               style={{
                 padding: '4px 10px',
                 borderRadius: 8,
@@ -215,7 +343,7 @@ const PrecheckRow = React.memo(function PrecheckRow({
                 color: '#1d4ed8',
                 fontSize: 11,
                 fontWeight: 700,
-                cursor: savingSpecWorkMasterId === editingWorkMasterId ? 'not-allowed' : 'pointer',
+                cursor: savingSpec ? 'not-allowed' : 'pointer',
               }}
             >
               취소
@@ -224,7 +352,7 @@ const PrecheckRow = React.memo(function PrecheckRow({
         ) : (
           <button
             type="button"
-            onClick={() => onStartSpecEdit(wm)}
+            onClick={startSpecEdit}
             style={{
               width: '100%',
               border: 'none',
@@ -283,20 +411,14 @@ const PrecheckRow = React.memo(function PrecheckRow({
 export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const [workMasters, setWorkMasters] = useState([]);
   const useMapRef = useRef(new Map());
-  const [useMapVersion, setUseMapVersion] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [savingId, setSavingId] = useState(null);
-  const [gaugeAddingId, setGaugeAddingId] = useState(null);
-  const [gaugeRemovingId, setGaugeRemovingId] = useState(null);
   const [error, setError] = useState(null);
 
-  const [editingWorkMasterId, setEditingWorkMasterId] = useState(null);
-  const [editingSpecSeed, setEditingSpecSeed] = useState('');
-  const [savingSpecWorkMasterId, setSavingSpecWorkMasterId] = useState(null);
+  const [refreshToken, setRefreshToken] = useState(0);
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef(new Map());
   const pendingRestoreRef = useRef(null);
-  const specTextareaRef = useRef(null);
+  const gaugeBusyRef = useRef(false);
 
   const insertNewlineAtCaret = useCallback((target) => {
     const start = target.selectionStart ?? target.value.length;
@@ -321,10 +443,6 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
         fetch(`${apiBaseUrl}/work-masters/`).then(handleResponse),
         fetch(`${apiBaseUrl}/work-masters/precheck`).then(handleResponse),
       ]);
-
-      const list = Array.isArray(wmData) ? wmData : [];
-      setWorkMasters(list);
-
       const nextMap = new Map();
       (Array.isArray(precheckData) ? precheckData : []).forEach((row) => {
         const id = Number(row?.work_master_id);
@@ -332,7 +450,10 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
         nextMap.set(id, Boolean(row?.use_yn));
       });
       useMapRef.current = nextMap;
-      setUseMapVersion((v) => v + 1);
+
+      const list = Array.isArray(wmData) ? wmData : [];
+      setWorkMasters(list);
+      setRefreshToken((t) => t + 1);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'WM pre-check 데이터를 불러오지 못했습니다.';
       setError(message);
@@ -370,82 +491,40 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
     requestAnimationFrame(() => requestAnimationFrame(restore));
   }, [loading, workMasters]);
 
-  const startSpecEdit = useCallback((wm) => {
-    const wmId = wm?.id ?? null;
-    if (!wmId) return;
-    setEditingWorkMasterId(wmId);
-    setEditingSpecSeed((wm?.add_spec ?? '').toString());
-  }, []);
-
-  const cancelSpecEdit = useCallback(() => {
-    setEditingWorkMasterId(null);
-    setEditingSpecSeed('');
-  }, []);
-
-  useEffect(() => {
-    if (editingWorkMasterId == null) return;
-    if (savingSpecWorkMasterId != null) return;
-    const node = specTextareaRef.current;
-    if (!node) return;
-    requestAnimationFrame(() => {
-      try {
-        node.focus();
-        const len = node.value?.length ?? 0;
-        node.selectionStart = len;
-        node.selectionEnd = len;
-      } catch {
-        // ignore
-      }
-    });
-  }, [editingWorkMasterId, savingSpecWorkMasterId]);
-
-  const saveSpecEdit = useCallback(async () => {
-    if (!apiBaseUrl || !editingWorkMasterId) return;
-    const nextSpec = (specTextareaRef.current?.value ?? editingSpecSeed).toString();
+  const queueScrollRestore = useCallback((workMasterId) => {
     const container = scrollContainerRef.current;
     pendingRestoreRef.current = {
       scrollTop: container ? container.scrollTop : 0,
-      workMasterId: editingWorkMasterId,
+      workMasterId,
     };
-    setSavingSpecWorkMasterId(editingWorkMasterId);
-    setError(null);
-    try {
-      const updated = await fetch(`${apiBaseUrl}/work-masters/${editingWorkMasterId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ add_spec: nextSpec }),
-      }).then(handleResponse);
-      setEditingWorkMasterId(null);
-      setEditingSpecSeed('');
-      setWorkMasters((prev) => prev.map((wm) => (
-        wm?.id === editingWorkMasterId
-          ? { ...wm, ...(updated || {}), add_spec: (updated?.add_spec ?? nextSpec) }
-          : wm
-      )));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Spec을 저장하지 못했습니다.';
-      setError(message);
-    } finally {
-      setSavingSpecWorkMasterId(null);
-    }
-  }, [apiBaseUrl, editingSpecSeed, editingWorkMasterId]);
+  }, []);
 
   const filteredWorkMasters = useMemo(() => {
     return workMasters.filter(matchesMatcherFilterRules).sort(sortWorkMastersByCodeGauge);
   }, [workMasters]);
 
-  const isChecked = useCallback((workMasterId) => {
-    if (workMasterId == null) return false;
-    return Boolean(useMapRef.current.get(workMasterId));
-  }, [useMapVersion]);
+  const setUseInMap = useCallback((workMasterId, next) => {
+    if (workMasterId == null) return;
+    useMapRef.current.set(workMasterId, Boolean(next));
+  }, []);
 
-  const handleAddGauge = useCallback(async (workMasterId) => {
+  const deleteUseFromMap = useCallback((workMasterId) => {
+    if (workMasterId == null) return;
+    useMapRef.current.delete(workMasterId);
+  }, []);
+
+  const updateWorkMasterLocal = useCallback((workMasterId, patch) => {
+    if (workMasterId == null) return;
+    setWorkMasters((prev) => prev.map((wm) => (
+      wm?.id === workMasterId ? { ...wm, ...(patch || {}) } : wm
+    )));
+  }, []);
+
+  const addGauge = useCallback(async (workMasterId) => {
     if (!apiBaseUrl) return;
     if (!workMasterId) return;
-    if (gaugeAddingId != null || gaugeRemovingId != null) return;
-
-    setGaugeAddingId(workMasterId);
-    setError(null);
+    if (gaugeBusyRef.current) throw new Error('다른 게이지 작업이 진행 중입니다.');
+    gaugeBusyRef.current = true;
     try {
       const created = await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/add-gauge`, {
         method: 'POST',
@@ -462,37 +541,25 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
           return exists ? prev : [...prev, created];
         });
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '게이지 항목을 생성할 수 없습니다.';
-      setError(message);
     } finally {
-      setGaugeAddingId(null);
+      gaugeBusyRef.current = false;
     }
-  }, [apiBaseUrl, gaugeAddingId, gaugeRemovingId]);
+  }, [apiBaseUrl]);
 
-  const handleRemoveGauge = useCallback(async (workMasterId) => {
+  const removeGauge = useCallback(async (workMasterId, targetCodeRaw) => {
     if (!apiBaseUrl) return;
     if (!workMasterId) return;
-    if (gaugeAddingId != null || gaugeRemovingId != null) return;
-
-    const target = workMasters.find((wm) => wm?.id === workMasterId);
-    const targetCode = (target?.work_master_code ?? '').toString().trim();
-
-    setGaugeRemovingId(workMasterId);
-    setError(null);
+    if (gaugeBusyRef.current) throw new Error('다른 게이지 작업이 진행 중입니다.');
+    gaugeBusyRef.current = true;
     try {
+      const targetCode = (targetCodeRaw ?? '').toString().trim();
+
       await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/remove-gauge`, {
         method: 'POST',
       }).then(handleResponse);
+
       setWorkMasters((prev) => prev.filter((wm) => wm?.id !== workMasterId));
-      if (useMapRef.current.has(workMasterId)) {
-        useMapRef.current.delete(workMasterId);
-        setUseMapVersion((v) => v + 1);
-      }
-      if (editingWorkMasterId === workMasterId) {
-        setEditingWorkMasterId(null);
-        setEditingSpecSeed('');
-      }
+      useMapRef.current.delete(workMasterId);
 
       if (targetCode) {
         const refreshed = await fetch(`${apiBaseUrl}/work-masters/?search=${encodeURIComponent(targetCode)}`).then(handleResponse);
@@ -504,44 +571,10 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
           return [...others, ...refreshedGroup];
         });
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '게이지를 삭제할 수 없습니다.';
-      setError(message);
     } finally {
-      setGaugeRemovingId(null);
+      gaugeBusyRef.current = false;
     }
-  }, [apiBaseUrl, editingWorkMasterId, gaugeAddingId, gaugeRemovingId, workMasters]);
-
-  const toggleUse = useCallback(
-    async (workMasterId) => {
-      if (!apiBaseUrl) return;
-      if (!workMasterId) return;
-
-      const previous = isChecked(workMasterId);
-      const next = !previous;
-
-      useMapRef.current.set(workMasterId, next);
-      setUseMapVersion((v) => v + 1);
-      setSavingId(workMasterId);
-      setError(null);
-
-      try {
-        await fetch(`${apiBaseUrl}/work-masters/${workMasterId}/precheck`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ use_yn: next }),
-        }).then(handleResponse);
-      } catch (err) {
-        useMapRef.current.set(workMasterId, previous);
-        setUseMapVersion((v) => v + 1);
-        const message = err instanceof Error ? err.message : '저장하지 못했습니다.';
-        setError(message);
-      } finally {
-        setSavingId(null);
-      }
-    },
-    [apiBaseUrl, isChecked]
-  );
+  }, [apiBaseUrl]);
 
   const columns = useMemo(
     () => [
@@ -615,24 +648,18 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                 <PrecheckRow
                   key={wmId}
                   wm={wm}
-                  checked={isChecked(wmId)}
-                  saving={savingId === wmId}
-                  gaugeAdding={gaugeAddingId === wmId}
-                  gaugeRemoving={gaugeRemovingId === wmId}
-                  gaugeBusy={gaugeAddingId != null || gaugeRemovingId != null}
+                  apiBaseUrl={apiBaseUrl}
                   loading={loading}
-                  isEditingSpec={editingWorkMasterId != null && wmId === editingWorkMasterId}
-                  editingWorkMasterId={editingWorkMasterId}
-                  editingSpecSeed={editingSpecSeed}
-                  savingSpecWorkMasterId={savingSpecWorkMasterId}
-                  specTextareaRef={specTextareaRef}
+                  refreshToken={refreshToken}
+                  initialChecked={Boolean(wmId != null ? useMapRef.current.get(wmId) : false)}
+                  queueScrollRestore={queueScrollRestore}
+                  updateWorkMasterLocal={updateWorkMasterLocal}
+                  addGauge={addGauge}
+                  removeGauge={removeGauge}
+                  setUseInMap={setUseInMap}
+                  deleteUseFromMap={deleteUseFromMap}
                   insertNewlineAtCaret={insertNewlineAtCaret}
-                  onToggleUse={toggleUse}
-                  onAddGauge={handleAddGauge}
-                  onRemoveGauge={handleRemoveGauge}
-                  onStartSpecEdit={startSpecEdit}
-                  onSaveSpecEdit={saveSpecEdit}
-                  onCancelSpecEdit={cancelSpecEdit}
+                  onError={setError}
                   rowRefs={rowRefs}
                 />
               );
