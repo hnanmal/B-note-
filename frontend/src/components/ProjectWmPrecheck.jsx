@@ -77,6 +77,7 @@ const PrecheckRow = React.memo(function PrecheckRow({
   deleteUseFromMap,
   insertNewlineAtCaret,
   onError,
+  onUseSavingChange,
   rowRefs,
 }) {
   const wmId = wm?.id;
@@ -129,6 +130,7 @@ const PrecheckRow = React.memo(function PrecheckRow({
     const next = !previous;
     setChecked(next);
     setSavingUse(true);
+    onUseSavingChange?.(1);
     onError?.(null);
 
     try {
@@ -145,8 +147,9 @@ const PrecheckRow = React.memo(function PrecheckRow({
       onError?.(message);
     } finally {
       setSavingUse(false);
+      onUseSavingChange?.(-1);
     }
-  }, [apiBaseUrl, checked, onError, savingUse, setUseInMap, wmId]);
+  }, [apiBaseUrl, checked, onError, onUseSavingChange, savingUse, setUseInMap, wmId]);
 
   const startSpecEdit = useCallback(() => {
     if (!wmId) return;
@@ -240,7 +243,6 @@ const PrecheckRow = React.memo(function PrecheckRow({
             disabled={savingUse}
             onChange={toggleUse}
           />
-          {savingUse ? <span style={{ fontSize: 11, color: '#6b7280' }}>Saving...</span> : null}
         </label>
       </td>
       <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 800, color: '#0f172a' }}>{wmCode}</td>
@@ -415,6 +417,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const [error, setError] = useState(null);
 
   const [refreshToken, setRefreshToken] = useState(0);
+  const [useSavingCount, setUseSavingCount] = useState(0);
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef(new Map());
   const pendingRestoreRef = useRef(null);
@@ -597,22 +600,29 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
             Matching 위젯 필터 기준으로 전체 WorkMaster를 보여주고, Use 체크를 프로젝트 DB에 저장합니다.
           </div>
         </div>
-        <button
-          type="button"
-          onClick={fetchAll}
-          disabled={loading}
-          style={{
-            padding: '6px 10px',
-            borderRadius: 6,
-            border: '1px solid #cbd5f5',
-            background: loading ? '#e5e7eb' : '#fff',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontSize: 12,
-            fontWeight: 600,
-          }}
-        >
-          {loading ? 'Loading...' : 'Refresh'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {useSavingCount > 0 ? (
+            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+              Saving...
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={fetchAll}
+            disabled={loading}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 6,
+              border: '1px solid #cbd5f5',
+              background: loading ? '#e5e7eb' : '#fff',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -660,6 +670,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                   deleteUseFromMap={deleteUseFromMap}
                   insertNewlineAtCaret={insertNewlineAtCaret}
                   onError={setError}
+                  onUseSavingChange={(delta) => setUseSavingCount((c) => Math.max(0, c + delta))}
                   rowRefs={rowRefs}
                 />
               );
