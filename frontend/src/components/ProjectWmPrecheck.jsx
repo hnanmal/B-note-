@@ -35,12 +35,12 @@ const sortWorkMastersByCodeGauge = (a, b) => {
   return gaugeA.localeCompare(gaugeB);
 };
 
-const formatWorkMasterSummary = (wm) => {
+const getWorkMasterSummaryParts = (wm) => {
   const parts = [];
   const add = (label, value) => {
     const v = (value ?? '').toString().trim();
     if (!v) return;
-    parts.push(`${label}=${v}`);
+    parts.push({ label, value: v });
   };
 
   add('Discipline', wm?.discipline);
@@ -56,7 +56,11 @@ const formatWorkMasterSummary = (wm) => {
   add('Group', wm?.work_group_code);
   add('New/Old', wm?.new_old_code);
 
-  return parts.join(' | ');
+  return parts;
+};
+
+const shouldBoldWorkMasterLabel = (label) => {
+  return label === 'Mid' || label === 'Small' || label === 'Attr1' || label === 'Attr2';
 };
 
 export default function ProjectWmPrecheck({ apiBaseUrl }) {
@@ -353,7 +357,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
               const wmTitle = wmCode ? (gaugeValue ? `${wmCode}(${gaugeValue})` : wmCode) : (gaugeValue ? `(${gaugeValue})` : '코드 정보 없음');
               const headline =
                 wm?.cat_large_desc || wm?.cat_mid_desc || wm?.cat_small_desc || wmTitle;
-              const summary = formatWorkMasterSummary(wm);
+              const summaryParts = getWorkMasterSummaryParts(wm);
               const unitLabel = [wm?.uom1, wm?.uom2].filter(Boolean).join(' / ');
               const specValue = (wm?.add_spec ?? '').toString();
               const isEditingSpec = editingWorkMasterId != null && wmId === editingWorkMasterId;
@@ -535,9 +539,21 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
                           {wmTitle}
                         </div>
                       </div>
-                      {summary && (
+                      {summaryParts.length > 0 && (
                         <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.4, wordBreak: 'break-word' }}>
-                          {summary}
+                          {summaryParts.map((part, index) => (
+                            <span key={`${part.label}-${index}`}>
+                              {index > 0 ? ' | ' : ''}
+                              <span>{part.label}=</span>
+                              <span
+                                style={shouldBoldWorkMasterLabel(part.label)
+                                  ? { fontWeight: 900, color: '#1d4ed8', fontSize: 12 }
+                                  : { fontWeight: 400 }}
+                              >
+                                {part.value}
+                              </span>
+                            </span>
+                          ))}
                         </div>
                       )}
                     </div>

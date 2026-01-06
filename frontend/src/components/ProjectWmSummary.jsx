@@ -219,12 +219,12 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     });
   }, [groupedRows, query]);
 
-  const formatWorkMasterDetails = useCallback((row) => {
+  const getWorkMasterDetailParts = useCallback((row) => {
     const parts = [];
     const add = (label, value) => {
       const v = (value ?? '').toString().trim();
       if (!v) return;
-      parts.push(`${label}=${v}`);
+      parts.push({ label, value: v });
     };
 
     add('Discipline', row?.discipline);
@@ -242,7 +242,17 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
     add('Group', row?.work_group_code);
     add('New/Old', row?.new_old_code);
 
-    return parts.join(' | ');
+    return parts;
+  }, []);
+
+  const formatWorkMasterDetails = useCallback((row) => {
+    return getWorkMasterDetailParts(row)
+      .map((part) => `${part.label}=${part.value}`)
+      .join(' | ');
+  }, [getWorkMasterDetailParts]);
+
+  const shouldBoldWorkMasterLabel = useCallback((label) => {
+    return label === 'Mid' || label === 'Small' || label === 'Attr1' || label === 'Attr2';
   }, []);
 
   const sortedRows = useMemo(() => {
@@ -604,7 +614,7 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
               const gauge = row?.gauge ?? '';
               const unit = row?.uom1 ?? '';
               const spec = row?.add_spec ?? '';
-              const workMasterText = `${wmCode}${gauge ? ` | ${gauge}` : ''}${formatWorkMasterDetails(row) ? ` | ${formatWorkMasterDetails(row)}` : ''}`;
+              const detailParts = getWorkMasterDetailParts(row);
               const type = `${row?.standard_item_type ?? ''}`;
               const itemPath = row?.standard_item_path ?? '';
               const isEditingSpec = editingWorkMasterId != null && row?.work_master_id === editingWorkMasterId;
@@ -731,7 +741,24 @@ export default function ProjectWmSummary({ apiBaseUrl }) {
                       </button>
                     )}
                   </div>
-                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{workMasterText}</div>
+                  <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    <span>{wmCode}</span>
+                    {gauge ? <span>{` | ${gauge}`}</span> : null}
+                    {detailParts.length > 0 ? <span>{' | '}</span> : null}
+                    {detailParts.map((part, index) => (
+                      <span key={`${part.label}-${index}`}>
+                        {index > 0 ? ' | ' : ''}
+                        <span>{part.label}=</span>
+                        <span
+                          style={shouldBoldWorkMasterLabel(part.label)
+                            ? { fontWeight: 900, color: '#1d4ed8', fontSize: 12 }
+                            : { fontWeight: 400 }}
+                        >
+                          {part.value}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
                   <div style={{ padding: '8px 10px', borderRight: '1px solid #f1f5f9' }}>{type}</div>
                   <div style={{ padding: '8px 10px', whiteSpace: 'pre-wrap' }}>{itemPath}</div>
                 </div>
