@@ -218,6 +218,7 @@ const buildAssignedSubtree = (nodes, assignedRoots, ancestorMap, metadata) => {
 };
 
 export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
+  const isProjectContext = typeof apiBaseUrl === 'string' && apiBaseUrl.includes('/project/');
   const [familyItems, setFamilyItems] = useState([]);
   const [filterType, setFilterType] = useState('ALL');
   const [status, setStatus] = useState(null);
@@ -2011,6 +2012,8 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
               externalCheckboxSelection={Array.from(selectedStdItems)}
               apiBaseUrl={apiBaseUrl}
               onItemsChange={setStandardItems}
+              hideDeriveControls={isProjectContext}
+              editDeleteMode={isProjectContext ? 'none' : 'all'}
             />
           </div>
           {!isStdTreeOpen && (
