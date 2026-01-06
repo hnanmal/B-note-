@@ -693,7 +693,7 @@ export default function StandardTreeManager({
                 </div>
                 <div>
                     {level < 2 && (
-                        <button style={{ marginLeft: 8, ...smallBtn }} onClick={() => handleAdd(node.id)}>추가</button>
+                        <button style={{ marginLeft: 8, ...smallBtn }} onClick={() => handleAdd(node.id)}>하위 생성</button>
                     )}
                     {level === 1 && (node.type ?? '').toUpperCase() === 'GWM' && (
                         !hideDeriveControls && (
