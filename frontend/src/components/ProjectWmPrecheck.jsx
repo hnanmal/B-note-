@@ -617,6 +617,9 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   const [error, setError] = useState(null);
   const [selectedWorkMasterIds, setSelectedWorkMasterIds] = useState(() => new Set());
 
+  const [importingReportWmExcel, setImportingReportWmExcel] = useState(false);
+  const reportWmExcelInputRef = useRef(null);
+
   const pendingRenderMeasureRef = useRef(null);
 
   const [scrollTop, setScrollTop] = useState(0);
@@ -722,6 +725,68 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  const triggerReportWmImport = useCallback(() => {
+    if (!apiBaseUrl) return;
+    if (importingReportWmExcel) return;
+    reportWmExcelInputRef.current?.click?.();
+  }, [apiBaseUrl, importingReportWmExcel]);
+
+  const handleReportWmImportFile = useCallback(async (event) => {
+    if (!apiBaseUrl) return;
+    if (importingReportWmExcel) return;
+
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+
+    setImportingReportWmExcel(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${apiBaseUrl}/import/report-wm`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.detail || body?.message || 'Report_WM 엑셀 임포트에 실패했습니다.';
+        throw new Error(message);
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      const processed = typeof payload?.processed_rows === 'number' ? payload.processed_rows : 0;
+      const matched = typeof payload?.matched_rows === 'number' ? payload.matched_rows : 0;
+      const updatedSpec = typeof payload?.updated_spec === 'number' ? payload.updated_spec : 0;
+      const updatedOther = typeof payload?.updated_other_opinion === 'number'
+        ? payload.updated_other_opinion
+        : 0;
+      const missingCount = Array.isArray(payload?.missing) ? payload.missing.length : 0;
+
+      alert(
+        `Report_WM 임포트 완료\n` +
+        `- 처리: ${processed}\n` +
+        `- 매칭: ${matched}\n` +
+        `- Spec 업데이트: ${updatedSpec}\n` +
+        `- 기타의견 업데이트: ${updatedOther}` +
+        (missingCount ? `\n- 매칭 실패(일부): ${missingCount}건` : '')
+      );
+
+      await fetchAll();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Report_WM 엑셀 임포트에 실패했습니다.';
+      setError(message);
+    } finally {
+      setImportingReportWmExcel(false);
+      try {
+        if (event?.target) event.target.value = '';
+      } catch {
+        // ignore
+      }
+    }
+  }, [apiBaseUrl, fetchAll, importingReportWmExcel]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -945,11 +1010,36 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            ref={reportWmExcelInputRef}
+            type="file"
+            accept=".xlsx"
+            style={{ display: 'none' }}
+            onChange={handleReportWmImportFile}
+          />
           {useSavingCount > 0 ? (
             <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
               Saving...
             </span>
           ) : null}
+          <button
+            type="button"
+            onClick={triggerReportWmImport}
+            disabled={!apiBaseUrl || importingReportWmExcel}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 6,
+              border: '1px solid #7c3aed',
+              background: !apiBaseUrl || importingReportWmExcel ? '#ddd6fe' : '#7c3aed',
+              color: '#0b1020',
+              cursor: !apiBaseUrl || importingReportWmExcel ? 'not-allowed' : 'pointer',
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+            title="DB Excel의 Report_WM 시트를 읽어 Spec/기타의견을 DB에 반영"
+          >
+            {importingReportWmExcel ? '임포트 중...' : 'Report_WM Import'}
+          </button>
           <button
             type="button"
             onClick={fetchAll}
