@@ -350,7 +350,9 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const matrixScrollRef = useRef(null);
   const rafScrollIdRef = useRef(null);
   const [matrixScrollTop, setMatrixScrollTop] = useState(0);
+  const [matrixScrollLeft, setMatrixScrollLeft] = useState(0);
   const [matrixViewportHeight, setMatrixViewportHeight] = useState(0);
+  const [matrixViewportWidth, setMatrixViewportWidth] = useState(0);
 
   const buildingOptions = useMemo(() => {
     const sorted = [...buildings].sort((a, b) => {
@@ -606,11 +608,13 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
       rafScrollIdRef.current = window.requestAnimationFrame(() => {
         rafScrollIdRef.current = null;
         setMatrixScrollTop(el.scrollTop || 0);
+        setMatrixScrollLeft(el.scrollLeft || 0);
       });
     };
 
     const updateViewport = () => {
       setMatrixViewportHeight(el.clientHeight || 0);
+      setMatrixViewportWidth(el.clientWidth || 0);
     };
 
     updateViewport();
@@ -726,6 +730,42 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const visibleRows = flatRows.slice(startRowIndex, endRowIndex);
   const topSpacerHeight = startRowIndex * ROW_HEIGHT;
   const bottomSpacerHeight = Math.max(0, estimatedTotalHeight - endRowIndex * ROW_HEIGHT);
+
+  const ITEM_COL_WIDTH = 280;
+  const ROOM_COL_WIDTH = 160;
+  const OVERSCAN_COLS = 3;
+  const roomsScrollLeft = Math.max(0, matrixScrollLeft - ITEM_COL_WIDTH);
+  const roomViewportWidth = Math.max(0, matrixViewportWidth - ITEM_COL_WIDTH);
+  const startColIndex = Math.max(0, Math.floor(roomsScrollLeft / ROOM_COL_WIDTH) - OVERSCAN_COLS);
+  const endColIndex = Math.min(
+    tableHeaders.length,
+    Math.ceil((roomsScrollLeft + roomViewportWidth) / ROOM_COL_WIDTH) + OVERSCAN_COLS
+  );
+  const visibleRoomHeaders = tableHeaders.slice(startColIndex, endColIndex);
+  const leftRoomSpacerWidth = startColIndex * ROOM_COL_WIDTH;
+  const rightRoomSpacerWidth = Math.max(0, (tableHeaders.length - endColIndex) * ROOM_COL_WIDTH);
+  const totalTableMinWidth = ITEM_COL_WIDTH + tableHeaders.length * ROOM_COL_WIDTH;
+  const totalVisibleColCount = 1 + 1 + visibleRoomHeaders.length + 1;
+
+  useEffect(() => {
+    if (!debugEnabled) return;
+    console.log(
+      '[InteriorMatrix] colWindow',
+      'scrollLeft:', Math.round(matrixScrollLeft),
+      'viewportW:', Math.round(matrixViewportWidth),
+      'rooms:', tableHeaders.length,
+      'visible:', visibleRoomHeaders.length,
+      'range:', startColIndex, '-', endColIndex
+    );
+  }, [
+    debugEnabled,
+    matrixScrollLeft,
+    matrixViewportWidth,
+    tableHeaders.length,
+    visibleRoomHeaders.length,
+    startColIndex,
+    endColIndex,
+  ]);
 
   useEffect(() => {
     const derivedSections = buildSectionsFromStandardItems(standardItems, projectAbbr);
@@ -1049,7 +1089,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
               </div>
             </div>
           )}
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: totalTableMinWidth }}>
             <thead>
               <tr>
                 <th
@@ -1062,11 +1102,25 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                     fontSize: 12,
                     textAlign: 'left',
                     padding: '8px 10px',
+                    width: ITEM_COL_WIDTH,
+                    minWidth: ITEM_COL_WIDTH,
                   }}
                 >
                   항목
                 </th>
-                {tableHeaders.map((room) => {
+
+                <th
+                  style={{
+                    borderBottom: '1px solid #e2e8f0',
+                    fontSize: 12,
+                    padding: 0,
+                    background: '#f8fafc',
+                    width: leftRoomSpacerWidth,
+                    minWidth: leftRoomSpacerWidth,
+                  }}
+                />
+
+                {visibleRoomHeaders.map((room) => {
                   const isSelected = selectedRoomKey === room.key;
                   return (
                     <th
@@ -1080,6 +1134,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                         textAlign: 'center',
                         whiteSpace: 'nowrap',
                         cursor: 'pointer',
+                        width: ROOM_COL_WIDTH,
+                        minWidth: ROOM_COL_WIDTH,
                       }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1094,12 +1150,23 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                     </th>
                   );
                 })}
+
+                <th
+                  style={{
+                    borderBottom: '1px solid #e2e8f0',
+                    fontSize: 12,
+                    padding: 0,
+                    background: '#f8fafc',
+                    width: rightRoomSpacerWidth,
+                    minWidth: rightRoomSpacerWidth,
+                  }}
+                />
               </tr>
             </thead>
             <tbody>
               {topSpacerHeight > 0 && (
                 <tr>
-                  <td colSpan={1 + tableHeaders.length} style={{ padding: 0, border: 0 }}>
+                  <td colSpan={totalVisibleColCount} style={{ padding: 0, border: 0 }}>
                     <div style={{ height: topSpacerHeight }} />
                   </td>
                 </tr>
@@ -1110,7 +1177,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                   return (
                     <tr key={row.key} style={{ height: ROW_HEIGHT }}>
                       <td
-                        colSpan={1 + tableHeaders.length}
+                        colSpan={totalVisibleColCount}
                         style={{
                           background: '#ede9fe',
                           color: '#4c1d95',
@@ -1140,11 +1207,24 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                         padding: '6px 10px',
                         whiteSpace: 'nowrap',
                         height: ROW_HEIGHT,
+                        width: ITEM_COL_WIDTH,
+                        minWidth: ITEM_COL_WIDTH,
                       }}
                     >
                       {row.item.label}
                     </td>
-                    {tableHeaders.map((room) => {
+
+                    <td
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        padding: 0,
+                        width: leftRoomSpacerWidth,
+                        minWidth: leftRoomSpacerWidth,
+                        background: '#fff',
+                      }}
+                    />
+
+                    {visibleRoomHeaders.map((room) => {
                       const roomKey = room.key;
                       const checked = isChecked(itemKey, row.item.standardItemId, roomKey);
                       return (
@@ -1157,7 +1237,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                             cursor: isInitialDbSyncing ? 'not-allowed' : 'pointer',
                             userSelect: 'none',
                             padding: '6px 8px',
-                            minWidth: 80,
+                            width: ROOM_COL_WIDTH,
+                            minWidth: ROOM_COL_WIDTH,
                             color: checked ? '#0f172a' : '#94a3b8',
                             opacity: isInitialDbSyncing ? 0.6 : 1,
                             height: ROW_HEIGHT,
@@ -1168,13 +1249,23 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                         </td>
                       );
                     })}
+
+                    <td
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        padding: 0,
+                        width: rightRoomSpacerWidth,
+                        minWidth: rightRoomSpacerWidth,
+                        background: '#fff',
+                      }}
+                    />
                   </tr>
                 );
               })}
 
               {bottomSpacerHeight > 0 && (
                 <tr>
-                  <td colSpan={1 + tableHeaders.length} style={{ padding: 0, border: 0 }}>
+                  <td colSpan={totalVisibleColCount} style={{ padding: 0, border: 0 }}>
                     <div style={{ height: bottomSpacerHeight }} />
                   </td>
                 </tr>
