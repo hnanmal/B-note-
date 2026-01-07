@@ -1564,13 +1564,28 @@ def export_project_db_excel(project_identifier: str):
             """
         )
 
+        # Project abbreviation (for derived item name formatting)
+        pjt_abbr = None
+        try:
+            df_meta = _read_df(
+                "SELECT pjt_abbr FROM project_metadata ORDER BY id LIMIT 1"
+            )
+            if df_meta is not None and not df_meta.empty:
+                raw_abbr = df_meta.iloc[0].get("pjt_abbr")
+                if raw_abbr is not None:
+                    abbr = str(raw_abbr).strip()
+                    pjt_abbr = abbr or None
+        except Exception:
+            pjt_abbr = None
+
         # Standard item hierarchy (for indentation of assigned items)
         df_standard_items_hier = _read_df(
-            "SELECT id, parent_id, name AS standard_item_name, type AS standard_item_type FROM standard_items"
+            "SELECT id, parent_id, derive_from, name AS standard_item_name, type AS standard_item_type FROM standard_items"
         )
         standard_item_name_by_id = {}
         standard_item_type_by_id = {}
         standard_item_parent_by_id = {}
+        standard_item_derive_from_by_id = {}
         if df_standard_items_hier is not None and not df_standard_items_hier.empty:
             for _, r in df_standard_items_hier.iterrows():
                 sid = r.get("id")
@@ -1588,6 +1603,31 @@ def export_project_db_excel(project_identifier: str):
                 except Exception:
                     pid_int = None
                 standard_item_parent_by_id[sid_int] = pid_int
+
+                derive_from = r.get("derive_from")
+                try:
+                    derive_from_int = (
+                        int(derive_from) if derive_from is not None else None
+                    )
+                except Exception:
+                    derive_from_int = None
+                standard_item_derive_from_by_id[sid_int] = derive_from_int
+
+        # Apply derived item naming: sourceName[abbr]:: baseName
+        if standard_item_derive_from_by_id:
+            for sid_int, source_id in list(standard_item_derive_from_by_id.items()):
+                if source_id is None:
+                    continue
+                base_name = standard_item_name_by_id.get(sid_int)
+                source_name = standard_item_name_by_id.get(source_id)
+                if not base_name or not source_name:
+                    continue
+                if pjt_abbr:
+                    standard_item_name_by_id[sid_int] = (
+                        f"{source_name}[{pjt_abbr}]:: {base_name}"
+                    )
+                else:
+                    standard_item_name_by_id[sid_int] = f"{source_name}:: {base_name}"
         assignments_by_family_id = {}
         if df_family_assignments is not None and not df_family_assignments.empty:
             for _, r in df_family_assignments.iterrows():
