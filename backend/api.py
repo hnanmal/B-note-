@@ -1046,10 +1046,76 @@ def export_project_db_for_dynamo(
             for fid in family_list_ids_for_entry
             for calc_entry in calc_dictionary_entries_by_family_list_id.get(fid, [])
         ]
+
+    def _first_from(value):
+        if value is None:
+            return None
+        if isinstance(value, (list, tuple)):
+            return value[0] if value else None
+        return value
+
+    def _coerce_int(value):
+        if value is None:
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return None
+            if value.isdigit():
+                return int(value)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _coerce_str(value):
+        if value is None:
+            return None
+        text_value = str(value).strip()
+        return text_value or None
+
+    dynamo_cart_entries = []
+    for entry in cart_entries:
+        wm = _first_from(getattr(entry, "work_masters", None) or [])
+        if wm is not None and not isinstance(wm, schemas.WorkMasterBrief):
+            try:
+                wm = schemas.WorkMasterBrief(**wm)
+            except Exception:
+                wm = None
+
+        dynamo_cart_entries.append(
+            schemas.DynamoWorkMasterCartEntry(
+                id=int(getattr(entry, "id")),
+                created_at=getattr(entry, "created_at"),
+                formula=getattr(entry, "formula", None),
+                revit_type=_coerce_str(_first_from(getattr(entry, "revit_types", None) or [])),
+                assignment_id=_coerce_int(
+                    _first_from(getattr(entry, "assignment_ids", None) or [])
+                ),
+                standard_item_id=_coerce_int(
+                    _first_from(getattr(entry, "standard_item_ids", None) or [])
+                ),
+                building_name=_coerce_str(
+                    _first_from(getattr(entry, "building_names", None) or [])
+                ),
+                assignment_label=_coerce_str(
+                    _first_from(getattr(entry, "assignment_labels", None) or [])
+                ),
+                standard_item_name=_coerce_str(
+                    _first_from(getattr(entry, "standard_item_names", None) or [])
+                ),
+                work_master=wm,
+                calc_dictionary_entries=list(
+                    getattr(entry, "calc_dictionary_entries", None) or []
+                ),
+            )
+        )
     return {
         "project_identifier": project_identifier,
         "buildings": buildings,
-        "workmaster_cart_entries": cart_entries,
+        "workmaster_cart_entries": dynamo_cart_entries,
     }
 
 

@@ -119,6 +119,28 @@ class WorkMasterCartEntry(WorkMasterCartEntryBase):
     calc_dictionary_entries: List["CalcDictionarySymbol"] = Field(default_factory=list)
 
 
+class DynamoWorkMasterCartEntry(BaseModel):
+    """Export-only cart row shape for Dynamo JSON.
+
+    Dynamo export expects each row to carry a single value/object for these fields.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    revit_type: Optional[str] = None
+    assignment_id: Optional[int] = None
+    standard_item_id: Optional[int] = None
+    building_name: Optional[str] = None
+    formula: Optional[str] = None
+
+    id: int
+    created_at: datetime.datetime
+    assignment_label: Optional[str] = None
+    standard_item_name: Optional[str] = None
+    work_master: Optional[WorkMasterBrief] = None
+    calc_dictionary_entries: List["CalcDictionarySymbol"] = Field(default_factory=list)
+
+
 # StandardItem Schemas
 class StandardItemBase(BaseModel):
     name: str
@@ -202,7 +224,7 @@ class DynamoProjectExportPayload(BaseModel):
     exported_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     project_identifier: str
     buildings: List["BuildingItem"] = Field(default_factory=list)
-    workmaster_cart_entries: List[WorkMasterCartEntry] = Field(default_factory=list)
+    workmaster_cart_entries: List[DynamoWorkMasterCartEntry] = Field(default_factory=list)
     wm_selection_summary: Optional[WorkMasterSummaryResponse] = None
 
 
@@ -477,3 +499,4 @@ FamilyListItem.model_rebuild()
 CalcDictionaryEntry.model_rebuild()
 FamilyRevitType.model_rebuild()
 WorkMasterCartEntry.model_rebuild()
+DynamoWorkMasterCartEntry.model_rebuild()
