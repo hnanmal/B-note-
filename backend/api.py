@@ -1542,6 +1542,30 @@ def export_project_db_excel(project_identifier: str):
         summary_ws.append([])
         summary_ws.append(["sheet", "rows"])
 
+        # Report_WM (WM pre-check)
+        df_wm_precheck = _read_df(
+            """
+            SELECT
+              wm.id AS work_master_id,
+              wm.work_master_code,
+              wm.discipline,
+              wm.cat_large_code,
+              wm.cat_large_desc,
+              wm.cat_mid_code,
+              wm.cat_mid_desc,
+              wm.cat_small_code,
+              wm.cat_small_desc,
+              wm.gauge,
+              COALESCE(wmp.use_yn, 0) AS use_yn,
+              wmp.updated_at
+            FROM work_masters wm
+            LEFT JOIN work_master_precheck wmp ON wmp.work_master_id = wm.id
+            ORDER BY wm.work_master_code, wm.id
+            """
+        )
+        _write_sheet_from_df("Report_WM", df_wm_precheck)
+        summary_ws.append(["Report_WM", int(len(df_wm_precheck.index))])
+
         # Family list (tree, as shown in app) + assigned standard items under each node.
         df_family_raw = _read_df(
             "SELECT id, parent_id, sequence_number, name, item_type, description, created_at FROM family_list ORDER BY id"
