@@ -1548,6 +1548,8 @@ def export_project_db_excel(project_identifier: str):
             SELECT
               wm.id AS work_master_id,
               wm.work_master_code,
+                            wm.gauge,
+                            wm.add_spec AS Spec,
               wm.discipline,
               wm.cat_large_code,
               wm.cat_large_desc,
@@ -1555,7 +1557,6 @@ def export_project_db_excel(project_identifier: str):
               wm.cat_mid_desc,
               wm.cat_small_code,
               wm.cat_small_desc,
-              wm.gauge,
               COALESCE(wmp.use_yn, 0) AS use_yn,
               wmp.updated_at
             FROM work_masters wm
