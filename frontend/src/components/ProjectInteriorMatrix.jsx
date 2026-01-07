@@ -732,7 +732,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const bottomSpacerHeight = Math.max(0, estimatedTotalHeight - endRowIndex * ROW_HEIGHT);
 
   const ITEM_COL_WIDTH = 280;
-  const ROOM_COL_WIDTH = 140;
+  const ROOM_COL_WIDTH = 70;
   const OVERSCAN_COLS = 3;
   const roomsScrollLeft = Math.max(0, matrixScrollLeft - ITEM_COL_WIDTH);
   const roomViewportWidth = Math.max(0, matrixViewportWidth - ITEM_COL_WIDTH);
