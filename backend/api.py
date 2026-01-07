@@ -404,6 +404,176 @@ async def upload_project_work_masters(
         )
 
 
+def import_project_report_wm_excel_bytes(
+    project_identifier: str,
+    xlsx_bytes: bytes,
+    db: Session,
+):
+    from openpyxl import load_workbook
+
+    def norm(value) -> str:
+        return str(value).strip() if value is not None else ""
+
+    try:
+        wb = load_workbook(io.BytesIO(xlsx_bytes), data_only=False)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid .xlsx file: {e}")
+
+    if "Report_WM" not in wb.sheetnames:
+        raise HTTPException(
+            status_code=400, detail="Excel에 'Report_WM' 시트가 없습니다."
+        )
+
+    ws = wb["Report_WM"]
+    max_col = int(ws.max_column or 0)
+    if max_col <= 0:
+        raise HTTPException(status_code=400, detail="Report_WM 시트가 비어 있습니다.")
+
+    headers = [ws.cell(row=1, column=c).value for c in range(1, max_col + 1)]
+    header_to_col = {norm(h): idx + 1 for idx, h in enumerate(headers) if norm(h)}
+
+    col_wm_code = header_to_col.get("WM Code")
+    col_gauge = header_to_col.get("Gauge")
+    col_spec = header_to_col.get("Spec")
+    col_other = header_to_col.get("기타의견")
+
+    if not col_wm_code:
+        raise HTTPException(
+            status_code=400, detail="Report_WM 시트에 'WM Code' 컬럼이 없습니다."
+        )
+
+    if not col_spec and not col_other:
+        raise HTTPException(
+            status_code=400,
+            detail="Report_WM 시트에 업데이트할 컬럼('Spec' 또는 '기타의견')이 없습니다.",
+        )
+
+    processed = 0
+    matched = 0
+    updated_spec = 0
+    updated_other = 0
+    missing = []
+
+    max_row = int(ws.max_row or 1)
+    for r in range(2, max_row + 1):
+        wm_code = norm(ws.cell(row=r, column=col_wm_code).value)
+        if not wm_code:
+            continue
+
+        gauge_norm = ""
+        if col_gauge:
+            gauge_norm = norm(ws.cell(row=r, column=col_gauge).value).upper()
+
+        spec_value = None
+        if col_spec:
+            v = ws.cell(row=r, column=col_spec).value
+            spec_value = "" if v is None else str(v)
+
+        other_value = None
+        if col_other:
+            v = ws.cell(row=r, column=col_other).value
+            other_value = "" if v is None else str(v)
+
+        processed += 1
+
+        row = db.execute(
+            text(
+                """
+                SELECT id
+                FROM work_masters
+                WHERE work_master_code = :code
+                  AND UPPER(COALESCE(TRIM(gauge), '')) = :gauge
+                ORDER BY id
+                LIMIT 1
+                """
+            ),
+            {"code": wm_code, "gauge": gauge_norm},
+        ).fetchone()
+
+        work_master_id = int(row[0]) if row else None
+
+        # Fallback: if gauge-based match fails, match by code only when unique.
+        if work_master_id is None:
+            rows = db.execute(
+                text(
+                    "SELECT id FROM work_masters WHERE work_master_code = :code ORDER BY id"
+                ),
+                {"code": wm_code},
+            ).fetchall()
+            if rows and len(rows) == 1:
+                work_master_id = int(rows[0][0])
+
+        if work_master_id is None:
+            if len(missing) < 50:
+                missing.append({"wm_code": wm_code, "gauge": gauge_norm})
+            continue
+
+        matched += 1
+        now = datetime.datetime.utcnow().isoformat()
+
+        if col_spec is not None and spec_value is not None:
+            db.execute(
+                text("UPDATE work_masters SET add_spec = :spec WHERE id = :id"),
+                {"spec": spec_value, "id": work_master_id},
+            )
+            updated_spec += 1
+
+        if col_other is not None and other_value is not None:
+            current = db.execute(
+                text(
+                    "SELECT use_yn FROM work_master_precheck WHERE work_master_id = :id"
+                ),
+                {"id": work_master_id},
+            ).fetchone()
+            use_val = 1 if (current is not None and bool(current[0])) else 0
+            db.execute(
+                text(
+                    """
+                    INSERT INTO work_master_precheck (work_master_id, use_yn, other_opinion, updated_at)
+                    VALUES (:id, :use_yn, :other, :updated_at)
+                    ON CONFLICT(work_master_id)
+                    DO UPDATE SET
+                      other_opinion = excluded.other_opinion,
+                      updated_at = excluded.updated_at
+                    """
+                ),
+                {
+                    "id": work_master_id,
+                    "use_yn": use_val,
+                    "other": other_value,
+                    "updated_at": now,
+                },
+            )
+            updated_other += 1
+
+    db.commit()
+    return {
+        "processed_rows": processed,
+        "matched_rows": matched,
+        "updated_spec": updated_spec,
+        "updated_other_opinion": updated_other,
+        "missing": missing,
+    }
+
+
+@router.post(
+    "/project/{project_identifier}/import/report-wm",
+    summary="Import Report_WM sheet and update Spec/Other opinion",
+    tags=["Project Data"],
+)
+async def import_project_report_wm_excel(
+    project_identifier: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_project_db_session),
+):
+    if not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(
+            status_code=400, detail="Invalid file type. Please upload an .xlsx file."
+        )
+    contents = await file.read()
+    return import_project_report_wm_excel_bytes(project_identifier, contents, db)
+
+
 @router.patch(
     "/project/{project_identifier}/work-masters/{work_master_id}",
     response_model=schemas.WorkMaster,
