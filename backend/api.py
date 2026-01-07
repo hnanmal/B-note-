@@ -1161,6 +1161,7 @@ def export_project_db_excel(project_identifier: str):
     try:
         from openpyxl import Workbook
         from openpyxl.utils import get_column_letter
+        from openpyxl.styles import Alignment
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Excel export dependency missing")
 
@@ -1213,7 +1214,7 @@ def export_project_db_excel(project_identifier: str):
 
         if df is None or df.empty:
             ws.append(["(no rows)"])
-            return
+            return ws
 
         ws.append(list(df.columns))
         for _, row in df.iterrows():
@@ -1232,8 +1233,159 @@ def export_project_db_excel(project_identifier: str):
                     break
             ws.column_dimensions[col_letter].width = min(60, max(10, max_len + 2))
 
+        return ws
+
     conn = sqlite3.connect(db_path.as_posix())
     try:
+
+        def _natural_key(text: str):
+            import re
+
+            value = (text or "").strip().casefold()
+            parts = re.split(r"(\d+)", value)
+            key = []
+            for part in parts:
+                if part.isdigit():
+                    try:
+                        key.append(int(part))
+                    except Exception:
+                        key.append(part)
+                else:
+                    key.append(part)
+            return key
+
+        def _parse_sequence_identifier(value):
+            import re
+
+            trimmed = str(value).strip() if value is not None else ""
+            if not trimmed:
+                return None
+            match = re.match(r"^(\d+(?:\.\d+)*)([a-zA-Z]*)", trimmed)
+            if not match:
+                return None
+            number_parts = []
+            for seg in match.group(1).split("."):
+                try:
+                    number_parts.append(int(seg))
+                except Exception:
+                    return None
+            suffix = (match.group(2) or "").lower()
+            return {"numbers": number_parts, "suffix": suffix}
+
+        def _get_sequence_identifier(node):
+            return _parse_sequence_identifier(
+                node.get("sequence_number")
+            ) or _parse_sequence_identifier(node.get("name"))
+
+        def _compare_sequence_identifiers(a, b):
+            max_len = max(len(a["numbers"]), len(b["numbers"]))
+            for i in range(max_len):
+                va = a["numbers"][i] if i < len(a["numbers"]) else 0
+                vb = b["numbers"][i] if i < len(b["numbers"]) else 0
+                if va != vb:
+                    return -1 if va < vb else 1
+            if a["suffix"] != b["suffix"]:
+                if not a["suffix"]:
+                    return -1
+                if not b["suffix"]:
+                    return 1
+                return -1 if a["suffix"] < b["suffix"] else 1
+            return 0
+
+        def _compare_family_nodes(a, b):
+            ida = _get_sequence_identifier(a)
+            idb = _get_sequence_identifier(b)
+            if ida and idb:
+                c = _compare_sequence_identifiers(ida, idb)
+                if c != 0:
+                    return c
+            elif ida:
+                return -1
+            elif idb:
+                return 1
+
+            name_a = (a.get("name") or "").strip()
+            name_b = (b.get("name") or "").strip()
+            if not name_a:
+                return 1 if name_b else 0
+            if not name_b:
+                return -1
+            ka = _natural_key(name_a)
+            kb = _natural_key(name_b)
+            if ka == kb:
+                return 0
+            return -1 if ka < kb else 1
+
+        def _build_family_tree_rows(items):
+            from functools import cmp_to_key
+            import math
+
+            def _to_int_or_none(value):
+                if value is None:
+                    return None
+                if isinstance(value, float) and math.isnan(value):
+                    return None
+                try:
+                    text = str(value).strip()
+                    if not text or text.lower() == "nan":
+                        return None
+                    return int(float(text))
+                except Exception:
+                    return None
+
+            node_by_id = {}
+            for item in items:
+                node_id = _to_int_or_none(item.get("id"))
+                if node_id is None:
+                    continue
+                parent_id = _to_int_or_none(item.get("parent_id"))
+                node_by_id[node_id] = {
+                    **item,
+                    "id": node_id,
+                    "parent_id": parent_id,
+                    "children": [],
+                }
+
+            roots = []
+            for node_id, node in node_by_id.items():
+                parent_id = node.get("parent_id")
+                if parent_id is not None and parent_id in node_by_id:
+                    node_by_id[parent_id]["children"].append(node)
+                else:
+                    roots.append(node)
+
+            def sort_nodes(nodes):
+                nodes.sort(key=cmp_to_key(_compare_family_nodes))
+                for n in nodes:
+                    if n.get("children"):
+                        sort_nodes(n["children"])
+
+            sort_nodes(roots)
+
+            rows = []
+
+            def walk(nodes, level=0):
+                for n in nodes:
+                    seq = (n.get("sequence_number") or "").strip()
+                    name = (n.get("name") or "").strip() or "Unnamed"
+                    rows.append(
+                        {
+                            "level": int(level),
+                            "sequence_number": seq or None,
+                            "name": name,
+                            "item_type": n.get("item_type"),
+                            "id": n.get("id"),
+                            "parent_id": n.get("parent_id"),
+                            "description": n.get("description"),
+                            "created_at": n.get("created_at"),
+                        }
+                    )
+                    children = n.get("children") or []
+                    if children:
+                        walk(children, level + 1)
+
+            walk(roots, 0)
+            return rows
 
         def _read_df(query: str, params=None) -> "pd.DataFrame":
             try:
@@ -1351,6 +1503,35 @@ def export_project_db_excel(project_identifier: str):
         )
         _write_sheet_from_df("CalcDictionary", df_calc)
         summary_ws.append(["CalcDictionary", int(len(df_calc.index))])
+
+        # Family list (tree, as shown in app)
+        df_family_raw = _read_df(
+            "SELECT id, parent_id, sequence_number, name, item_type, description, created_at FROM family_list ORDER BY id"
+        )
+        family_rows = _build_family_tree_rows(
+            df_family_raw.to_dict(orient="records") if not df_family_raw.empty else []
+        )
+        df_family_tree = pd.DataFrame(family_rows)
+        family_ws = _write_sheet_from_df("FamilyList", df_family_tree)
+        if family_ws and df_family_tree is not None and not df_family_tree.empty:
+            headers = [cell.value for cell in family_ws[1]]
+            try:
+                level_col = headers.index("level") + 1
+                name_col = headers.index("name") + 1
+            except ValueError:
+                level_col = None
+                name_col = None
+
+            if level_col and name_col:
+                for row_idx in range(2, family_ws.max_row + 1):
+                    level_value = family_ws.cell(row=row_idx, column=level_col).value
+                    try:
+                        indent_level = int(level_value or 0)
+                    except Exception:
+                        indent_level = 0
+                    name_cell = family_ws.cell(row=row_idx, column=name_col)
+                    name_cell.alignment = Alignment(indent=indent_level, wrap_text=True)
+        summary_ws.append(["FamilyList", int(len(df_family_tree.index))])
 
         # Cart entries (flattened for review)
         df_cart_raw = _read_df(
