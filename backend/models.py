@@ -87,7 +87,6 @@ class WorkMaster(Base):
     new_old_code = Column(String)
     add_spec = Column(String)
     gauge = Column(String)
-    other_opinion = Column(String)
 
     # Many-to-Many relationship with StandardItem
     standard_items = relationship(

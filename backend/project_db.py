@@ -68,6 +68,7 @@ EXTRA_TABLE_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS work_master_precheck (
         work_master_id INTEGER PRIMARY KEY,
         use_yn INTEGER NOT NULL DEFAULT 1,
+        other_opinion TEXT,
         updated_at TEXT NOT NULL
     )
     """,
@@ -190,14 +191,20 @@ def ensure_extra_tables(db_path: Path) -> None:
             cursor.execute(
                 "ALTER TABLE family_revit_type ADD COLUMN building_name TEXT"
             )
+
+        cursor.execute("PRAGMA table_info(work_master_precheck)")
+        wmp_columns = {row[1] for row in cursor.fetchall()}
+        if "other_opinion" not in wmp_columns:
+            cursor.execute(
+                "ALTER TABLE work_master_precheck ADD COLUMN other_opinion TEXT"
+            )
+
         cursor.execute("PRAGMA table_info(work_masters)")
         wm_columns = {row[1] for row in cursor.fetchall()}
         if "add_spec" not in wm_columns:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN add_spec TEXT")
         if "gauge" not in wm_columns:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN gauge TEXT")
-        if "other_opinion" not in wm_columns:
-            cursor.execute("ALTER TABLE work_masters ADD COLUMN other_opinion TEXT")
         cursor.execute("PRAGMA table_info(project_metadata)")
         meta_columns = {row[1] for row in cursor.fetchall()}
         if "pjt_abbr" not in meta_columns:

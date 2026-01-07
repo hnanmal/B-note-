@@ -55,7 +55,6 @@ class WorkMasterBase(BaseModel):
     new_old_code: Optional[str] = None
     add_spec: Optional[str] = None
     gauge: Optional[str] = None
-    other_opinion: Optional[str] = None
 
 
 class WorkMasterCreate(WorkMasterBase):
@@ -65,17 +64,18 @@ class WorkMasterCreate(WorkMasterBase):
 class WorkMasterUpdate(BaseModel):
     add_spec: Optional[str] = None
     gauge: Optional[str] = None
-    other_opinion: Optional[str] = None
 
 
 class WorkMasterPrecheckState(BaseModel):
     work_master_id: int
     use_yn: bool
     updated_at: Optional[str] = None
+    other_opinion: Optional[str] = None
 
 
 class WorkMasterPrecheckUpdate(BaseModel):
-    use_yn: bool
+    use_yn: Optional[bool] = None
+    other_opinion: Optional[str] = None
 
 
 class WorkMaster(WorkMasterBase):

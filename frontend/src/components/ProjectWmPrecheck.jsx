@@ -269,7 +269,7 @@ const PrecheckRow = React.memo(function PrecheckRow({
     onError?.(null);
 
     try {
-      const updated = await fetch(`${apiBaseUrl}/work-masters/${wmId}`, {
+      const updated = await fetch(`${apiBaseUrl}/work-masters/${wmId}/precheck`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ other_opinion: nextOpinion }),
@@ -277,7 +277,7 @@ const PrecheckRow = React.memo(function PrecheckRow({
 
       setIsEditingOtherOpinion(false);
       setEditingOtherOpinionSeed('');
-      updateWorkMasterLocal?.(wmId, { ...(updated || {}), other_opinion: (updated?.other_opinion ?? nextOpinion) });
+      updateWorkMasterLocal?.(wmId, { other_opinion: (updated?.other_opinion ?? nextOpinion) });
     } catch (err) {
       const message = err instanceof Error ? err.message : '기타의견을 저장하지 못했습니다.';
       onError?.(message);
@@ -689,18 +689,27 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
       }
 
       const nextMap = new Map();
+      const opinionMap = new Map();
       (Array.isArray(precheckData) ? precheckData : []).forEach((row) => {
         const id = Number(row?.work_master_id);
         if (!Number.isFinite(id)) return;
         nextMap.set(id, Boolean(row?.use_yn));
+        const opinion = (row?.other_opinion ?? '').toString();
+        if (opinion) opinionMap.set(id, opinion);
       });
       useMapRef.current = nextMap;
 
       const list = Array.isArray(wmData) ? wmData : [];
+      const merged = list.map((wm) => {
+        const id = Number(wm?.id);
+        if (!Number.isFinite(id)) return wm;
+        const otherOpinion = opinionMap.get(id);
+        return otherOpinion != null ? { ...(wm || {}), other_opinion: otherOpinion } : wm;
+      });
       if (DEBUG_PRECHECK_TIMING) {
-        pendingRenderMeasureRef.current = { startedAt: performance.now(), rowCount: list.length };
+        pendingRenderMeasureRef.current = { startedAt: performance.now(), rowCount: merged.length };
       }
-      setWorkMasters(list);
+      setWorkMasters(merged);
       setRefreshToken((t) => t + 1);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'WM pre-check 데이터를 불러오지 못했습니다.';

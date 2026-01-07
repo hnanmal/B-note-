@@ -263,7 +263,7 @@ def read_project_work_master_precheck_states(
 ):
     rows = db.execute(
         text(
-            "SELECT work_master_id, use_yn, updated_at FROM work_master_precheck ORDER BY work_master_id"
+            "SELECT work_master_id, use_yn, updated_at, other_opinion FROM work_master_precheck ORDER BY work_master_id"
         )
     ).fetchall()
     result: List[schemas.WorkMasterPrecheckState] = []
@@ -273,6 +273,7 @@ def read_project_work_master_precheck_states(
                 work_master_id=int(row[0]),
                 use_yn=bool(row[1]),
                 updated_at=row[2],
+                other_opinion=row[3],
             )
         )
     return result
@@ -293,25 +294,60 @@ def update_project_work_master_precheck_state(
     if not db_work_master:
         raise HTTPException(status_code=404, detail="WorkMaster not found")
 
+    if updates.use_yn is None and updates.other_opinion is None:
+        raise HTTPException(status_code=400, detail="No updates provided")
+
+    current = db.execute(
+        text(
+            "SELECT use_yn, other_opinion FROM work_master_precheck WHERE work_master_id = :work_master_id"
+        ),
+        {"work_master_id": work_master_id},
+    ).fetchone()
+    current_use = None
+    current_other = None
+    if current is not None:
+        try:
+            current_use = bool(current[0])
+        except Exception:
+            current_use = None
+        current_other = current[1]
+
     now = datetime.datetime.utcnow().isoformat()
-    use_value = 1 if updates.use_yn else 0
+    next_use_bool = (
+        updates.use_yn
+        if updates.use_yn is not None
+        else (current_use if current_use is not None else False)
+    )
+    use_value = 1 if next_use_bool else 0
+    next_other_opinion = (
+        updates.other_opinion if updates.other_opinion is not None else current_other
+    )
 
     db.execute(
         text(
             """
-            INSERT INTO work_master_precheck (work_master_id, use_yn, updated_at)
-            VALUES (:work_master_id, :use_yn, :updated_at)
+            INSERT INTO work_master_precheck (work_master_id, use_yn, other_opinion, updated_at)
+            VALUES (:work_master_id, :use_yn, :other_opinion, :updated_at)
             ON CONFLICT(work_master_id)
-            DO UPDATE SET use_yn = excluded.use_yn, updated_at = excluded.updated_at
+            DO UPDATE SET
+              use_yn = excluded.use_yn,
+              other_opinion = excluded.other_opinion,
+              updated_at = excluded.updated_at
             """
         ),
-        {"work_master_id": work_master_id, "use_yn": use_value, "updated_at": now},
+        {
+            "work_master_id": work_master_id,
+            "use_yn": use_value,
+            "other_opinion": next_other_opinion,
+            "updated_at": now,
+        },
     )
     db.commit()
     return schemas.WorkMasterPrecheckState(
         work_master_id=work_master_id,
-        use_yn=updates.use_yn,
+        use_yn=bool(next_use_bool),
         updated_at=now,
+        other_opinion=next_other_opinion,
     )
 
 
@@ -1548,6 +1584,7 @@ def export_project_db_excel(project_identifier: str):
             SELECT
               wm.id AS work_master_id,
               COALESCE(wmp.use_yn, 0) AS use_yn,
+                            wmp.other_opinion,
               wm.work_master_code,
               wm.gauge,
               wm.uom1,
@@ -1676,6 +1713,7 @@ def export_project_db_excel(project_identifier: str):
             ui_gauge = []
             ui_unit = []
             ui_spec = []
+            ui_other_opinion = []
             ui_work_master = []
             for _, r in df_wm_precheck.iterrows():
                 wm_code = _wm_trim(r.get("work_master_code"))
@@ -1697,6 +1735,7 @@ def export_project_db_excel(project_identifier: str):
                     [v for v in [_wm_trim(r.get("uom1")), _wm_trim(r.get("uom2"))] if v]
                 )
                 spec_value = str(r.get("add_spec") or "")
+                other_opinion_value = str(r.get("other_opinion") or "")
 
                 parts = _wm_summary_parts(r)
                 summary = " | ".join([f"{k}={v}" for k, v in parts])
@@ -1709,10 +1748,12 @@ def export_project_db_excel(project_identifier: str):
                 ui_gauge.append(gauge_value)
                 ui_unit.append(unit_label)
                 ui_spec.append(spec_value)
+                ui_other_opinion.append(other_opinion_value)
                 ui_work_master.append(work_master_cell)
 
             # Insert UI columns first (same order as WM pre-check table)
             df_wm_precheck.insert(0, "Work Master", ui_work_master)
+            df_wm_precheck.insert(0, "기타의견", ui_other_opinion)
             df_wm_precheck.insert(0, "Spec", ui_spec)
             df_wm_precheck.insert(0, "Unit", ui_unit)
             df_wm_precheck.insert(0, "Gauge", ui_gauge)
@@ -1727,7 +1768,7 @@ def export_project_db_excel(project_identifier: str):
                 ws_wm.iter_rows(min_row=1, max_row=1, values_only=False)
             )[0]
             header_to_col = {c.value: c.column for c in header_cells}
-            for header_name in ("Spec", "Work Master"):
+            for header_name in ("Spec", "기타의견", "Work Master"):
                 col_idx = header_to_col.get(header_name)
                 if not col_idx:
                     continue
@@ -1994,7 +2035,7 @@ def export_project_db_excel(project_identifier: str):
         summary_ws.append(["StandardItems", int(len(df_standard_items.index))])
 
         df_work_masters = _read_df(
-            "SELECT id, discipline, work_master_code, cat_large_code, cat_large_desc, cat_mid_code, cat_mid_desc, cat_small_code, cat_small_desc, attr1_code, attr1_spec, attr2_code, attr2_spec, attr3_code, attr3_spec, attr4_code, attr4_spec, attr5_code, attr5_spec, attr6_code, attr6_spec, uom1, uom2, work_group_code, new_old_code, add_spec, gauge, other_opinion FROM work_masters ORDER BY id"
+            "SELECT id, discipline, work_master_code, cat_large_code, cat_large_desc, cat_mid_code, cat_mid_desc, cat_small_code, cat_small_desc, attr1_code, attr1_spec, attr2_code, attr2_spec, attr3_code, attr3_spec, attr4_code, attr4_spec, attr5_code, attr5_spec, attr6_code, attr6_spec, uom1, uom2, work_group_code, new_old_code, add_spec, gauge FROM work_masters ORDER BY id"
         )
         _write_sheet_from_df("WorkMasters", df_work_masters)
         summary_ws.append(["WorkMasters", int(len(df_work_masters.index))])
