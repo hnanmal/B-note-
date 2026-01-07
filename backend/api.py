@@ -1192,6 +1192,14 @@ def export_project_db_excel(project_identifier: str):
                 return str(value)
         return value
 
+    def _excel_escape_formula(value):
+        if value is None:
+            return None
+        text_value = str(value)
+        if not text_value:
+            return text_value
+        return text_value if text_value.startswith("'") else f"'{text_value}"
+
     wb = Workbook()
     if wb.worksheets:
         wb.remove(wb.worksheets[0])
@@ -1301,6 +1309,10 @@ def export_project_db_excel(project_identifier: str):
             ORDER BY g.id
             """
         )
+        if not df_gwm_assign.empty and "formula" in df_gwm_assign.columns:
+            df_gwm_assign["formula"] = df_gwm_assign["formula"].map(
+                _excel_escape_formula
+            )
         _write_sheet_from_df("GwmFamilyAssign", df_gwm_assign)
         summary_ws.append(["GwmFamilyAssign", int(len(df_gwm_assign.index))])
 
@@ -1403,7 +1415,7 @@ def export_project_db_excel(project_identifier: str):
                     "standard_item_type": std_type_by_id.get(standard_item_id),
                     "assignment_id": (assignment_ids[0] if assignment_ids else None),
                     "revit_type": (revit_types[0] if revit_types else None),
-                    "formula": normalized.get("formula"),
+                    "formula": _excel_escape_formula(normalized.get("formula")),
                     "selected_work_master_id": (
                         sel.get("selected_work_master_id") if sel else None
                     ),
