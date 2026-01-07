@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const INTERIOR_ITEM_STANDARD_MAP = {
   'Suspended Ceiling::[DQ] Acoustic T-Bar': 422,
@@ -336,6 +336,22 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const [familyAssignments, setFamilyAssignments] = useState([]);
   const assignmentIndex = useMemo(() => indexAssignmentsByStandardItem(familyAssignments), [familyAssignments]);
 
+  const debugEnabled = useMemo(() => {
+    try {
+      const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      if (qs?.get('debugInteriorMatrix') === '1') return true;
+      const stored = typeof window !== 'undefined' ? window.localStorage?.getItem('debugInteriorMatrix') : null;
+      return stored === '1' || stored === 'true';
+    } catch (error) {
+      return false;
+    }
+  }, []);
+
+  const matrixScrollRef = useRef(null);
+  const rafScrollIdRef = useRef(null);
+  const [matrixScrollTop, setMatrixScrollTop] = useState(0);
+  const [matrixViewportHeight, setMatrixViewportHeight] = useState(0);
+
   const buildingOptions = useMemo(() => {
     const sorted = [...buildings].sort((a, b) => {
       const aDate = new Date(a?.created_at || 0).getTime();
@@ -358,9 +374,14 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     if (!apiBaseUrl) return;
     try {
       if (showOverlay) setIsCartLoading(true);
+      const t0 = debugEnabled ? performance.now() : 0;
       const res = await fetch(`${apiBaseUrl}/workmaster-cart`);
       if (!res.ok) return;
       const data = await res.json();
+      if (debugEnabled) {
+        const t1 = performance.now();
+        console.log('[InteriorMatrix] workmaster-cart fetch ms:', Math.round(t1 - t0));
+      }
       const normalized = Array.isArray(data) ? data.map(normalizeCartEntry) : [];
       setCartEntries(normalized);
       const parsedRooms = [];
@@ -554,11 +575,16 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     const loadStandardItems = async () => {
       try {
         setIsStandardItemsLoading(true);
+        const t0 = debugEnabled ? performance.now() : 0;
         const res = await fetch(`${apiBaseUrl}/standard-items/`);
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
         setStandardItems(Array.isArray(data) ? data : []);
+        if (debugEnabled) {
+          const t1 = performance.now();
+          console.log('[InteriorMatrix] standard-items fetch ms:', Math.round(t1 - t0));
+        }
       } catch (error) {
         if (!cancelled) setStandardItems([]);
       } finally {
@@ -570,6 +596,41 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
       cancelled = true;
     };
   }, [apiBaseUrl]);
+
+  useEffect(() => {
+    const el = matrixScrollRef.current;
+    if (!el) return undefined;
+
+    const handleScroll = () => {
+      if (rafScrollIdRef.current) return;
+      rafScrollIdRef.current = window.requestAnimationFrame(() => {
+        rafScrollIdRef.current = null;
+        setMatrixScrollTop(el.scrollTop || 0);
+      });
+    };
+
+    const updateViewport = () => {
+      setMatrixViewportHeight(el.clientHeight || 0);
+    };
+
+    updateViewport();
+    el.addEventListener('scroll', handleScroll, { passive: true });
+
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => updateViewport());
+      ro.observe(el);
+    }
+
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      if (rafScrollIdRef.current) {
+        window.cancelAnimationFrame(rafScrollIdRef.current);
+        rafScrollIdRef.current = null;
+      }
+      if (ro) ro.disconnect();
+    };
+  }, []);
 
   const roomMetaByKey = useMemo(() => {
     const map = new Map();
@@ -584,6 +645,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   }, [rooms]);
 
   const cartIndex = useMemo(() => {
+    const t0 = debugEnabled ? performance.now() : 0;
     const index = new Map();
     cartEntries.forEach((entry) => {
       const standardItemIds = Array.isArray(entry?.standardItemIds) ? entry.standardItemIds : [];
@@ -610,10 +672,60 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         });
       });
     });
+
+    if (debugEnabled) {
+      const t1 = performance.now();
+      console.log('[InteriorMatrix] cartIndex build ms:', Math.round(t1 - t0));
+    }
     return index;
   }, [cartEntries, buildingOptions]);
 
   const isInitialDbSyncing = (!hasLoadedCartOnce && isCartLoading) || isStandardItemsLoading;
+
+  const tableHeaders = useMemo(
+    () => rooms.filter((room) => {
+      const matchesBuilding = !selectedBuilding
+        || !room.building
+        || room.building === selectedBuilding;
+      return matchesBuilding;
+    }),
+    [rooms, selectedBuilding]
+  );
+
+  const flatRows = useMemo(() => {
+    const rows = [];
+    interiorSections.forEach((section) => {
+      rows.push({ kind: 'section', key: `section-${section.id}`, section });
+      (section.items || []).forEach((item) => {
+        rows.push({ kind: 'item', key: `item-${section.id}-${item.key}`, section, item });
+      });
+    });
+    return rows;
+  }, [interiorSections]);
+
+  const totalRowCount = flatRows.length;
+  const totalItemCount = useMemo(
+    () => interiorSections.reduce((acc, section) => acc + (section?.items?.length || 0), 0),
+    [interiorSections]
+  );
+
+  useEffect(() => {
+    if (!debugEnabled) return;
+    const cells = totalItemCount * (tableHeaders?.length || 0);
+    console.log('[InteriorMatrix] rooms:', tableHeaders?.length || 0, 'items:', totalItemCount, 'cells:', cells);
+  }, [debugEnabled, tableHeaders.length, totalItemCount]);
+
+  const ROW_HEIGHT = 34;
+  const OVERSCAN_ROWS = 12;
+  const estimatedTotalHeight = totalRowCount * ROW_HEIGHT;
+  const startRowIndex = Math.max(0, Math.floor(matrixScrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
+  const endRowIndex = Math.min(
+    totalRowCount,
+    Math.ceil((matrixScrollTop + matrixViewportHeight) / ROW_HEIGHT) + OVERSCAN_ROWS
+  );
+  const visibleRows = flatRows.slice(startRowIndex, endRowIndex);
+  const topSpacerHeight = startRowIndex * ROW_HEIGHT;
+  const bottomSpacerHeight = Math.max(0, estimatedTotalHeight - endRowIndex * ROW_HEIGHT);
 
   useEffect(() => {
     const derivedSections = buildSectionsFromStandardItems(standardItems, projectAbbr);
@@ -763,16 +875,6 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     return roomSet ? roomSet.has(roomKey) : false;
   };
 
-  const tableHeaders = useMemo(
-    () => rooms.filter((room) => {
-      const matchesBuilding = !selectedBuilding
-        || !room.building
-        || room.building === selectedBuilding;
-      return matchesBuilding;
-    }),
-    [rooms, selectedBuilding]
-  );
-
   const handleCopySelectionToRoom = () => {
     if (isInitialDbSyncing) return;
     if (!selectedRoomKey || !copyTargetRoomKey) return;
@@ -914,6 +1016,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
           <span style={{ color: '#94a3b8' }}>클릭으로 체크</span>
         </div>
         <div
+          ref={matrixScrollRef}
           style={{
             flex: 1,
             minHeight: 0,
@@ -994,68 +1097,88 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
               </tr>
             </thead>
             <tbody>
-              {interiorSections.map((section) => (
-                <React.Fragment key={section.id}>
-                  <tr>
+              {topSpacerHeight > 0 && (
+                <tr>
+                  <td colSpan={1 + tableHeaders.length} style={{ padding: 0, border: 0 }}>
+                    <div style={{ height: topSpacerHeight }} />
+                  </td>
+                </tr>
+              )}
+
+              {visibleRows.map((row) => {
+                if (row.kind === 'section') {
+                  return (
+                    <tr key={row.key} style={{ height: ROW_HEIGHT }}>
+                      <td
+                        colSpan={1 + tableHeaders.length}
+                        style={{
+                          background: '#ede9fe',
+                          color: '#4c1d95',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          padding: '6px 10px',
+                          height: ROW_HEIGHT,
+                        }}
+                      >
+                        {row.section.label}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                const itemKey = row.item.key;
+                return (
+                  <tr key={row.key} style={{ height: ROW_HEIGHT }}>
                     <td
-                      colSpan={1 + tableHeaders.length}
                       style={{
-                        background: '#ede9fe',
-                        color: '#4c1d95',
-                        fontWeight: 700,
+                        position: 'sticky',
+                        left: 0,
+                        background: '#fff',
+                        borderBottom: '1px solid #f1f5f9',
                         fontSize: 12,
+                        color: '#0f172a',
                         padding: '6px 10px',
+                        whiteSpace: 'nowrap',
+                        height: ROW_HEIGHT,
                       }}
                     >
-                      {section.label}
+                      {row.item.label}
                     </td>
-                  </tr>
-                  {section.items.map((item) => {
-                    const itemKey = item.key;
-                    return (
-                      <tr key={itemKey}>
+                    {tableHeaders.map((room) => {
+                      const roomKey = room.key;
+                      const checked = isChecked(itemKey, row.item.standardItemId, roomKey);
+                      return (
                         <td
+                          key={`${row.key}-${roomKey}`}
+                          onClick={() => handleToggle(itemKey, row.item.standardItemId, roomKey)}
                           style={{
-                            position: 'sticky',
-                            left: 0,
-                            background: '#fff',
                             borderBottom: '1px solid #f1f5f9',
-                            fontSize: 12,
-                            color: '#0f172a',
-                            padding: '6px 10px',
-                            whiteSpace: 'nowrap',
+                            textAlign: 'center',
+                            cursor: isInitialDbSyncing ? 'not-allowed' : 'pointer',
+                            userSelect: 'none',
+                            padding: '6px 8px',
+                            minWidth: 80,
+                            color: checked ? '#0f172a' : '#94a3b8',
+                            opacity: isInitialDbSyncing ? 0.6 : 1,
+                            height: ROW_HEIGHT,
                           }}
+                          title="클릭하여 체크/해제"
                         >
-                          {item.label}
+                          {checked ? '☑' : '☐'}
                         </td>
-                        {tableHeaders.map((room) => {
-                          const roomKey = room.key;
-                          const checked = isChecked(itemKey, item.standardItemId, roomKey);
-                          return (
-                            <td
-                              key={`${itemKey}-${roomKey}`}
-                              onClick={() => handleToggle(itemKey, item.standardItemId, roomKey)}
-                              style={{
-                                borderBottom: '1px solid #f1f5f9',
-                                textAlign: 'center',
-                                cursor: isInitialDbSyncing ? 'not-allowed' : 'pointer',
-                                userSelect: 'none',
-                                padding: '6px 8px',
-                                minWidth: 80,
-                                color: checked ? '#0f172a' : '#94a3b8',
-                                opacity: isInitialDbSyncing ? 0.6 : 1,
-                              }}
-                              title="클릭하여 체크/해제"
-                            >
-                              {checked ? '☑' : '☐'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </React.Fragment>
-              ))}
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+
+              {bottomSpacerHeight > 0 && (
+                <tr>
+                  <td colSpan={1 + tableHeaders.length} style={{ padding: 0, border: 0 }}>
+                    <div style={{ height: bottomSpacerHeight }} />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
