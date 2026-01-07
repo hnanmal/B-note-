@@ -1609,7 +1609,10 @@ def export_project_db_excel(project_identifier: str):
             add(
                 "Mid",
                 " ".join(
-                    [_wm_trim(row.get("cat_mid_code")), _wm_trim(row.get("cat_mid_desc"))]
+                    [
+                        _wm_trim(row.get("cat_mid_code")),
+                        _wm_trim(row.get("cat_mid_desc")),
+                    ]
                 ).strip(),
             )
             add(
@@ -1662,7 +1665,11 @@ def export_project_db_excel(project_identifier: str):
 
             return parts
 
-        df_wm_precheck = df_wm_precheck_raw.copy() if df_wm_precheck_raw is not None else pd.DataFrame()
+        df_wm_precheck = (
+            df_wm_precheck_raw.copy()
+            if df_wm_precheck_raw is not None
+            else pd.DataFrame()
+        )
         if df_wm_precheck is not None and not df_wm_precheck.empty:
             ui_use = []
             ui_code = []
@@ -1693,7 +1700,9 @@ def export_project_db_excel(project_identifier: str):
 
                 parts = _wm_summary_parts(r)
                 summary = " | ".join([f"{k}={v}" for k, v in parts])
-                work_master_cell = f"{headline}\n{wm_title}" + (f"\n{summary}" if summary else "")
+                work_master_cell = f"{headline}\n{wm_title}" + (
+                    f"\n{summary}" if summary else ""
+                )
 
                 ui_use.append(bool(r.get("use_yn")))
                 ui_code.append(wm_code)
@@ -1714,14 +1723,18 @@ def export_project_db_excel(project_identifier: str):
 
         # Improve readability for the UI-style text columns.
         try:
-            header_cells = list(ws_wm.iter_rows(min_row=1, max_row=1, values_only=False))[0]
+            header_cells = list(
+                ws_wm.iter_rows(min_row=1, max_row=1, values_only=False)
+            )[0]
             header_to_col = {c.value: c.column for c in header_cells}
             for header_name in ("Spec", "Work Master"):
                 col_idx = header_to_col.get(header_name)
                 if not col_idx:
                     continue
                 col_letter = get_column_letter(col_idx)
-                ws_wm.column_dimensions[col_letter].width = 60 if header_name == "Work Master" else 40
+                ws_wm.column_dimensions[col_letter].width = (
+                    60 if header_name == "Work Master" else 40
+                )
                 for cell in ws_wm[col_letter]:
                     if cell.row == 1:
                         continue
