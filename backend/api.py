@@ -1779,7 +1779,7 @@ def export_project_db_excel(project_identifier: str):
                 for cell in ws_wm[col_letter]:
                     if cell.row == 1:
                         continue
-                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+                    cell.alignment = Alignment(wrap_text=True, vertical="center")
 
             # --- WM pre-check screen color cues (approximation) ---
             # - Gauge text is purple & bold
@@ -1849,6 +1849,14 @@ def export_project_db_excel(project_identifier: str):
                             c.font = wm_selected_font
                         else:
                             c.font = wm_code_font
+
+            # Ensure all cells are vertically centered (including header).
+            for row in ws_wm.iter_rows():
+                for cell in row:
+                    try:
+                        cell.alignment = cell.alignment.copy(vertical="center")
+                    except Exception:
+                        cell.alignment = Alignment(vertical="center")
         except Exception:
             pass
 
