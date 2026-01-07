@@ -1613,7 +1613,7 @@ def export_project_db_excel(project_identifier: str):
                     derive_from_int = None
                 standard_item_derive_from_by_id[sid_int] = derive_from_int
 
-        # Apply derived item naming: sourceName[abbr]:: baseName
+        # Apply derived item naming: sourceName [abbr]::baseName
         if standard_item_derive_from_by_id:
             for sid_int, source_id in list(standard_item_derive_from_by_id.items()):
                 if source_id is None:
@@ -1622,12 +1622,20 @@ def export_project_db_excel(project_identifier: str):
                 source_name = standard_item_name_by_id.get(source_id)
                 if not base_name or not source_name:
                     continue
+                base_name = str(base_name).replace("\u00a0", " ").strip()
+                source_name = str(source_name).replace("\u00a0", " ").strip()
+                if not base_name or not source_name:
+                    continue
                 if pjt_abbr:
-                    standard_item_name_by_id[sid_int] = (
-                        f"{source_name}[{pjt_abbr}]:: {base_name}"
-                    )
+                    formatted = f"{source_name} [{pjt_abbr}]::{base_name}"
                 else:
-                    standard_item_name_by_id[sid_int] = f"{source_name}:: {base_name}"
+                    formatted = f"{source_name}::{base_name}"
+
+                # Enforce no whitespace after '::'
+                while ":: " in formatted:
+                    formatted = formatted.replace(":: ", "::")
+                formatted = formatted.replace("::\u00a0", "::")
+                standard_item_name_by_id[sid_int] = formatted
         assignments_by_family_id = {}
         if df_family_assignments is not None and not df_family_assignments.empty:
             for _, r in df_family_assignments.iterrows():
@@ -1659,7 +1667,29 @@ def export_project_db_excel(project_identifier: str):
             standard_item_parent_by_id=standard_item_parent_by_id,
         )
         df_family_tree = pd.DataFrame(family_rows)
-        family_ws = _write_sheet_from_df("FamilyList", df_family_tree)
+        if df_family_tree is not None and not df_family_tree.empty:
+            df_family_tree = df_family_tree.drop(
+                columns=["created_at"], errors="ignore"
+            )
+            preferred_cols = [
+                "level",
+                "sequence_number",
+                "name",
+                "item_type",
+                "id",
+                "parent_id",
+                "formula",
+                "description",
+            ]
+            existing = [c for c in preferred_cols if c in df_family_tree.columns]
+            remainder = [
+                c
+                for c in df_family_tree.columns
+                if c not in set(existing) and c != "created_at"
+            ]
+            df_family_tree = df_family_tree[existing + remainder]
+
+        family_ws = _write_sheet_from_df("Report_FamilyList", df_family_tree)
         if family_ws and df_family_tree is not None and not df_family_tree.empty:
             headers = [cell.value for cell in family_ws[1]]
             try:
@@ -1678,7 +1708,7 @@ def export_project_db_excel(project_identifier: str):
                         indent_level = 0
                     name_cell = family_ws.cell(row=row_idx, column=name_col)
                     name_cell.alignment = Alignment(indent=indent_level, wrap_text=True)
-        summary_ws.append(["FamilyList", int(len(df_family_tree.index))])
+        summary_ws.append(["Report_FamilyList", int(len(df_family_tree.index))])
 
         df_buildings = _read_df(
             "SELECT id, name AS building_name, created_at FROM building_list ORDER BY id"
