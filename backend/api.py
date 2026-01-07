@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 from typing import List, Optional
@@ -6,6 +7,7 @@ import pandas as pd
 import io
 import json
 import datetime
+import sqlite3
 
 from . import crud, project_db, schemas, models
 from .database import SessionLocal
@@ -1136,6 +1138,132 @@ def export_project_db_json(
     """
 
     return export_project_db_for_dynamo(project_identifier=project_identifier, db=db)
+
+
+@router.get(
+    "/project/{project_identifier}/export/db-excel",
+    tags=["Project Data"],
+)
+def export_project_db_excel(project_identifier: str):
+    """Export the entire project SQLite DB as a human-reviewable Excel workbook.
+
+    Each table becomes a worksheet.
+    """
+
+    try:
+        db_path = project_db.resolve_project_db_path(project_identifier)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    project_db.ensure_extra_tables(db_path)
+
+    try:
+        from openpyxl import Workbook
+        from openpyxl.utils import get_column_letter
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Excel export dependency missing")
+
+    def _safe_sheet_name(name: str, existing: set) -> str:
+        base = (name or "Sheet").strip() or "Sheet"
+        cleaned = "".join(ch for ch in base if ch not in "[]:*?/\\")
+        cleaned = cleaned[:31] or "Sheet"
+        candidate = cleaned
+        counter = 1
+        while candidate in existing:
+            suffix = f"_{counter}"
+            candidate = (cleaned[: max(0, 31 - len(suffix))] + suffix)[:31]
+            counter += 1
+        existing.add(candidate)
+        return candidate
+
+    def _excel_value(value):
+        if value is None:
+            return None
+        if isinstance(value, bytes):
+            try:
+                return value.decode("utf-8", errors="replace")
+            except Exception:
+                return value.hex()
+        if isinstance(value, (dict, list)):
+            try:
+                return json.dumps(value, ensure_ascii=False)
+            except Exception:
+                return str(value)
+        return value
+
+    wb = Workbook()
+    # Remove default sheet
+    if wb.worksheets:
+        wb.remove(wb.worksheets[0])
+
+    sheet_names = set()
+    generated_at = datetime.datetime.now().isoformat(timespec="seconds")
+
+    summary_ws = wb.create_sheet(_safe_sheet_name("SUMMARY", sheet_names))
+    summary_ws.append(["project_identifier", project_identifier])
+    summary_ws.append(["db_file", db_path.name])
+    summary_ws.append(["generated_at", generated_at])
+    summary_ws.append([])
+    summary_ws.append(["table", "rows"])
+
+    conn = sqlite3.connect(db_path.as_posix())
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        )
+        tables = [row[0] for row in cur.fetchall()]
+
+        for table_name in tables:
+            ws = wb.create_sheet(_safe_sheet_name(table_name, sheet_names))
+            ws.freeze_panes = "A2"
+
+            cur.execute(f"PRAGMA table_info('{table_name}')")
+            cols = [r[1] for r in cur.fetchall()]
+            ws.append(cols)
+
+            row_count = 0
+            try:
+                cur.execute(f"SELECT * FROM '{table_name}'")
+                for row in cur.fetchall():
+                    ws.append([_excel_value(row.get(col)) for col in cols])
+                    row_count += 1
+            except Exception:
+                ws.append(["<failed to read table>"])
+
+            summary_ws.append([table_name, row_count])
+
+            # Basic width cap to keep file readable
+            for idx, col_name in enumerate(cols, start=1):
+                col_letter = get_column_letter(idx)
+                max_len = len(str(col_name))
+                for cell in ws[col_letter]:
+                    if cell.value is None:
+                        continue
+                    max_len = max(max_len, len(str(cell.value)))
+                    if max_len > 60:
+                        max_len = 60
+                        break
+                ws.column_dimensions[col_letter].width = min(60, max(10, max_len + 2))
+    finally:
+        conn.close()
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    now = datetime.datetime.now()
+    stamp = now.strftime("%Y%m%d_%H%M%S")
+    filename = f"db_report_{project_identifier}_{stamp}.xlsx"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"'
+    }
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
 
 
 @router.post(
