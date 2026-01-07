@@ -1145,7 +1145,6 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                         <span style={{ fontSize: 11, color: '#475467', fontWeight: isSelected ? 700 : 400 }}>
                           {room.building}
                         </span>
-                        <span style={{ fontSize: 11, color: '#94a3b8' }}>{room.std ? `Std ${room.std}` : ''}</span>
                       </div>
                     </th>
                   );
