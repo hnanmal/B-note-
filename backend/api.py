@@ -1161,7 +1161,7 @@ def export_project_db_excel(project_identifier: str):
     try:
         from openpyxl import Workbook
         from openpyxl.utils import get_column_letter
-        from openpyxl.styles import Alignment
+        from openpyxl.styles import Alignment, Font, PatternFill
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Excel export dependency missing")
 
@@ -1739,6 +1739,75 @@ def export_project_db_excel(project_identifier: str):
                     if cell.row == 1:
                         continue
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+            # --- WM pre-check screen color cues (approximation) ---
+            # - Gauge text is purple & bold
+            # - WM Code cell is bold, and highlighted when selected in Standard Select
+
+            selected_work_master_ids = set()
+            try:
+                df_selected = _read_df(
+                    "SELECT work_master_id FROM standard_item_work_master_select"
+                )
+                if df_selected is not None and not df_selected.empty:
+                    for v in df_selected["work_master_id"].tolist():
+                        try:
+                            selected_work_master_ids.add(int(v))
+                        except Exception:
+                            continue
+            except Exception:
+                selected_work_master_ids = set()
+
+            header_fill = PatternFill("solid", fgColor="FFF9FAFB")
+            header_font = Font(bold=True)
+            gauge_font = Font(color="FF9333EA", bold=True)
+            wm_code_font = Font(bold=True)
+            wm_selected_fill = PatternFill("solid", fgColor="FFEDE9FE")
+            wm_selected_font = Font(color="FF4C1D95", bold=True)
+
+            # Header styling
+            for cell in ws_wm[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+
+            col_use = header_to_col.get("Use")
+            col_wm_code = header_to_col.get("WM Code")
+            col_gauge = header_to_col.get("Gauge")
+            col_work_master_id = header_to_col.get("work_master_id")
+
+            if col_use:
+                col_letter = get_column_letter(col_use)
+                for cell in ws_wm[col_letter]:
+                    if cell.row == 1:
+                        continue
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            # Row-wise styling (keep it minimal for performance)
+            if col_wm_code or col_gauge or col_work_master_id:
+                max_row = ws_wm.max_row
+                for r in range(2, max_row + 1):
+                    work_master_id = None
+                    if col_work_master_id:
+                        try:
+                            v = ws_wm.cell(row=r, column=col_work_master_id).value
+                            work_master_id = int(v) if v is not None else None
+                        except Exception:
+                            work_master_id = None
+
+                    if col_gauge:
+                        c = ws_wm.cell(row=r, column=col_gauge)
+                        c.font = gauge_font
+
+                    if col_wm_code:
+                        c = ws_wm.cell(row=r, column=col_wm_code)
+                        if (
+                            work_master_id is not None
+                            and work_master_id in selected_work_master_ids
+                        ):
+                            c.fill = wm_selected_fill
+                            c.font = wm_selected_font
+                        else:
+                            c.font = wm_code_font
         except Exception:
             pass
 
