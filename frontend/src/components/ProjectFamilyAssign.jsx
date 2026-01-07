@@ -605,6 +605,8 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
 
     setSavedCartEntries((prev) => [...entriesToSave, ...prev]);
     setCartStatusMessage('장바구니 저장 중...');
+    // Reset the Work Master menu checkbox selections after enqueuing cart entries.
+    setSelectedAssignmentIds([]);
 
     if (!apiBaseUrl) {
       setCartStatusMessage('장바구니를 로컬에 저장했습니다.');
