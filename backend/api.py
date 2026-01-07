@@ -1316,7 +1316,7 @@ def export_project_db_excel(project_identifier: str):
                 return 0
             return -1 if ka < kb else 1
 
-        def _build_family_tree_rows(items):
+        def _build_family_tree_rows(items, assignments_by_family_id=None):
             from functools import cmp_to_key
             import math
 
@@ -1364,10 +1364,13 @@ def export_project_db_excel(project_identifier: str):
 
             rows = []
 
+            assignments_by_family_id = assignments_by_family_id or {}
+
             def walk(nodes, level=0):
                 for n in nodes:
                     seq = (n.get("sequence_number") or "").strip()
                     name = (n.get("name") or "").strip() or "Unnamed"
+                    family_id = n.get("id")
                     rows.append(
                         {
                             "level": int(level),
@@ -1377,9 +1380,28 @@ def export_project_db_excel(project_identifier: str):
                             "id": n.get("id"),
                             "parent_id": n.get("parent_id"),
                             "description": n.get("description"),
+                            "formula": None,
                             "created_at": n.get("created_at"),
                         }
                     )
+
+                    # Insert assigned standard items right under this family node.
+                    for a in assignments_by_family_id.get(family_id, []) or []:
+                        rows.append(
+                            {
+                                "level": int(level) + 1,
+                                "sequence_number": None,
+                                "name": a.get("standard_item_name"),
+                                "item_type": a.get("standard_item_type"),
+                                "id": a.get("assignment_id"),
+                                "parent_id": family_id,
+                                "description": a.get("assignment_description"),
+                                "formula": _excel_escape_formula(a.get("formula")),
+                                "created_at": a.get("assigned_at")
+                                or a.get("created_at"),
+                            }
+                        )
+
                     children = n.get("children") or []
                     if children:
                         walk(children, level + 1)
@@ -1400,6 +1422,74 @@ def export_project_db_excel(project_identifier: str):
         summary_ws.append(["generated_at", generated_at])
         summary_ws.append([])
         summary_ws.append(["sheet", "rows"])
+
+        # Family list (tree, as shown in app) + assigned standard items under each node.
+        df_family_raw = _read_df(
+            "SELECT id, parent_id, sequence_number, name, item_type, description, created_at FROM family_list ORDER BY id"
+        )
+        df_family_assignments = _read_df(
+            """
+            SELECT
+              g.id AS assignment_id,
+              g.family_list_id,
+              si.name AS standard_item_name,
+              si.type AS standard_item_type,
+              g.formula,
+              g.description AS assignment_description,
+              g.assigned_at,
+              g.created_at
+            FROM gwm_family_assign g
+            LEFT JOIN standard_items si ON si.id = g.standard_item_id
+            ORDER BY g.family_list_id, si.type, si.name, g.id
+            """
+        )
+        assignments_by_family_id = {}
+        if df_family_assignments is not None and not df_family_assignments.empty:
+            for _, r in df_family_assignments.iterrows():
+                fid = r.get("family_list_id")
+                try:
+                    fid_int = int(fid) if fid is not None else None
+                except Exception:
+                    fid_int = None
+                if fid_int is None:
+                    continue
+                assignments_by_family_id.setdefault(fid_int, []).append(
+                    {
+                        "assignment_id": r.get("assignment_id"),
+                        "standard_item_name": r.get("standard_item_name"),
+                        "standard_item_type": r.get("standard_item_type"),
+                        "formula": r.get("formula"),
+                        "assignment_description": r.get("assignment_description"),
+                        "assigned_at": r.get("assigned_at"),
+                        "created_at": r.get("created_at"),
+                    }
+                )
+
+        family_rows = _build_family_tree_rows(
+            df_family_raw.to_dict(orient="records") if not df_family_raw.empty else [],
+            assignments_by_family_id=assignments_by_family_id,
+        )
+        df_family_tree = pd.DataFrame(family_rows)
+        family_ws = _write_sheet_from_df("FamilyList", df_family_tree)
+        if family_ws and df_family_tree is not None and not df_family_tree.empty:
+            headers = [cell.value for cell in family_ws[1]]
+            try:
+                level_col = headers.index("level") + 1
+                name_col = headers.index("name") + 1
+            except ValueError:
+                level_col = None
+                name_col = None
+
+            if level_col and name_col:
+                for row_idx in range(2, family_ws.max_row + 1):
+                    level_value = family_ws.cell(row=row_idx, column=level_col).value
+                    try:
+                        indent_level = int(level_value or 0)
+                    except Exception:
+                        indent_level = 0
+                    name_cell = family_ws.cell(row=row_idx, column=name_col)
+                    name_cell.alignment = Alignment(indent=indent_level, wrap_text=True)
+        summary_ws.append(["FamilyList", int(len(df_family_tree.index))])
 
         df_buildings = _read_df(
             "SELECT id, name AS building_name, created_at FROM building_list ORDER BY id"
@@ -1503,35 +1593,6 @@ def export_project_db_excel(project_identifier: str):
         )
         _write_sheet_from_df("CalcDictionary", df_calc)
         summary_ws.append(["CalcDictionary", int(len(df_calc.index))])
-
-        # Family list (tree, as shown in app)
-        df_family_raw = _read_df(
-            "SELECT id, parent_id, sequence_number, name, item_type, description, created_at FROM family_list ORDER BY id"
-        )
-        family_rows = _build_family_tree_rows(
-            df_family_raw.to_dict(orient="records") if not df_family_raw.empty else []
-        )
-        df_family_tree = pd.DataFrame(family_rows)
-        family_ws = _write_sheet_from_df("FamilyList", df_family_tree)
-        if family_ws and df_family_tree is not None and not df_family_tree.empty:
-            headers = [cell.value for cell in family_ws[1]]
-            try:
-                level_col = headers.index("level") + 1
-                name_col = headers.index("name") + 1
-            except ValueError:
-                level_col = None
-                name_col = None
-
-            if level_col and name_col:
-                for row_idx in range(2, family_ws.max_row + 1):
-                    level_value = family_ws.cell(row=row_idx, column=level_col).value
-                    try:
-                        indent_level = int(level_value or 0)
-                    except Exception:
-                        indent_level = 0
-                    name_cell = family_ws.cell(row=row_idx, column=name_col)
-                    name_cell.alignment = Alignment(indent=indent_level, wrap_text=True)
-        summary_ws.append(["FamilyList", int(len(df_family_tree.index))])
 
         # Cart entries (flattened for review)
         df_cart_raw = _read_df(
