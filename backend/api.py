@@ -1090,7 +1090,9 @@ def export_project_db_for_dynamo(
                 id=int(getattr(entry, "id")),
                 created_at=getattr(entry, "created_at"),
                 formula=getattr(entry, "formula", None),
-                revit_type=_coerce_str(_first_from(getattr(entry, "revit_types", None) or [])),
+                revit_type=_coerce_str(
+                    _first_from(getattr(entry, "revit_types", None) or [])
+                ),
                 assignment_id=_coerce_int(
                     _first_from(getattr(entry, "assignment_ids", None) or [])
                 ),

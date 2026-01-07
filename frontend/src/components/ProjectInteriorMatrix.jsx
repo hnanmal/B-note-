@@ -327,8 +327,11 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const [copyTargetRoomKey, setCopyTargetRoomKey] = useState(null);
   const [selectionByBuilding, setSelectionByBuilding] = useState({});
   const [cartEntries, setCartEntries] = useState([]);
+  const [hasLoadedCartOnce, setHasLoadedCartOnce] = useState(false);
+  const [isCartLoading, setIsCartLoading] = useState(false);
   const [projectAbbr, setProjectAbbr] = useState('');
   const [standardItems, setStandardItems] = useState([]);
+  const [isStandardItemsLoading, setIsStandardItemsLoading] = useState(false);
   const [roomFamilyId, setRoomFamilyId] = useState(null);
   const [familyAssignments, setFamilyAssignments] = useState([]);
   const assignmentIndex = useMemo(() => indexAssignmentsByStandardItem(familyAssignments), [familyAssignments]);
@@ -351,9 +354,10 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     return result;
   }, [buildings]);
 
-  const reloadCartEntries = async () => {
+  const reloadCartEntries = async ({ showOverlay = false } = {}) => {
     if (!apiBaseUrl) return;
     try {
+      if (showOverlay) setIsCartLoading(true);
       const res = await fetch(`${apiBaseUrl}/workmaster-cart`);
       if (!res.ok) return;
       const data = await res.json();
@@ -379,6 +383,11 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
       }
     } catch (error) {
       // ignore fetch errors
+    } finally {
+      if (showOverlay) {
+        setIsCartLoading(false);
+        setHasLoadedCartOnce(true);
+      }
     }
   };
 
@@ -505,7 +514,14 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   useEffect(() => {
     if (!apiBaseUrl) return undefined;
     let cancelled = false;
-    reloadCartEntries().catch(() => {});
+    setHasLoadedCartOnce(false);
+    setIsCartLoading(true);
+    reloadCartEntries({ showOverlay: true }).catch(() => {
+      if (!cancelled) {
+        setIsCartLoading(false);
+        setHasLoadedCartOnce(true);
+      }
+    });
     return () => {
       cancelled = true;
     };
@@ -537,6 +553,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     let cancelled = false;
     const loadStandardItems = async () => {
       try {
+        setIsStandardItemsLoading(true);
         const res = await fetch(`${apiBaseUrl}/standard-items/`);
         if (!res.ok) return;
         const data = await res.json();
@@ -544,6 +561,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         setStandardItems(Array.isArray(data) ? data : []);
       } catch (error) {
         if (!cancelled) setStandardItems([]);
+      } finally {
+        if (!cancelled) setIsStandardItemsLoading(false);
       }
     };
     loadStandardItems();
@@ -551,6 +570,50 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
       cancelled = true;
     };
   }, [apiBaseUrl]);
+
+  const roomMetaByKey = useMemo(() => {
+    const map = new Map();
+    rooms.forEach((room) => {
+      if (!room?.key) return;
+      map.set(room.key, {
+        norm: normalizeRoomKey(room.label || room.key),
+        building: (room.building || '').trim(),
+      });
+    });
+    return map;
+  }, [rooms]);
+
+  const cartIndex = useMemo(() => {
+    const index = new Map();
+    cartEntries.forEach((entry) => {
+      const standardItemIds = Array.isArray(entry?.standardItemIds) ? entry.standardItemIds : [];
+      if (!standardItemIds.length) return;
+
+      const revits = Array.isArray(entry?.revitTypes) ? entry.revitTypes : [];
+      if (!revits.length) return;
+
+      const buildingsForEntry = deriveBuildingNames(entry, buildingOptions);
+      const hasWildcardBuilding = !buildingsForEntry.length;
+
+      revits.forEach((rt) => {
+        const parsed = parseRevitRoom(rt, buildingOptions);
+        const norm = normalizeRoomKey(parsed.label || rt);
+        if (!norm) return;
+        standardItemIds.forEach((sid) => {
+          if (sid == null) return;
+          if (!index.has(sid)) index.set(sid, new Map());
+          const byRoom = index.get(sid);
+          const record = byRoom.get(norm) || { hasWildcardBuilding: false, buildings: new Set() };
+          if (hasWildcardBuilding) record.hasWildcardBuilding = true;
+          buildingsForEntry.forEach((b) => record.buildings.add(b));
+          byRoom.set(norm, record);
+        });
+      });
+    });
+    return index;
+  }, [cartEntries, buildingOptions]);
+
+  const isInitialDbSyncing = (!hasLoadedCartOnce && isCartLoading) || isStandardItemsLoading;
 
   useEffect(() => {
     const derivedSections = buildSectionsFromStandardItems(standardItems, projectAbbr);
@@ -602,6 +665,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   };
 
   const handleToggle = (itemKey, standardItemId, roomKey) => {
+    if (isInitialDbSyncing) return;
     if (!selectedBuilding) return;
     if (!standardItemId) return;
 
@@ -649,12 +713,12 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }).catch(() => null);
-      await reloadCartEntries();
+      await reloadCartEntries({ showOverlay: false });
     };
 
     const deleteEntry = async (entryId) => {
       await fetch(`${apiBaseUrl}/workmaster-cart/${entryId}`, { method: 'DELETE' }).catch(() => null);
-      await reloadCartEntries();
+      await reloadCartEntries({ showOverlay: false });
     };
 
     if (existing?.id) {
@@ -684,23 +748,14 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
 
   const isChecked = (itemKey, standardItemId, roomKey) => {
     if (!standardItemId) return false;
-    const parsedTarget = parseRevitRoom(roomKey, buildingOptions);
-    const targetNorm = normalizeRoomKey(parsedTarget.label || roomKey);
-    const targetBuilding = selectedBuilding || parsedTarget.building || '';
-    const hasCart = cartEntries.some((entry) => {
-      const matchesStd = Array.isArray(entry?.standardItemIds) && entry.standardItemIds.includes(standardItemId);
-      if (!matchesStd) return false;
-      const revits = Array.isArray(entry?.revitTypes) ? entry.revitTypes : [];
-      const buildings = deriveBuildingNames(entry, buildingOptions);
-      const matchesBuilding = !targetBuilding || !buildings.length || buildings.includes(targetBuilding);
-      if (!matchesBuilding) return false;
-      return revits.some((rt) => {
-        const parsed = parseRevitRoom(rt, buildingOptions);
-        const norm = normalizeRoomKey(parsed.label || rt);
-        return norm === targetNorm;
-      });
-    });
-    if (hasCart) return true;
+    const meta = roomMetaByKey.get(roomKey);
+    const targetNorm = meta?.norm || normalizeRoomKey(parseRevitRoom(roomKey, buildingOptions).label || roomKey);
+    const targetBuilding = selectedBuilding || meta?.building || '';
+    const byRoom = cartIndex.get(standardItemId);
+    const record = byRoom?.get(targetNorm);
+    if (record && (!targetBuilding || record.hasWildcardBuilding || record.buildings.has(targetBuilding))) {
+      return true;
+    }
 
     const bucket = selectionByBuilding[selectedBuilding];
     if (!bucket) return false;
@@ -719,6 +774,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   );
 
   const handleCopySelectionToRoom = () => {
+    if (isInitialDbSyncing) return;
     if (!selectedRoomKey || !copyTargetRoomKey) return;
     if (selectedRoomKey === copyTargetRoomKey) return;
 
@@ -739,7 +795,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', minHeight: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Project Interior Matrix</h2>
-        <span style={{ fontSize: 12, color: '#475467' }}>더블 클릭으로 체크/해제</span>
+        <span style={{ fontSize: 12, color: '#475467' }}>클릭으로 체크/해제</span>
         <span style={{ fontSize: 11, color: '#94a3b8' }}>· 선택 룸 → 다른 룸 복사 지원</span>
       </div>
       <div
@@ -770,7 +826,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
           </select>
         </div>
         <div style={{ fontSize: 11, color: '#475467' }}>
-          건물별 등록된 Room 기준 · 두 번 클릭하면 체크/해제됩니다.
+          건물별 등록된 Room 기준 · 클릭하면 체크/해제됩니다.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, color: '#0f172a', fontWeight: 600 }}>룸 복사</span>
@@ -808,20 +864,20 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
           <button
             type="button"
             onClick={handleCopySelectionToRoom}
-            disabled={!selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey}
+            disabled={isInitialDbSyncing || !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey}
             style={{
               border: '1px solid #2563eb',
-              background: !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey
+              background: isInitialDbSyncing || !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey
                 ? '#e5e7eb'
                 : '#2563eb',
-              color: !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey
+              color: isInitialDbSyncing || !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey
                 ? '#94a3b8'
                 : '#fff',
               borderRadius: 8,
               padding: '6px 10px',
               fontSize: 12,
               fontWeight: 600,
-              cursor: !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey
+              cursor: isInitialDbSyncing || !selectedRoomKey || !copyTargetRoomKey || selectedRoomKey === copyTargetRoomKey
                 ? 'not-allowed'
                 : 'pointer',
             }}
@@ -857,7 +913,39 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
           <span>인터리어 매트릭스 · Building: {selectedBuilding || '—'}</span>
           <span style={{ color: '#94a3b8' }}>클릭으로 체크</span>
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'auto',
+            borderRadius: 10,
+            border: '1px solid #e2e8f0',
+            position: 'relative',
+          }}
+        >
+          {isInitialDbSyncing && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(255, 255, 255, 0.78)',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 16,
+              }}
+            >
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                  체크 상태 불러오는 중…
+                </div>
+                <div style={{ fontSize: 12, color: '#475467', marginTop: 6 }}>
+                  DB 상태를 반영하는 동안 잠시만 기다려주세요.
+                </div>
+              </div>
+            </div>
+          )}
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
             <thead>
               <tr>
@@ -950,11 +1038,12 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                               style={{
                                 borderBottom: '1px solid #f1f5f9',
                                 textAlign: 'center',
-                                cursor: 'pointer',
+                                cursor: isInitialDbSyncing ? 'not-allowed' : 'pointer',
                                 userSelect: 'none',
                                 padding: '6px 8px',
                                 minWidth: 80,
                                 color: checked ? '#0f172a' : '#94a3b8',
+                                opacity: isInitialDbSyncing ? 0.6 : 1,
                               }}
                               title="클릭하여 체크/해제"
                             >
