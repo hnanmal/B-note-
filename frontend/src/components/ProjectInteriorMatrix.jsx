@@ -732,7 +732,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
   const bottomSpacerHeight = Math.max(0, estimatedTotalHeight - endRowIndex * ROW_HEIGHT);
 
   const ITEM_COL_WIDTH = 280;
-  const ROOM_COL_WIDTH = 160;
+  const ROOM_COL_WIDTH = 140;
   const OVERSCAN_COLS = 3;
   const roomsScrollLeft = Math.max(0, matrixScrollLeft - ITEM_COL_WIDTH);
   const roomViewportWidth = Math.max(0, matrixViewportWidth - ITEM_COL_WIDTH);
@@ -1134,14 +1134,23 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                         lineHeight: 1.2,
                         background: '#f8fafc',
                         textAlign: 'center',
-                        whiteSpace: 'nowrap',
+                        whiteSpace: 'normal',
                         cursor: 'pointer',
                         width: ROOM_COL_WIDTH,
                         minWidth: ROOM_COL_WIDTH,
                       }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span style={{ fontWeight: 700, color: isSelected ? '#2563eb' : '#0f172a' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            color: isSelected ? '#2563eb' : '#0f172a',
+                            whiteSpace: 'normal',
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
+                            maxWidth: '100%',
+                          }}
+                        >
                           {room.label}
                         </span>
                       </div>
