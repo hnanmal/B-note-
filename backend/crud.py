@@ -509,6 +509,13 @@ def list_family_revit_types(db: Session, family_item_id: int):
 def replace_family_revit_types(db: Session, family_item_id: int, entries: List[dict]):
     normalized_entries: List[dict] = []
     for entry in entries:
+        if entry is None:
+            continue
+        if hasattr(entry, "model_dump"):
+            entry = entry.model_dump(exclude_none=False)
+        elif hasattr(entry, "dict"):
+            entry = entry.dict(exclude_none=False)
+
         type_name = (entry.get("type_name") or "").strip()
         if not type_name:
             continue
