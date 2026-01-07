@@ -1707,6 +1707,22 @@ def export_project_db_excel(project_identifier: str):
             if df_wm_precheck_raw is not None
             else pd.DataFrame()
         )
+
+        selected_work_master_ids = set()
+        try:
+            df_selected = _read_df(
+                "SELECT work_master_id FROM standard_item_work_master_select"
+            )
+            if df_selected is not None and not df_selected.empty:
+                for v in df_selected["work_master_id"].tolist():
+                    try:
+                        selected_work_master_ids.add(int(v))
+                    except Exception:
+                        continue
+        except Exception:
+            selected_work_master_ids = set()
+
+        selected_row_flags = []
         if df_wm_precheck is not None and not df_wm_precheck.empty:
             ui_use = []
             ui_code = []
@@ -1716,6 +1732,14 @@ def export_project_db_excel(project_identifier: str):
             ui_other_opinion = []
             ui_work_master = []
             for _, r in df_wm_precheck.iterrows():
+                try:
+                    wm_id = r.get("work_master_id")
+                    selected_row_flags.append(
+                        int(wm_id) in selected_work_master_ids if wm_id is not None else False
+                    )
+                except Exception:
+                    selected_row_flags.append(False)
+
                 wm_code = _wm_trim(r.get("work_master_code"))
                 gauge_value = _wm_trim(r.get("gauge")).upper()
                 wm_title = (
@@ -1760,6 +1784,11 @@ def export_project_db_excel(project_identifier: str):
             df_wm_precheck.insert(0, "WM Code", ui_code)
             df_wm_precheck.insert(0, "Use", ui_use)
 
+            # Omit columns from `work_master_id` and everything to the right.
+            if "work_master_id" in df_wm_precheck.columns:
+                keep_end = int(df_wm_precheck.columns.get_loc("work_master_id"))
+                df_wm_precheck = df_wm_precheck.loc[:, df_wm_precheck.columns[:keep_end]]
+
         ws_wm = _write_sheet_from_df("Report_WM", df_wm_precheck)
 
         # Improve readability for the UI-style text columns.
@@ -1785,20 +1814,6 @@ def export_project_db_excel(project_identifier: str):
             # - Gauge text is purple & bold
             # - WM Code cell is bold, and highlighted when selected in Standard Select
 
-            selected_work_master_ids = set()
-            try:
-                df_selected = _read_df(
-                    "SELECT work_master_id FROM standard_item_work_master_select"
-                )
-                if df_selected is not None and not df_selected.empty:
-                    for v in df_selected["work_master_id"].tolist():
-                        try:
-                            selected_work_master_ids.add(int(v))
-                        except Exception:
-                            continue
-            except Exception:
-                selected_work_master_ids = set()
-
             header_fill = PatternFill("solid", fgColor="FFF9FAFB")
             header_font = Font(bold=True)
             gauge_font = Font(color="FF9333EA", bold=True)
@@ -1814,7 +1829,6 @@ def export_project_db_excel(project_identifier: str):
             col_use = header_to_col.get("Use")
             col_wm_code = header_to_col.get("WM Code")
             col_gauge = header_to_col.get("Gauge")
-            col_work_master_id = header_to_col.get("work_master_id")
 
             if col_use:
                 col_letter = get_column_letter(col_use)
@@ -1824,27 +1838,24 @@ def export_project_db_excel(project_identifier: str):
                     cell.alignment = Alignment(horizontal="center", vertical="center")
 
             # Row-wise styling (keep it minimal for performance)
-            if col_wm_code or col_gauge or col_work_master_id:
+            if col_wm_code or col_gauge:
                 max_row = ws_wm.max_row
                 for r in range(2, max_row + 1):
-                    work_master_id = None
-                    if col_work_master_id:
-                        try:
-                            v = ws_wm.cell(row=r, column=col_work_master_id).value
-                            work_master_id = int(v) if v is not None else None
-                        except Exception:
-                            work_master_id = None
-
                     if col_gauge:
                         c = ws_wm.cell(row=r, column=col_gauge)
                         c.font = gauge_font
 
                     if col_wm_code:
                         c = ws_wm.cell(row=r, column=col_wm_code)
-                        if (
-                            work_master_id is not None
-                            and work_master_id in selected_work_master_ids
-                        ):
+                        selected = False
+                        try:
+                            idx = r - 2
+                            if idx >= 0 and idx < len(selected_row_flags):
+                                selected = bool(selected_row_flags[idx])
+                        except Exception:
+                            selected = False
+
+                        if selected:
                             c.fill = wm_selected_fill
                             c.font = wm_selected_font
                         else:
@@ -1857,6 +1868,28 @@ def export_project_db_excel(project_identifier: str):
                         cell.alignment = cell.alignment.copy(vertical="center")
                     except Exception:
                         cell.alignment = Alignment(vertical="center")
+
+            # Scale down font size and row height (~70%).
+            scale = 0.7
+            default_font_size = 11
+
+            for row in ws_wm.iter_rows():
+                for cell in row:
+                    try:
+                        base = cell.font.size if cell.font.size is not None else default_font_size
+                        cell.font = cell.font.copy(size=max(1, base * scale))
+                    except Exception:
+                        cell.font = Font(size=max(1, default_font_size * scale))
+
+            default_row_height = 15
+            for r in range(1, ws_wm.max_row + 1):
+                try:
+                    base_h = ws_wm.row_dimensions[r].height
+                    if base_h is None:
+                        base_h = default_row_height
+                    ws_wm.row_dimensions[r].height = max(1, base_h * scale)
+                except Exception:
+                    continue
         except Exception:
             pass
 
