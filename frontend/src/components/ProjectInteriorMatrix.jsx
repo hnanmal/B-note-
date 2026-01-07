@@ -719,7 +719,7 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
     console.log('[InteriorMatrix] rooms:', tableHeaders?.length || 0, 'items:', totalItemCount, 'cells:', cells);
   }, [debugEnabled, tableHeaders.length, totalItemCount]);
 
-  const ROW_HEIGHT = 34;
+  const ROW_HEIGHT = 26;
   const OVERSCAN_ROWS = 12;
   const estimatedTotalHeight = totalRowCount * ROW_HEIGHT;
   const startRowIndex = Math.max(0, Math.floor(matrixScrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
@@ -1101,7 +1101,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                     borderBottom: '1px solid #e2e8f0',
                     fontSize: 12,
                     textAlign: 'left',
-                    padding: '8px 10px',
+                    padding: '4px 8px',
+                    lineHeight: 1.2,
                     width: ITEM_COL_WIDTH,
                     minWidth: ITEM_COL_WIDTH,
                   }}
@@ -1129,7 +1130,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                       style={{
                         borderBottom: '1px solid #e2e8f0',
                         fontSize: 12,
-                        padding: '8px 10px',
+                        padding: '4px 8px',
+                        lineHeight: 1.2,
                         background: '#f8fafc',
                         textAlign: 'center',
                         whiteSpace: 'nowrap',
@@ -1141,9 +1143,6 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <span style={{ fontWeight: 700, color: isSelected ? '#2563eb' : '#0f172a' }}>
                           {room.label}
-                        </span>
-                        <span style={{ fontSize: 11, color: '#475467', fontWeight: isSelected ? 700 : 400 }}>
-                          {room.building}
                         </span>
                       </div>
                     </th>
@@ -1182,7 +1181,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                           color: '#4c1d95',
                           fontWeight: 700,
                           fontSize: 12,
-                          padding: '6px 10px',
+                          padding: '4px 8px',
+                          lineHeight: 1.2,
                           height: ROW_HEIGHT,
                         }}
                       >
@@ -1203,7 +1203,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                         borderBottom: '1px solid #f1f5f9',
                         fontSize: 12,
                         color: '#0f172a',
-                        padding: '6px 10px',
+                        padding: '4px 8px',
+                        lineHeight: 1.2,
                         whiteSpace: 'nowrap',
                         height: ROW_HEIGHT,
                         width: ITEM_COL_WIDTH,
@@ -1235,7 +1236,8 @@ export default function ProjectInteriorMatrix({ apiBaseUrl }) {
                             textAlign: 'center',
                             cursor: isInitialDbSyncing ? 'not-allowed' : 'pointer',
                             userSelect: 'none',
-                            padding: '6px 8px',
+                            padding: '2px 6px',
+                            lineHeight: 1.1,
                             width: ROOM_COL_WIDTH,
                             minWidth: ROOM_COL_WIDTH,
                             color: checked ? '#0f172a' : '#94a3b8',
