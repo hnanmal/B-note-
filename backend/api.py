@@ -1735,7 +1735,9 @@ def export_project_db_excel(project_identifier: str):
                 try:
                     wm_id = r.get("work_master_id")
                     selected_row_flags.append(
-                        int(wm_id) in selected_work_master_ids if wm_id is not None else False
+                        int(wm_id) in selected_work_master_ids
+                        if wm_id is not None
+                        else False
                     )
                 except Exception:
                     selected_row_flags.append(False)
@@ -1787,7 +1789,9 @@ def export_project_db_excel(project_identifier: str):
             # Omit columns from `work_master_id` and everything to the right.
             if "work_master_id" in df_wm_precheck.columns:
                 keep_end = int(df_wm_precheck.columns.get_loc("work_master_id"))
-                df_wm_precheck = df_wm_precheck.loc[:, df_wm_precheck.columns[:keep_end]]
+                df_wm_precheck = df_wm_precheck.loc[
+                    :, df_wm_precheck.columns[:keep_end]
+                ]
 
         ws_wm = _write_sheet_from_df("Report_WM", df_wm_precheck)
 
@@ -1869,25 +1873,43 @@ def export_project_db_excel(project_identifier: str):
                     except Exception:
                         cell.alignment = Alignment(vertical="center")
 
-            # Scale down font size and row height (~70%).
-            scale = 0.7
+            # Scale down font size (~80%).
+            scale = 0.8
             default_font_size = 11
 
             for row in ws_wm.iter_rows():
                 for cell in row:
                     try:
-                        base = cell.font.size if cell.font.size is not None else default_font_size
+                        base = (
+                            cell.font.size
+                            if cell.font.size is not None
+                            else default_font_size
+                        )
                         cell.font = cell.font.copy(size=max(1, base * scale))
                     except Exception:
                         cell.font = Font(size=max(1, default_font_size * scale))
 
             default_row_height = 15
+            base_line_height = default_row_height * scale
+
+            def _line_count(value) -> int:
+                if value is None:
+                    return 1
+                try:
+                    text = str(value)
+                except Exception:
+                    return 1
+                return max(1, text.count("\n") + 1)
+
             for r in range(1, ws_wm.max_row + 1):
                 try:
-                    base_h = ws_wm.row_dimensions[r].height
-                    if base_h is None:
-                        base_h = default_row_height
-                    ws_wm.row_dimensions[r].height = max(1, base_h * scale)
+                    max_lines = 1
+                    for c in range(1, ws_wm.max_column + 1):
+                        v = ws_wm.cell(row=r, column=c).value
+                        max_lines = max(max_lines, _line_count(v))
+                    ws_wm.row_dimensions[r].height = max(
+                        1, base_line_height * max_lines
+                    )
                 except Exception:
                     continue
         except Exception:
