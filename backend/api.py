@@ -1316,7 +1316,13 @@ def export_project_db_excel(project_identifier: str):
                 return 0
             return -1 if ka < kb else 1
 
-        def _build_family_tree_rows(items, assignments_by_family_id=None):
+        def _build_family_tree_rows(
+            items,
+            assignments_by_family_id=None,
+            standard_item_name_by_id=None,
+            standard_item_type_by_id=None,
+            standard_item_parent_by_id=None,
+        ):
             from functools import cmp_to_key
             import math
 
@@ -1365,6 +1371,123 @@ def export_project_db_excel(project_identifier: str):
             rows = []
 
             assignments_by_family_id = assignments_by_family_id or {}
+            standard_item_name_by_id = standard_item_name_by_id or {}
+            standard_item_type_by_id = standard_item_type_by_id or {}
+            standard_item_parent_by_id = standard_item_parent_by_id or {}
+
+            def _build_standard_item_subtree_rows(family_id: int, base_level: int):
+                assigned = assignments_by_family_id.get(family_id, []) or []
+                if not assigned:
+                    return
+
+                assigned_by_std_id = {}
+                for a in assigned:
+                    sid = a.get("standard_item_id")
+                    try:
+                        sid_int = int(sid) if sid is not None else None
+                    except Exception:
+                        sid_int = None
+                    if sid_int is None:
+                        continue
+                    # Keep the first assignment if duplicates exist.
+                    assigned_by_std_id.setdefault(sid_int, a)
+
+                if not assigned_by_std_id:
+                    return
+
+                included_ids = set(assigned_by_std_id.keys())
+                stack = list(included_ids)
+                while stack:
+                    sid = stack.pop()
+                    pid = standard_item_parent_by_id.get(sid)
+                    if pid is None:
+                        continue
+                    try:
+                        pid_int = int(pid)
+                    except Exception:
+                        continue
+                    if pid_int not in included_ids:
+                        included_ids.add(pid_int)
+                        stack.append(pid_int)
+
+                children_by_parent = {sid: [] for sid in included_ids}
+                roots = []
+                for sid in included_ids:
+                    pid = standard_item_parent_by_id.get(sid)
+                    try:
+                        pid_int = int(pid) if pid is not None else None
+                    except Exception:
+                        pid_int = None
+                    if pid_int is not None and pid_int in included_ids:
+                        children_by_parent[pid_int].append(sid)
+                    else:
+                        roots.append(sid)
+
+                def _std_sort_key(sid: int):
+                    t = (standard_item_type_by_id.get(sid) or "").strip()
+                    # Prefer GWM then SWM, then others
+                    type_rank = 2
+                    if t == "GWM":
+                        type_rank = 0
+                    elif t == "SWM":
+                        type_rank = 1
+                    name = (standard_item_name_by_id.get(sid) or "").strip()
+                    return (type_rank, _natural_key(name), sid)
+
+                for pid in list(children_by_parent.keys()):
+                    children_by_parent[pid].sort(key=_std_sort_key)
+                roots.sort(key=_std_sort_key)
+
+                def walk_std(sid: int, depth: int):
+                    name = standard_item_name_by_id.get(sid)
+                    typ = standard_item_type_by_id.get(sid)
+                    assignment = assigned_by_std_id.get(sid)
+
+                    pid = standard_item_parent_by_id.get(sid)
+                    parent_id = None
+                    if pid is not None:
+                        try:
+                            pid_int = int(pid)
+                        except Exception:
+                            pid_int = None
+                        if pid_int is not None and pid_int in included_ids:
+                            parent_id = pid_int
+                    if parent_id is None:
+                        parent_id = family_id
+
+                    rows.append(
+                        {
+                            "level": int(base_level) + 1 + int(depth),
+                            "sequence_number": None,
+                            "name": name,
+                            "item_type": typ,
+                            "id": sid,
+                            "parent_id": parent_id,
+                            "description": (
+                                assignment.get("assignment_description")
+                                if assignment
+                                else None
+                            ),
+                            "formula": (
+                                _excel_escape_formula(assignment.get("formula"))
+                                if assignment
+                                else None
+                            ),
+                            "created_at": (
+                                (
+                                    assignment.get("assigned_at")
+                                    or assignment.get("created_at")
+                                )
+                                if assignment
+                                else None
+                            ),
+                        }
+                    )
+                    for child_id in children_by_parent.get(sid, []) or []:
+                        walk_std(child_id, depth + 1)
+
+                for root_id in roots:
+                    walk_std(root_id, 0)
 
             def walk(nodes, level=0):
                 for n in nodes:
@@ -1385,21 +1508,17 @@ def export_project_db_excel(project_identifier: str):
                         }
                     )
 
-                    # Insert assigned standard items right under this family node.
-                    for a in assignments_by_family_id.get(family_id, []) or []:
-                        rows.append(
-                            {
-                                "level": int(level) + 1,
-                                "sequence_number": None,
-                                "name": a.get("standard_item_name"),
-                                "item_type": a.get("standard_item_type"),
-                                "id": a.get("assignment_id"),
-                                "parent_id": family_id,
-                                "description": a.get("assignment_description"),
-                                "formula": _excel_escape_formula(a.get("formula")),
-                                "created_at": a.get("assigned_at")
-                                or a.get("created_at"),
-                            }
+                    # Insert assigned standard items right under this family node, preserving hierarchy.
+                    try:
+                        family_id_int = (
+                            int(family_id) if family_id is not None else None
+                        )
+                    except Exception:
+                        family_id_int = None
+                    if family_id_int is not None:
+                        _build_standard_item_subtree_rows(
+                            family_id=family_id_int,
+                            base_level=int(level),
                         )
 
                     children = n.get("children") or []
@@ -1432,6 +1551,7 @@ def export_project_db_excel(project_identifier: str):
             SELECT
               g.id AS assignment_id,
               g.family_list_id,
+              g.standard_item_id,
               si.name AS standard_item_name,
               si.type AS standard_item_type,
               g.formula,
@@ -1443,6 +1563,31 @@ def export_project_db_excel(project_identifier: str):
             ORDER BY g.family_list_id, si.type, si.name, g.id
             """
         )
+
+        # Standard item hierarchy (for indentation of assigned items)
+        df_standard_items_hier = _read_df(
+            "SELECT id, parent_id, name AS standard_item_name, type AS standard_item_type FROM standard_items"
+        )
+        standard_item_name_by_id = {}
+        standard_item_type_by_id = {}
+        standard_item_parent_by_id = {}
+        if df_standard_items_hier is not None and not df_standard_items_hier.empty:
+            for _, r in df_standard_items_hier.iterrows():
+                sid = r.get("id")
+                try:
+                    sid_int = int(sid) if sid is not None else None
+                except Exception:
+                    sid_int = None
+                if sid_int is None:
+                    continue
+                standard_item_name_by_id[sid_int] = r.get("standard_item_name")
+                standard_item_type_by_id[sid_int] = r.get("standard_item_type")
+                pid = r.get("parent_id")
+                try:
+                    pid_int = int(pid) if pid is not None else None
+                except Exception:
+                    pid_int = None
+                standard_item_parent_by_id[sid_int] = pid_int
         assignments_by_family_id = {}
         if df_family_assignments is not None and not df_family_assignments.empty:
             for _, r in df_family_assignments.iterrows():
@@ -1456,6 +1601,7 @@ def export_project_db_excel(project_identifier: str):
                 assignments_by_family_id.setdefault(fid_int, []).append(
                     {
                         "assignment_id": r.get("assignment_id"),
+                        "standard_item_id": r.get("standard_item_id"),
                         "standard_item_name": r.get("standard_item_name"),
                         "standard_item_type": r.get("standard_item_type"),
                         "formula": r.get("formula"),
@@ -1468,6 +1614,9 @@ def export_project_db_excel(project_identifier: str):
         family_rows = _build_family_tree_rows(
             df_family_raw.to_dict(orient="records") if not df_family_raw.empty else [],
             assignments_by_family_id=assignments_by_family_id,
+            standard_item_name_by_id=standard_item_name_by_id,
+            standard_item_type_by_id=standard_item_type_by_id,
+            standard_item_parent_by_id=standard_item_parent_by_id,
         )
         df_family_tree = pd.DataFrame(family_rows)
         family_ws = _write_sheet_from_df("FamilyList", df_family_tree)
