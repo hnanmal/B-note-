@@ -913,6 +913,30 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     };
   }, [assignmentGroups]);
 
+  const swmParentsWithoutDerivedLeaves = useMemo(() => {
+    const rows = assignmentRowsByType.SWM ?? [];
+    if (!rows.length) return new Set();
+    const parentVisibleLeaf = new Map();
+    const stack = [];
+    rows.forEach((row) => {
+      const depth = row?.depth ?? 0;
+      while (stack.length && stack[stack.length - 1].depth >= depth) {
+        stack.pop();
+      }
+      if (row?.hasChildren) {
+        if (!parentVisibleLeaf.has(row.id)) parentVisibleLeaf.set(row.id, false);
+        stack.push({ id: row.id, depth });
+        return;
+      }
+      stack.forEach((p) => parentVisibleLeaf.set(p.id, true));
+    });
+    const missing = new Set();
+    parentVisibleLeaf.forEach((hasLeaf, parentId) => {
+      if (!hasLeaf) missing.add(parentId);
+    });
+    return missing;
+  }, [assignmentRowsByType]);
+
   const assignmentRowMap = useMemo(() => {
     const map = new Map();
     Object.values(assignmentRowsByType).forEach((rows) => {
@@ -1208,6 +1232,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       : '패밀리를 선택하면 목록이 여기에 표시됩니다.';
 
     const isGwmMenu = typeKey === 'GWM';
+
     const normalizeDepth = (value) => {
       const parsed = Number(value);
       if (!Number.isFinite(parsed) || parsed < 0) return 0;
@@ -1336,9 +1361,17 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
                     >
                       {row.item}
                     </span>
-                    <span style={{ fontSize: 10, color: '#475467' }}>{row.discipline}</span>
-                    <span />
-                    <span />
+                    {typeKey === 'SWM' && swmParentsWithoutDerivedLeaves.has(row.id) ? (
+                      <span style={{ gridColumn: '3 / span 3', fontSize: 10, color: '#94a3b8' }}>
+                        아직 파생항목이 없습니다
+                      </span>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: 10, color: '#475467' }}>{row.discipline}</span>
+                        <span />
+                        <span />
+                      </>
+                    )}
                   </div>
                 );
               }
