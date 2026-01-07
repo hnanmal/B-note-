@@ -1226,6 +1226,7 @@ def export_project_db_excel(project_identifier: str):
 
     conn = sqlite3.connect(db_path.as_posix())
     try:
+
         def _read_df(query: str, params=None) -> "pd.DataFrame":
             try:
                 return pd.read_sql_query(query, conn, params=params)
@@ -1371,7 +1372,9 @@ def export_project_db_excel(project_identifier: str):
                 payload = json.loads(raw_payload or "{}")
             except Exception:
                 payload = {}
-            normalized = _normalize_cart_payload(payload if isinstance(payload, dict) else {})
+            normalized = _normalize_cart_payload(
+                payload if isinstance(payload, dict) else {}
+            )
             revit_types = normalized.get("revit_types") or []
             assignment_ids = normalized.get("assignment_ids") or []
             standard_item_ids = normalized.get("standard_item_ids") or []
@@ -1379,11 +1382,17 @@ def export_project_db_excel(project_identifier: str):
 
             standard_item_id = None
             try:
-                standard_item_id = int(standard_item_ids[0]) if standard_item_ids else None
+                standard_item_id = (
+                    int(standard_item_ids[0]) if standard_item_ids else None
+                )
             except Exception:
                 standard_item_id = None
 
-            sel = sel_by_std_id.get(standard_item_id) if standard_item_id is not None else None
+            sel = (
+                sel_by_std_id.get(standard_item_id)
+                if standard_item_id is not None
+                else None
+            )
             cart_rows.append(
                 {
                     "cart_entry_id": r.get("cart_entry_id"),
@@ -1395,11 +1404,21 @@ def export_project_db_excel(project_identifier: str):
                     "assignment_id": (assignment_ids[0] if assignment_ids else None),
                     "revit_type": (revit_types[0] if revit_types else None),
                     "formula": normalized.get("formula"),
-                    "selected_work_master_id": (sel.get("selected_work_master_id") if sel else None),
-                    "selected_work_master_code": (sel.get("selected_work_master_code") if sel else None),
-                    "building_names_json": json.dumps(building_names, ensure_ascii=False),
-                    "standard_item_ids_json": json.dumps(standard_item_ids, ensure_ascii=False),
-                    "assignment_ids_json": json.dumps(assignment_ids, ensure_ascii=False),
+                    "selected_work_master_id": (
+                        sel.get("selected_work_master_id") if sel else None
+                    ),
+                    "selected_work_master_code": (
+                        sel.get("selected_work_master_code") if sel else None
+                    ),
+                    "building_names_json": json.dumps(
+                        building_names, ensure_ascii=False
+                    ),
+                    "standard_item_ids_json": json.dumps(
+                        standard_item_ids, ensure_ascii=False
+                    ),
+                    "assignment_ids_json": json.dumps(
+                        assignment_ids, ensure_ascii=False
+                    ),
                     "revit_types_json": json.dumps(revit_types, ensure_ascii=False),
                 }
             )
