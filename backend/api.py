@@ -1994,7 +1994,7 @@ def export_project_db_excel(project_identifier: str):
         summary_ws.append(["StandardItems", int(len(df_standard_items.index))])
 
         df_work_masters = _read_df(
-            "SELECT id, discipline, work_master_code, cat_large_code, cat_large_desc, cat_mid_code, cat_mid_desc, cat_small_code, cat_small_desc, attr1_code, attr1_spec, attr2_code, attr2_spec, attr3_code, attr3_spec, attr4_code, attr4_spec, attr5_code, attr5_spec, attr6_code, attr6_spec, uom1, uom2, work_group_code, new_old_code, add_spec, gauge FROM work_masters ORDER BY id"
+            "SELECT id, discipline, work_master_code, cat_large_code, cat_large_desc, cat_mid_code, cat_mid_desc, cat_small_code, cat_small_desc, attr1_code, attr1_spec, attr2_code, attr2_spec, attr3_code, attr3_spec, attr4_code, attr4_spec, attr5_code, attr5_spec, attr6_code, attr6_spec, uom1, uom2, work_group_code, new_old_code, add_spec, gauge, other_opinion FROM work_masters ORDER BY id"
         )
         _write_sheet_from_df("WorkMasters", df_work_masters)
         summary_ws.append(["WorkMasters", int(len(df_work_masters.index))])

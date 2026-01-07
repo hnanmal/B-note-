@@ -196,6 +196,8 @@ def ensure_extra_tables(db_path: Path) -> None:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN add_spec TEXT")
         if "gauge" not in wm_columns:
             cursor.execute("ALTER TABLE work_masters ADD COLUMN gauge TEXT")
+        if "other_opinion" not in wm_columns:
+            cursor.execute("ALTER TABLE work_masters ADD COLUMN other_opinion TEXT")
         cursor.execute("PRAGMA table_info(project_metadata)")
         meta_columns = {row[1] for row in cursor.fetchall()}
         if "pjt_abbr" not in meta_columns:

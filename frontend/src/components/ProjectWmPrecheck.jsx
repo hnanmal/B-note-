@@ -105,6 +105,7 @@ const PrecheckRow = React.memo(function PrecheckRow({
   const summaryParts = getWorkMasterSummaryParts(wm);
   const unitLabel = [wm?.uom1, wm?.uom2].filter(Boolean).join(' / ');
   const specValue = (wm?.add_spec ?? '').toString();
+  const otherOpinionValue = (wm?.other_opinion ?? '').toString();
 
   const [checked, setChecked] = useState(() => Boolean(initialChecked));
   const [savingUse, setSavingUse] = useState(false);
@@ -116,6 +117,12 @@ const PrecheckRow = React.memo(function PrecheckRow({
   const [specEditSession, setSpecEditSession] = useState(0);
   const [savingSpec, setSavingSpec] = useState(false);
   const specTextareaRef = useRef(null);
+
+  const [isEditingOtherOpinion, setIsEditingOtherOpinion] = useState(false);
+  const [editingOtherOpinionSeed, setEditingOtherOpinionSeed] = useState('');
+  const [otherOpinionEditSession, setOtherOpinionEditSession] = useState(0);
+  const [savingOtherOpinion, setSavingOtherOpinion] = useState(false);
+  const otherOpinionTextareaRef = useRef(null);
 
   useEffect(() => {
     setChecked(Boolean(initialChecked));
@@ -137,6 +144,23 @@ const PrecheckRow = React.memo(function PrecheckRow({
       }
     });
   }, [isEditingSpec, savingSpec, specEditSession]);
+
+  useEffect(() => {
+    if (!isEditingOtherOpinion) return;
+    if (savingOtherOpinion) return;
+    const node = otherOpinionTextareaRef.current;
+    if (!node) return;
+    requestAnimationFrame(() => {
+      try {
+        node.focus();
+        const len = node.value?.length ?? 0;
+        node.selectionStart = len;
+        node.selectionEnd = len;
+      } catch {
+        // ignore
+      }
+    });
+  }, [isEditingOtherOpinion, savingOtherOpinion, otherOpinionEditSession]);
 
   const toggleUse = useCallback(async () => {
     if (!apiBaseUrl) return;
@@ -219,6 +243,48 @@ const PrecheckRow = React.memo(function PrecheckRow({
       setSavingSpec(false);
     }
   }, [apiBaseUrl, editingSpecSeed, onError, queueScrollRestore, savingSpec, updateWorkMasterLocal, wmId]);
+
+  const startOtherOpinionEdit = useCallback(() => {
+    if (!wmId) return;
+    setIsEditingOtherOpinion(true);
+    setEditingOtherOpinionSeed((wm?.other_opinion ?? '').toString());
+    setOtherOpinionEditSession((s) => s + 1);
+    onError?.(null);
+  }, [onError, wm, wmId]);
+
+  const cancelOtherOpinionEdit = useCallback(() => {
+    setIsEditingOtherOpinion(false);
+    setEditingOtherOpinionSeed('');
+    onError?.(null);
+  }, [onError]);
+
+  const saveOtherOpinionEdit = useCallback(async () => {
+    if (!apiBaseUrl) return;
+    if (!wmId) return;
+    if (savingOtherOpinion) return;
+
+    const nextOpinion = (otherOpinionTextareaRef.current?.value ?? editingOtherOpinionSeed).toString();
+    queueScrollRestore?.(wmId);
+    setSavingOtherOpinion(true);
+    onError?.(null);
+
+    try {
+      const updated = await fetch(`${apiBaseUrl}/work-masters/${wmId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ other_opinion: nextOpinion }),
+      }).then(handleResponse);
+
+      setIsEditingOtherOpinion(false);
+      setEditingOtherOpinionSeed('');
+      updateWorkMasterLocal?.(wmId, { ...(updated || {}), other_opinion: (updated?.other_opinion ?? nextOpinion) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '기타의견을 저장하지 못했습니다.';
+      onError?.(message);
+    } finally {
+      setSavingOtherOpinion(false);
+    }
+  }, [apiBaseUrl, editingOtherOpinionSeed, onError, queueScrollRestore, savingOtherOpinion, updateWorkMasterLocal, wmId]);
 
   const handleAddGauge = useCallback(async () => {
     if (!wmId) return;
@@ -415,6 +481,97 @@ const PrecheckRow = React.memo(function PrecheckRow({
             title="Spec 수정"
           >
             {specValue ? specValue : (
+              <span style={{ color: '#94a3b8' }}>클릭하여 입력</span>
+            )}
+          </button>
+        )}
+      </td>
+      <td style={{ padding: '6px 10px', minWidth: 260, maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {isEditingOtherOpinion ? (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <textarea
+              ref={otherOpinionTextareaRef}
+              key={otherOpinionEditSession}
+              defaultValue={editingOtherOpinionSeed}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return;
+                if (event.altKey) {
+                  event.preventDefault();
+                  const target = event.target;
+                  if (target instanceof HTMLTextAreaElement) insertNewlineAtCaret(target);
+                  return;
+                }
+                event.preventDefault();
+                saveOtherOpinionEdit();
+              }}
+              rows={3}
+              style={{
+                flex: 1,
+                border: '1px solid #d1d5db',
+                borderRadius: 8,
+                padding: '6px 8px',
+                fontSize: 11,
+                minWidth: 0,
+                resize: 'vertical',
+                lineHeight: 1.35,
+              }}
+            />
+            <button
+              type="button"
+              onClick={saveOtherOpinionEdit}
+              disabled={savingOtherOpinion}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 8,
+                border: '1px solid #2563eb',
+                background: savingOtherOpinion ? '#93c5fd' : '#2563eb',
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: savingOtherOpinion ? 'not-allowed' : 'pointer',
+              }}
+            >
+              저장
+            </button>
+            <button
+              type="button"
+              onClick={cancelOtherOpinionEdit}
+              disabled={savingOtherOpinion}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 8,
+                border: '1px solid #cbd5f5',
+                background: '#fff',
+                color: '#1d4ed8',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: savingOtherOpinion ? 'not-allowed' : 'pointer',
+              }}
+            >
+              취소
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={startOtherOpinionEdit}
+            style={{
+              width: '100%',
+              border: 'none',
+              background: 'transparent',
+              padding: '2px 0',
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontSize: 12,
+              color: '#0f172a',
+              display: 'block',
+              minHeight: 18,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+            title="기타의견 수정"
+          >
+            {otherOpinionValue ? otherOpinionValue : (
               <span style={{ color: '#94a3b8' }}>클릭하여 입력</span>
             )}
           </button>
@@ -763,6 +920,7 @@ export default function ProjectWmPrecheck({ apiBaseUrl }) {
       { key: 'gauge', label: 'Gauge' },
       { key: 'unit', label: 'Unit' },
       { key: 'spec', label: 'Spec' },
+      { key: 'other_opinion', label: '기타의견' },
       { key: 'work_master', label: 'Work Master' },
     ],
     []

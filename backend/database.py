@@ -149,6 +149,8 @@ def ensure_work_master_columns(engine):
             conn.execute(text("ALTER TABLE work_masters ADD COLUMN add_spec TEXT"))
         if "gauge" not in column_names:
             conn.execute(text("ALTER TABLE work_masters ADD COLUMN gauge TEXT"))
+        if "other_opinion" not in column_names:
+            conn.execute(text("ALTER TABLE work_masters ADD COLUMN other_opinion TEXT"))
         indexes = conn.execute(text("PRAGMA index_list('work_masters')")).fetchall()
         if any(idx[1] == "ix_work_masters_work_master_code" for idx in indexes):
             conn.execute(text("DROP INDEX IF EXISTS ix_work_masters_work_master_code"))
