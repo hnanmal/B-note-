@@ -1145,9 +1145,10 @@ def export_project_db_json(
     tags=["Project Data"],
 )
 def export_project_db_excel(project_identifier: str):
-    """Export the entire project SQLite DB as a human-reviewable Excel workbook.
+    """Export a human-reviewable Excel report for the project DB.
 
-    Each table becomes a worksheet.
+    NOTE: This is intentionally *not* a raw table dump. It generates joined/flattened
+    sheets so a person can review without jumping across tables.
     """
 
     try:
@@ -1192,60 +1193,219 @@ def export_project_db_excel(project_identifier: str):
         return value
 
     wb = Workbook()
-    # Remove default sheet
     if wb.worksheets:
         wb.remove(wb.worksheets[0])
 
     sheet_names = set()
     generated_at = datetime.datetime.now().isoformat(timespec="seconds")
 
-    summary_ws = wb.create_sheet(_safe_sheet_name("SUMMARY", sheet_names))
-    summary_ws.append(["project_identifier", project_identifier])
-    summary_ws.append(["db_file", db_path.name])
-    summary_ws.append(["generated_at", generated_at])
-    summary_ws.append([])
-    summary_ws.append(["table", "rows"])
+    def _write_sheet_from_df(title: str, df: "pd.DataFrame"):
+        ws = wb.create_sheet(_safe_sheet_name(title, sheet_names))
+        ws.freeze_panes = "A2"
+
+        if df is None or df.empty:
+            ws.append(["(no rows)"])
+            return
+
+        ws.append(list(df.columns))
+        for _, row in df.iterrows():
+            ws.append([_excel_value(v) for v in row.tolist()])
+
+        # Basic width cap to keep file readable
+        for idx, col_name in enumerate(df.columns, start=1):
+            col_letter = get_column_letter(idx)
+            max_len = len(str(col_name))
+            for cell in ws[col_letter]:
+                if cell.value is None:
+                    continue
+                max_len = max(max_len, len(str(cell.value)))
+                if max_len > 60:
+                    max_len = 60
+                    break
+            ws.column_dimensions[col_letter].width = min(60, max(10, max_len + 2))
 
     conn = sqlite3.connect(db_path.as_posix())
     try:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-        )
-        tables = [row[0] for row in cur.fetchall()]
-
-        for table_name in tables:
-            ws = wb.create_sheet(_safe_sheet_name(table_name, sheet_names))
-            ws.freeze_panes = "A2"
-
-            cur.execute(f"PRAGMA table_info('{table_name}')")
-            cols = [r[1] for r in cur.fetchall()]
-            ws.append(cols)
-
-            row_count = 0
+        def _read_df(query: str, params=None) -> "pd.DataFrame":
             try:
-                cur.execute(f"SELECT * FROM '{table_name}'")
-                for row in cur.fetchall():
-                    ws.append([_excel_value(row.get(col)) for col in cols])
-                    row_count += 1
+                return pd.read_sql_query(query, conn, params=params)
             except Exception:
-                ws.append(["<failed to read table>"])
+                return pd.DataFrame()
 
-            summary_ws.append([table_name, row_count])
+        # Summary / metadata
+        summary_ws = wb.create_sheet(_safe_sheet_name("SUMMARY", sheet_names))
+        summary_ws.append(["project_identifier", project_identifier])
+        summary_ws.append(["db_file", db_path.name])
+        summary_ws.append(["generated_at", generated_at])
+        summary_ws.append([])
+        summary_ws.append(["sheet", "rows"])
 
-            # Basic width cap to keep file readable
-            for idx, col_name in enumerate(cols, start=1):
-                col_letter = get_column_letter(idx)
-                max_len = len(str(col_name))
-                for cell in ws[col_letter]:
-                    if cell.value is None:
-                        continue
-                    max_len = max(max_len, len(str(cell.value)))
-                    if max_len > 60:
-                        max_len = 60
-                        break
-                ws.column_dimensions[col_letter].width = min(60, max(10, max_len + 2))
+        df_buildings = _read_df(
+            "SELECT id, name AS building_name, created_at FROM building_list ORDER BY id"
+        )
+        _write_sheet_from_df("Buildings", df_buildings)
+        summary_ws.append(["Buildings", int(len(df_buildings.index))])
+
+        df_standard_items = _read_df(
+            "SELECT id, name AS standard_item_name, type AS standard_item_type, parent_id, derive_from FROM standard_items ORDER BY id"
+        )
+        _write_sheet_from_df("StandardItems", df_standard_items)
+        summary_ws.append(["StandardItems", int(len(df_standard_items.index))])
+
+        df_work_masters = _read_df(
+            "SELECT id, discipline, work_master_code, cat_large_code, cat_large_desc, cat_mid_code, cat_mid_desc, cat_small_code, cat_small_desc, attr1_code, attr1_spec, attr2_code, attr2_spec, attr3_code, attr3_spec, attr4_code, attr4_spec, attr5_code, attr5_spec, attr6_code, attr6_spec, uom1, uom2, work_group_code, new_old_code, add_spec, gauge FROM work_masters ORDER BY id"
+        )
+        _write_sheet_from_df("WorkMasters", df_work_masters)
+        summary_ws.append(["WorkMasters", int(len(df_work_masters.index))])
+
+        df_selected = _read_df(
+            """
+            SELECT
+              sel.id,
+              sel.standard_item_id,
+              si.name AS standard_item_name,
+              si.type AS standard_item_type,
+              sel.work_master_id,
+              wm.work_master_code,
+              wm.cat_large_code,
+              wm.cat_mid_code,
+              wm.cat_small_code,
+              sel.created_at,
+              sel.updated_at
+            FROM standard_item_work_master_select sel
+            LEFT JOIN standard_items si ON si.id = sel.standard_item_id
+            LEFT JOIN work_masters wm ON wm.id = sel.work_master_id
+            ORDER BY sel.standard_item_id
+            """
+        )
+        _write_sheet_from_df("StandardItemSelections", df_selected)
+        summary_ws.append(["StandardItemSelections", int(len(df_selected.index))])
+
+        df_gwm_assign = _read_df(
+            """
+            SELECT
+              g.id,
+              g.family_list_id,
+              fl.name AS family_name,
+              g.standard_item_id,
+              si.name AS standard_item_name,
+              si.type AS standard_item_type,
+              g.formula,
+              g.description,
+              g.assigned_at,
+              g.created_at
+            FROM gwm_family_assign g
+            LEFT JOIN family_list fl ON fl.id = g.family_list_id
+            LEFT JOIN standard_items si ON si.id = g.standard_item_id
+            ORDER BY g.id
+            """
+        )
+        _write_sheet_from_df("GwmFamilyAssign", df_gwm_assign)
+        summary_ws.append(["GwmFamilyAssign", int(len(df_gwm_assign.index))])
+
+        df_revit_types = _read_df(
+            """
+            SELECT
+              frt.id,
+              frt.family_list_id,
+              fl.name AS family_name,
+              frt.type_name,
+              frt.building_name,
+              frt.created_at
+            FROM family_revit_type frt
+            LEFT JOIN family_list fl ON fl.id = frt.family_list_id
+            ORDER BY frt.id
+            """
+        )
+        _write_sheet_from_df("FamilyRevitTypes", df_revit_types)
+        summary_ws.append(["FamilyRevitTypes", int(len(df_revit_types.index))])
+
+        df_calc = _read_df(
+            """
+            SELECT
+              c.id,
+              c.family_list_id,
+              fl.name AS family_name,
+              c.calc_code,
+              c.symbol_key,
+              c.symbol_value,
+              c.created_at
+            FROM calc_dictionary c
+            LEFT JOIN family_list fl ON fl.id = c.family_list_id
+            WHERE COALESCE(c.is_deleted, 0) = 0
+            ORDER BY c.id
+            """
+        )
+        _write_sheet_from_df("CalcDictionary", df_calc)
+        summary_ws.append(["CalcDictionary", int(len(df_calc.index))])
+
+        # Cart entries (flattened for review)
+        df_cart_raw = _read_df(
+            "SELECT id AS cart_entry_id, payload, created_at FROM workmaster_cart_entries ORDER BY id DESC"
+        )
+        std_name_by_id = (
+            df_standard_items.set_index("id")["standard_item_name"].to_dict()
+            if not df_standard_items.empty and "id" in df_standard_items.columns
+            else {}
+        )
+        std_type_by_id = (
+            df_standard_items.set_index("id")["standard_item_type"].to_dict()
+            if not df_standard_items.empty and "id" in df_standard_items.columns
+            else {}
+        )
+        sel_by_std_id = {}
+        if not df_selected.empty and "standard_item_id" in df_selected.columns:
+            for _, r in df_selected.iterrows():
+                sid = r.get("standard_item_id")
+                if sid is None:
+                    continue
+                sel_by_std_id[int(sid)] = {
+                    "selected_work_master_id": r.get("work_master_id"),
+                    "selected_work_master_code": r.get("work_master_code"),
+                }
+
+        cart_rows = []
+        for _, r in df_cart_raw.iterrows():
+            raw_payload = r.get("payload")
+            try:
+                payload = json.loads(raw_payload or "{}")
+            except Exception:
+                payload = {}
+            normalized = _normalize_cart_payload(payload if isinstance(payload, dict) else {})
+            revit_types = normalized.get("revit_types") or []
+            assignment_ids = normalized.get("assignment_ids") or []
+            standard_item_ids = normalized.get("standard_item_ids") or []
+            building_names = normalized.get("building_names") or []
+
+            standard_item_id = None
+            try:
+                standard_item_id = int(standard_item_ids[0]) if standard_item_ids else None
+            except Exception:
+                standard_item_id = None
+
+            sel = sel_by_std_id.get(standard_item_id) if standard_item_id is not None else None
+            cart_rows.append(
+                {
+                    "cart_entry_id": r.get("cart_entry_id"),
+                    "created_at": r.get("created_at"),
+                    "building_name": (building_names[0] if building_names else None),
+                    "standard_item_id": standard_item_id,
+                    "standard_item_name": std_name_by_id.get(standard_item_id),
+                    "standard_item_type": std_type_by_id.get(standard_item_id),
+                    "assignment_id": (assignment_ids[0] if assignment_ids else None),
+                    "revit_type": (revit_types[0] if revit_types else None),
+                    "formula": normalized.get("formula"),
+                    "selected_work_master_id": (sel.get("selected_work_master_id") if sel else None),
+                    "selected_work_master_code": (sel.get("selected_work_master_code") if sel else None),
+                    "building_names_json": json.dumps(building_names, ensure_ascii=False),
+                    "standard_item_ids_json": json.dumps(standard_item_ids, ensure_ascii=False),
+                    "assignment_ids_json": json.dumps(assignment_ids, ensure_ascii=False),
+                    "revit_types_json": json.dumps(revit_types, ensure_ascii=False),
+                }
+            )
+        df_cart = pd.DataFrame(cart_rows)
+        _write_sheet_from_df("CartEntries", df_cart)
+        summary_ws.append(["CartEntries", int(len(df_cart.index))])
     finally:
         conn.close()
 
@@ -1256,9 +1416,7 @@ def export_project_db_excel(project_identifier: str):
     now = datetime.datetime.now()
     stamp = now.strftime("%Y%m%d_%H%M%S")
     filename = f"db_report_{project_identifier}_{stamp}.xlsx"
-    headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"'
-    }
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
