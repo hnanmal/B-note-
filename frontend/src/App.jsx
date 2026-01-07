@@ -32,9 +32,10 @@ function App() {
   const [rawProjectIdentifier] = routeSuffix.split('/').filter(Boolean);
   const projectRouteIdentifier = rawProjectIdentifier ? decodeURIComponent(rawProjectIdentifier) : '';
   const isProjectEditorRoute = Boolean(projectRouteIdentifier);
+  const isTeamEntryRoute = !isProjectEditorRoute;
 
   const [selectedNode, setSelectedNode] = useState(null);
-  const [activePage, setActivePage] = useState(isProjectEditorRoute ? 'project-main' : 'matching');
+  const [activePage, setActivePage] = useState(isProjectEditorRoute ? 'project-main' : 'project');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const [calcDictionaryEntries, setCalcDictionaryEntries] = useState([]);
@@ -115,7 +116,7 @@ function App() {
   };
   const navItems = isProjectEditorRoute
     ? [{ id: 'project-main', label: 'Project Main', icon: '🏠' }, ...NAV_ITEMS]
-    : NAV_ITEMS.filter((item) => item.id !== 'wm-precheck');
+    : [];
   const activeNavItems = navItems.map((item) => ({
     ...item,
     label: navLabelOverrides[item.id] ?? item.label,
@@ -367,10 +368,10 @@ function App() {
   }, [activePage]);
 
   useEffect(() => {
-    if (!isProjectEditorRoute && activePage === 'project-main') {
-      setActivePage('matching');
+    if (isTeamEntryRoute && activePage !== 'project') {
+      setActivePage('project');
     }
-  }, [isProjectEditorRoute, activePage]);
+  }, [isTeamEntryRoute, activePage]);
 
   return (
     <div className="App" style={{ height: 'calc(100vh - 1rem)', width: 'calc(100vw - 2rem)', minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
@@ -448,319 +449,375 @@ function App() {
           </button>
           {sidebarOpen ? (
             <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
-              <div style={groupLabelStyle}>{standardGroupLabel} &gt;</div>
-              {activeNavItems.map(item => (
-                <button
-                  key={item.id}
-                  className={`nav-btn${activePage === item.id ? ' active' : ''}`}
-                  onClick={() => setActivePage(item.id)}
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    boxSizing: 'border-box',
-                    padding: '4px 0',
-                    fontWeight: 600,
-                    fontSize: 12,
-                    border: 'none',
-                    background: activePage === item.id ? '#f7c748' : '#f1f1f1',
-                    color: activePage === item.id ? '#2c1b00' : '#1d4ed8',
-                    cursor: 'pointer',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-              <div style={{ marginTop: 0, display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => setActivePage('common')}
-                  className={`nav-btn${activePage === 'common' ? ' active' : ''}`}
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    padding: '6px 0',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    border: 'none',
-                    background: activePage === 'common' ? '#f7c748' : '#f1f1f1',
-                    color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {commonButtonLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={openCalcDictionaryPage}
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    padding: '6px 0',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    border: 'none',
-                    borderRadius: 8,
-                    background: '#e2e8f0',
-                    color: '#111827',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                  }}
-                >
-                  {calcButtonLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePage('family')}
-                  className={`nav-btn${activePage === 'family' ? ' active' : ''}`}
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    padding: '6px 0',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    border: 'none',
-                    background: activePage === 'family' ? '#f7c748' : '#f1f1f1',
-                    color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {familyButtonLabel}
-                </button>
-              </div>
-              {isProjectEditorRoute && (
+              {isTeamEntryRoute ? (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div style={{ ...groupLabelStyle, fontWeight: 600 }}>Project User &gt;</div>
+                  <button
+                    type="button"
+                    onClick={() => setActivePage('project')}
+                    style={{
+                      width: '80%',
+                      padding: '8px 0',
+                      borderRadius: 8,
+                      border: '1px solid #f7c748',
+                      background: '#f7c748',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      fontSize: 13,
+                      color: '#2c1b00',
+                    }}
+                  >
+                    Project Select
+                  </button>
+                </div>
+              ) : (
                 <>
-                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', ...groupLabelStyle }}>
-                    <span>Project Input &gt;</span>
+                  <div style={groupLabelStyle}>{standardGroupLabel} &gt;</div>
+                  {activeNavItems.map(item => (
+                    <button
+                      key={item.id}
+                      className={`nav-btn${activePage === item.id ? ' active' : ''}`}
+                      onClick={() => setActivePage(item.id)}
+                      style={{
+                        width: '100%',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        boxSizing: 'border-box',
+                        padding: '4px 0',
+                        fontWeight: 600,
+                        fontSize: 12,
+                        border: 'none',
+                        background: activePage === item.id ? '#f7c748' : '#f1f1f1',
+                        color: activePage === item.id ? '#2c1b00' : '#1d4ed8',
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                  <div style={{ marginTop: 0, display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 12 }}>
+                    <button
+                      type="button"
+                      onClick={() => setActivePage('common')}
+                      className={`nav-btn${activePage === 'common' ? ' active' : ''}`}
+                      style={{
+                        width: '100%',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        padding: '6px 0',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        border: 'none',
+                        background: activePage === 'common' ? '#f7c748' : '#f1f1f1',
+                        color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {commonButtonLabel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openCalcDictionaryPage}
+                      style={{
+                        width: '100%',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        padding: '6px 0',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        border: 'none',
+                        borderRadius: 8,
+                        background: '#e2e8f0',
+                        color: '#111827',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                      }}
+                    >
+                      {calcButtonLabel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActivePage('family')}
+                      className={`nav-btn${activePage === 'family' ? ' active' : ''}`}
+                      style={{
+                        width: '100%',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        padding: '6px 0',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        border: 'none',
+                        background: activePage === 'family' ? '#f7c748' : '#f1f1f1',
+                        color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {familyButtonLabel}
+                    </button>
                   </div>
-                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {isProjectEditorRoute && (
+                    <>
+                      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', ...groupLabelStyle }}>
+                        <span>Project Input &gt;</span>
+                      </div>
+                      <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => setActivePage('project-input-main')}
+                          className={`nav-btn${activePage === 'project-input-main' ? ' active' : ''}`}
+                          style={{
+                            width: '100%',
+                            minWidth: 0,
+                            maxWidth: '100%',
+                            padding: '6px 0',
+                            fontWeight: 600,
+                            fontSize: 13,
+                            border: 'none',
+                            background: activePage === 'project-input-main' ? '#f7c748' : '#f1f1f1',
+                            color: activePage === 'project-input-main' ? '#2c1b00' : '#1d4ed8',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Project Input Main
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActivePage('project-input-family')}
+                          className={`nav-btn${activePage === 'project-input-family' ? ' active' : ''}`}
+                          style={{
+                            width: '100%',
+                            minWidth: 0,
+                            maxWidth: '100%',
+                            padding: '6px 0',
+                            fontWeight: 600,
+                            fontSize: 13,
+                            border: 'none',
+                            background: activePage === 'project-input-family' ? '#f7c748' : '#f1f1f1',
+                            color: activePage === 'project-input-family' ? '#2c1b00' : '#1d4ed8',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Project Family Assign
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActivePage('project-input-interior')}
+                          className={`nav-btn${activePage === 'project-input-interior' ? ' active' : ''}`}
+                          style={{
+                            width: '100%',
+                            minWidth: 0,
+                            maxWidth: '100%',
+                            padding: '6px 0',
+                            fontWeight: 600,
+                            fontSize: 13,
+                            border: 'none',
+                            background: activePage === 'project-input-interior' ? '#f7c748' : '#f1f1f1',
+                            color: activePage === 'project-input-interior' ? '#2c1b00' : '#1d4ed8',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Project Interior Matrix
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <div style={{ ...groupLabelStyle, fontWeight: 600 }}>Project User &gt;</div>
                     <button
                       type="button"
-                      onClick={() => setActivePage('project-input-main')}
-                      className={`nav-btn${activePage === 'project-input-main' ? ' active' : ''}`}
+                      onClick={() => setActivePage('project')}
                       style={{
-                        width: '100%',
-                        minWidth: 0,
-                        maxWidth: '100%',
+                        width: '80%',
                         padding: '6px 0',
+                        borderRadius: 8,
+                        border: '1px solid #f7c748',
+                        background: activePage === 'project' ? '#f7c748' : '#fff',
                         fontWeight: 600,
-                        fontSize: 13,
-                        border: 'none',
-                        background: activePage === 'project-input-main' ? '#f7c748' : '#f1f1f1',
-                        color: activePage === 'project-input-main' ? '#2c1b00' : '#1d4ed8',
                         cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        textAlign: 'center',
+                        fontSize: 13,
+                        color: activePage === 'project' ? '#2c1b00' : '#1d4ed8',
                       }}
                     >
-                      Project Input Main
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActivePage('project-input-family')}
-                      className={`nav-btn${activePage === 'project-input-family' ? ' active' : ''}`}
-                      style={{
-                        width: '100%',
-                        minWidth: 0,
-                        maxWidth: '100%',
-                        padding: '6px 0',
-                        fontWeight: 600,
-                        fontSize: 13,
-                        border: 'none',
-                        background: activePage === 'project-input-family' ? '#f7c748' : '#f1f1f1',
-                        color: activePage === 'project-input-family' ? '#2c1b00' : '#1d4ed8',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Project Family Assign
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActivePage('project-input-interior')}
-                      className={`nav-btn${activePage === 'project-input-interior' ? ' active' : ''}`}
-                      style={{
-                        width: '100%',
-                        minWidth: 0,
-                        maxWidth: '100%',
-                        padding: '6px 0',
-                        fontWeight: 600,
-                        fontSize: 13,
-                        border: 'none',
-                        background: activePage === 'project-input-interior' ? '#f7c748' : '#f1f1f1',
-                        color: activePage === 'project-input-interior' ? '#2c1b00' : '#1d4ed8',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Project Interior Matrix
+                      Project Select
                     </button>
                   </div>
                 </>
               )}
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                <div style={{ ...groupLabelStyle, fontWeight: 600 }}>Project User &gt;</div>
-                <button
-                  type="button"
-                  onClick={() => setActivePage('project')}
-                  style={{
-                    width: '80%',
-                    padding: '6px 0',
-                    borderRadius: 8,
-                    border: '1px solid #f7c748',
-                    background: activePage === 'project' ? '#f7c748' : '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                    textAlign: 'center',
-                    fontSize: 13,
-                    color: activePage === 'project' ? '#2c1b00' : '#1d4ed8',
-                  }}
-                >
-                  Project Select
-                </button>
-              </div>
             </nav>
           ) : (
             <div style={{ marginTop: 56, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>{adminLabel}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {activeNavItems.map(item => (
+              {isTeamEntryRoute ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                  <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Project</div>
+                  <button
+                    type="button"
+                    onClick={() => setActivePage('project')}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      border: '1px solid #f7c748',
+                      background: '#f7c748',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      fontSize: 12,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#2c1b00',
+                    }}
+                    aria-label="Project Select"
+                  >
+                    P
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                    <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>{adminLabel}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {activeNavItems.map(item => (
+                        <button
+                          key={item.id}
+                          className={`nav-btn icon${activePage === item.id ? ' active' : ''}`}
+                          onClick={() => setActivePage(item.id)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 16,
+                            fontWeight: 600,
+                            color: activePage === item.id ? '#222' : '#1d4ed8',
+                            borderRadius: 6,
+                            transition: 'background 0.2s',
+                          }}
+                          aria-label={item.label}
+                        >
+                          {item.icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                    <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Common</div>
                     <button
-                      key={item.id}
-                      className={`nav-btn icon${activePage === item.id ? ' active' : ''}`}
-                      onClick={() => setActivePage(item.id)}
+                      type="button"
+                      onClick={() => setActivePage('common')}
                       style={{
                         width: 32,
                         height: 32,
-                        border: 'none',
-                        background: 'transparent',
+                        borderRadius: 8,
+                        border: '1px solid #f7c748',
+                        background: activePage === 'common' ? '#f7c748' : '#fff',
+                        fontWeight: 600,
                         cursor: 'pointer',
-                        padding: 0,
+                        transition: 'background 0.2s',
+                        textAlign: 'center',
+                        fontSize: 12,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 16,
-                        fontWeight: 600,
-                        color: activePage === item.id ? '#222' : '#1d4ed8',
-                        borderRadius: 6,
-                        transition: 'background 0.2s',
+                        color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
                       }}
-                      aria-label={item.label}
+                      aria-label={commonAriaLabel}
                     >
-                      {item.icon}
+                      C
                     </button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Common</div>
-                <button
-                  type="button"
-                  onClick={() => setActivePage('common')}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: '1px solid #f7c748',
-                    background: activePage === 'common' ? '#f7c748' : '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                    textAlign: 'center',
-                    fontSize: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
-                  }}
-                  aria-label={commonAriaLabel}
-                >
-                  C
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Calc</div>
-                <button
-                  type="button"
-                  onClick={openCalcDictionaryPage}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: '1px solid #cbd5f5',
-                    background: '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                    textAlign: 'center',
-                    fontSize: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#1d4ed8',
-                  }}
-                  aria-label={calcAriaLabel}
-                >
-                  Σ
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Family</div>
-                <button
-                  type="button"
-                  onClick={() => setActivePage('family')}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: '1px solid #f7c748',
-                    background: activePage === 'family' ? '#f7c748' : '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                    textAlign: 'center',
-                    fontSize: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
-                  }}
-                  aria-label={familyAriaLabel}
-                >
-                  F
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Project User</div>
-                <button
-                  type="button"
-                  onClick={() => setActivePage('project')}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: '1px solid #f7c748',
-                    background: activePage === 'project' ? '#f7c748' : '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                    textAlign: 'center',
-                    fontSize: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: activePage === 'project' ? '#2c1b00' : '#1d4ed8',
-                  }}
-                >
-                  P
-                </button>
-              </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                    <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Calc</div>
+                    <button
+                      type="button"
+                      onClick={openCalcDictionaryPage}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        border: '1px solid #cbd5f5',
+                        background: '#fff',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        textAlign: 'center',
+                        fontSize: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#1d4ed8',
+                      }}
+                      aria-label={calcAriaLabel}
+                    >
+                      Σ
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                    <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Family</div>
+                    <button
+                      type="button"
+                      onClick={() => setActivePage('family')}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        border: '1px solid #f7c748',
+                        background: activePage === 'family' ? '#f7c748' : '#fff',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        textAlign: 'center',
+                        fontSize: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
+                      }}
+                      aria-label={familyAriaLabel}
+                    >
+                      F
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                    <div style={{ fontSize: 10, letterSpacing: 1, color: '#444' }}>Project User</div>
+                    <button
+                      type="button"
+                      onClick={() => setActivePage('project')}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        border: '1px solid #f7c748',
+                        background: activePage === 'project' ? '#f7c748' : '#fff',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        textAlign: 'center',
+                        fontSize: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: activePage === 'project' ? '#2c1b00' : '#1d4ed8',
+                      }}
+                    >
+                      P
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
