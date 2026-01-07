@@ -1543,13 +1543,16 @@ def export_project_db_excel(project_identifier: str):
         summary_ws.append(["sheet", "rows"])
 
         # Report_WM (WM pre-check)
-        df_wm_precheck = _read_df(
+        df_wm_precheck_raw = _read_df(
             """
             SELECT
               wm.id AS work_master_id,
+              COALESCE(wmp.use_yn, 0) AS use_yn,
               wm.work_master_code,
-                            wm.gauge,
-                            wm.add_spec AS Spec,
+              wm.gauge,
+              wm.uom1,
+              wm.uom2,
+              wm.add_spec,
               wm.discipline,
               wm.cat_large_code,
               wm.cat_large_desc,
@@ -1557,14 +1560,175 @@ def export_project_db_excel(project_identifier: str):
               wm.cat_mid_desc,
               wm.cat_small_code,
               wm.cat_small_desc,
-              COALESCE(wmp.use_yn, 0) AS use_yn,
+              wm.attr1_code,
+              wm.attr1_spec,
+              wm.attr2_code,
+              wm.attr2_spec,
+              wm.attr3_code,
+              wm.attr3_spec,
+              wm.attr4_code,
+              wm.attr4_spec,
+              wm.attr5_code,
+              wm.attr5_spec,
+              wm.attr6_code,
+              wm.attr6_spec,
+              wm.work_group_code,
+              wm.new_old_code,
               wmp.updated_at
             FROM work_masters wm
             LEFT JOIN work_master_precheck wmp ON wmp.work_master_id = wm.id
-            ORDER BY wm.work_master_code, wm.id
+            WHERE LOWER(COALESCE(TRIM(wm.new_old_code), '')) <> 'old'
+              AND (wm.work_master_code NOT LIKE 'S%' OR COALESCE(wm.cat_mid_code, '') = 'AA')
+              AND (wm.work_master_code NOT LIKE 'F%' OR COALESCE(wm.cat_large_code, '') = 'F01')
+            ORDER BY wm.work_master_code, wm.gauge, wm.id
             """
         )
-        _write_sheet_from_df("Report_WM", df_wm_precheck)
+
+        def _wm_trim(value):
+            return str(value).strip() if value is not None else ""
+
+        def _wm_summary_parts(row) -> list:
+            parts = []
+
+            def add(label, value):
+                v = _wm_trim(value)
+                if not v:
+                    return
+                parts.append((label, v))
+
+            add("Discipline", row.get("discipline"))
+            add(
+                "Large",
+                " ".join(
+                    [
+                        _wm_trim(row.get("cat_large_code")),
+                        _wm_trim(row.get("cat_large_desc")),
+                    ]
+                ).strip(),
+            )
+            add(
+                "Mid",
+                " ".join(
+                    [_wm_trim(row.get("cat_mid_code")), _wm_trim(row.get("cat_mid_desc"))]
+                ).strip(),
+            )
+            add(
+                "Small",
+                " ".join(
+                    [
+                        _wm_trim(row.get("cat_small_code")),
+                        _wm_trim(row.get("cat_small_desc")),
+                    ]
+                ).strip(),
+            )
+            add(
+                "Attr1",
+                " ".join(
+                    [_wm_trim(row.get("attr1_code")), _wm_trim(row.get("attr1_spec"))]
+                ).strip(),
+            )
+            add(
+                "Attr2",
+                " ".join(
+                    [_wm_trim(row.get("attr2_code")), _wm_trim(row.get("attr2_spec"))]
+                ).strip(),
+            )
+            add(
+                "Attr3",
+                " ".join(
+                    [_wm_trim(row.get("attr3_code")), _wm_trim(row.get("attr3_spec"))]
+                ).strip(),
+            )
+            add(
+                "Attr4",
+                " ".join(
+                    [_wm_trim(row.get("attr4_code")), _wm_trim(row.get("attr4_spec"))]
+                ).strip(),
+            )
+            add(
+                "Attr5",
+                " ".join(
+                    [_wm_trim(row.get("attr5_code")), _wm_trim(row.get("attr5_spec"))]
+                ).strip(),
+            )
+            add(
+                "Attr6",
+                " ".join(
+                    [_wm_trim(row.get("attr6_code")), _wm_trim(row.get("attr6_spec"))]
+                ).strip(),
+            )
+            add("Group", row.get("work_group_code"))
+            add("New/Old", row.get("new_old_code"))
+
+            return parts
+
+        df_wm_precheck = df_wm_precheck_raw.copy() if df_wm_precheck_raw is not None else pd.DataFrame()
+        if df_wm_precheck is not None and not df_wm_precheck.empty:
+            ui_use = []
+            ui_code = []
+            ui_gauge = []
+            ui_unit = []
+            ui_spec = []
+            ui_work_master = []
+            for _, r in df_wm_precheck.iterrows():
+                wm_code = _wm_trim(r.get("work_master_code"))
+                gauge_value = _wm_trim(r.get("gauge")).upper()
+                wm_title = (
+                    (f"{wm_code}({gauge_value})" if gauge_value else wm_code)
+                    if wm_code
+                    else (f"({gauge_value})" if gauge_value else "코드 정보 없음")
+                )
+
+                headline = (
+                    _wm_trim(r.get("cat_large_desc"))
+                    or _wm_trim(r.get("cat_mid_desc"))
+                    or _wm_trim(r.get("cat_small_desc"))
+                    or wm_title
+                )
+
+                unit_label = " / ".join(
+                    [v for v in [_wm_trim(r.get("uom1")), _wm_trim(r.get("uom2"))] if v]
+                )
+                spec_value = str(r.get("add_spec") or "")
+
+                parts = _wm_summary_parts(r)
+                summary = " | ".join([f"{k}={v}" for k, v in parts])
+                work_master_cell = f"{headline}\n{wm_title}" + (f"\n{summary}" if summary else "")
+
+                ui_use.append(bool(r.get("use_yn")))
+                ui_code.append(wm_code)
+                ui_gauge.append(gauge_value)
+                ui_unit.append(unit_label)
+                ui_spec.append(spec_value)
+                ui_work_master.append(work_master_cell)
+
+            # Insert UI columns first (same order as WM pre-check table)
+            df_wm_precheck.insert(0, "Work Master", ui_work_master)
+            df_wm_precheck.insert(0, "Spec", ui_spec)
+            df_wm_precheck.insert(0, "Unit", ui_unit)
+            df_wm_precheck.insert(0, "Gauge", ui_gauge)
+            df_wm_precheck.insert(0, "WM Code", ui_code)
+            df_wm_precheck.insert(0, "Use", ui_use)
+
+        ws_wm = _write_sheet_from_df("Report_WM", df_wm_precheck)
+
+        # Improve readability for the UI-style text columns.
+        try:
+            header_cells = list(ws_wm.iter_rows(min_row=1, max_row=1, values_only=False))[0]
+            header_to_col = {c.value: c.column for c in header_cells}
+            for header_name in ("Spec", "Work Master"):
+                col_idx = header_to_col.get(header_name)
+                if not col_idx:
+                    continue
+                col_letter = get_column_letter(col_idx)
+                ws_wm.column_dimensions[col_letter].width = 60 if header_name == "Work Master" else 40
+                for cell in ws_wm[col_letter]:
+                    if cell.row == 1:
+                        continue
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+        except Exception:
+            pass
+
         summary_ws.append(["Report_WM", int(len(df_wm_precheck.index))])
 
         # Family list (tree, as shown in app) + assigned standard items under each node.
