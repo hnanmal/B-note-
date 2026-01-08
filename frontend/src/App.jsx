@@ -460,7 +460,7 @@ function App() {
                 }}
                 title="프로젝트 DB 내용을 Dynamo 테스트용 JSON으로 다운로드"
               >
-                {exportingDynamoJson ? 'JSON 생성 중...' : 'Dynamo JSON'}
+                {exportingDynamoJson ? 'JSON 생성 중...' : '물량 산출Dynamo 용 주문서 출력'}
               </button>
             </>
           ) : null}
