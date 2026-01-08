@@ -15,6 +15,9 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
   const [loadError, setLoadError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
   const [pendingImportFile, setPendingImportFile] = useState(null);
   const [pendingImportBuildingName, setPendingImportBuildingName] = useState('');
   const [pendingExistingRevKeys, setPendingExistingRevKeys] = useState([]);
@@ -88,6 +91,11 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
   useEffect(() => {
     fetchRevKeys(selectedBuilding);
   }, [fetchRevKeys, selectedBuilding]);
+
+  useEffect(() => {
+    setDeleteArmed(false);
+    setDeleteConfirmText('');
+  }, [selectedBuilding, selectedRevKey]);
 
   useEffect(() => {
     fetchRows({ buildingName: selectedBuilding || '', revKey: selectedRevKey || '' });
@@ -212,8 +220,10 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
     const revKey = (selectedRevKey || '').trim();
     if (!buildingName || !revKey) return;
 
-    const ok = window.confirm(`삭제하시겠습니까?\n\nBuilding: ${buildingName}\nrev_key: ${revKey}\n\n(해당 Building+rev_key 물량이 DB에서 삭제됩니다)`);
-    if (!ok) return;
+    if (normalizeKey(deleteConfirmText) !== normalizeKey(revKey)) {
+      setLoadError('삭제하려면 선택된 rev_key를 정확히 입력해 주세요.');
+      return;
+    }
 
     setLoading(true);
     setLoadError(null);
@@ -232,6 +242,8 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
       await fetchRevKeys(buildingName);
       setSelectedRevKey('');
       await fetchRows({ buildingName, revKey: '' });
+      setDeleteArmed(false);
+      setDeleteConfirmText('');
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : '삭제 실패');
     } finally {
@@ -299,15 +311,45 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
           ))}
         </select>
 
-        <button
-          type="button"
-          onClick={deleteSelectedRevision}
-          disabled={!selectedBuilding || !selectedRevKey || loading}
-          style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ef4444', background: '#fff', cursor: 'pointer' }}
-          title="선택된 Building + rev_key 데이터 삭제"
-        >
-          Delete (Building+rev)
-        </button>
+        {!deleteArmed ? (
+          <button
+            type="button"
+            onClick={() => { setDeleteArmed(true); setDeleteConfirmText(''); }}
+            disabled={!selectedBuilding || !selectedRevKey || loading}
+            style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ef4444', background: '#fff', cursor: 'pointer' }}
+            title="선택된 Building + rev_key 데이터 삭제(확인 단계 포함)"
+          >
+            Delete (Building+rev)
+          </button>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>rev_key 입력</div>
+            <input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={selectedRevKey ? `"${selectedRevKey}"` : 'rev_key'}
+              style={{ height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid #d1d5db', minWidth: 180 }}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              onClick={deleteSelectedRevision}
+              disabled={!selectedBuilding || !selectedRevKey || loading || normalizeKey(deleteConfirmText) !== normalizeKey(selectedRevKey)}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ef4444', background: '#fff', cursor: 'pointer' }}
+              title="rev_key가 일치하면 삭제됩니다"
+            >
+              Confirm Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDeleteArmed(false); setDeleteConfirmText(''); }}
+              disabled={loading}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         <button
           type="button"
