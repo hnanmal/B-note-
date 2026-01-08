@@ -1007,6 +1007,7 @@ def get_project_work_master_selection_summary(
 @router.get(
     "/project/{project_identifier}/export/dynamo-json",
     response_model=schemas.DynamoProjectExportPayload,
+    response_model_by_alias=True,
     tags=["Project Data"],
 )
 def export_project_db_for_dynamo(
@@ -1174,6 +1175,12 @@ def export_project_db_for_dynamo(
                 models.WorkMaster.id,
                 models.WorkMaster.work_master_code,
                 models.WorkMaster.gauge,
+                models.WorkMaster.discipline,
+                models.WorkMaster.cat_large_desc,
+                models.WorkMaster.cat_mid_desc,
+                models.WorkMaster.cat_small_desc,
+                models.WorkMaster.uom1,
+                models.WorkMaster.uom2,
             )
             .join(
                 models.WorkMaster,
@@ -1187,11 +1194,28 @@ def export_project_db_for_dynamo(
             )
             .all()
         )
-        for standard_item_id, work_master_id, work_master_code, gauge in rows:
+        for (
+            standard_item_id,
+            work_master_id,
+            work_master_code,
+            gauge,
+            discipline,
+            cat_large_desc,
+            cat_mid_desc,
+            cat_small_desc,
+            uom1,
+            uom2,
+        ) in rows:
             selected_work_master_by_standard_item_id[int(standard_item_id)] = {
                 "id": int(work_master_id),
                 "work_master_code": work_master_code,
                 "gauge": gauge,
+                "discipline": discipline,
+                "cat_large_desc": cat_large_desc,
+                "cat_mid_desc": cat_mid_desc,
+                "cat_small_desc": cat_small_desc,
+                "uom1": uom1,
+                "uom2": uom2,
             }
 
     calc_dictionary_entries_by_family_list_id = {}
@@ -1284,6 +1308,14 @@ def export_project_db_for_dynamo(
         text_value = str(value).strip()
         return text_value or None
 
+    def _compose_unit(wm_obj):
+        if wm_obj is None:
+            return None
+        u1 = _coerce_str(getattr(wm_obj, "uom1", None))
+        u2 = _coerce_str(getattr(wm_obj, "uom2", None))
+        parts = [v for v in (u1, u2) if v]
+        return " / ".join(parts) if parts else None
+
     dynamo_cart_entries = []
     for entry in cart_entries:
         wm = _first_from(getattr(entry, "work_masters", None) or [])
@@ -1292,6 +1324,13 @@ def export_project_db_for_dynamo(
                 wm = schemas.WorkMasterBrief(**wm)
             except Exception:
                 wm = None
+
+        standard_item_id_value = _coerce_int(
+            _first_from(getattr(entry, "standard_item_ids", None) or [])
+        )
+        standard_item_name_value = _coerce_str(
+            _first_from(getattr(entry, "standard_item_names", None) or [])
+        )
 
         dynamo_cart_entries.append(
             schemas.DynamoWorkMasterCartEntry(
@@ -1304,18 +1343,27 @@ def export_project_db_for_dynamo(
                 assignment_id=_coerce_int(
                     _first_from(getattr(entry, "assignment_ids", None) or [])
                 ),
-                standard_item_id=_coerce_int(
-                    _first_from(getattr(entry, "standard_item_ids", None) or [])
-                ),
+                standard_item_id=standard_item_id_value,
                 building_name=_coerce_str(
                     _first_from(getattr(entry, "building_names", None) or [])
                 ),
                 assignment_label=_coerce_str(
                     _first_from(getattr(entry, "assignment_labels", None) or [])
                 ),
-                standard_item_name=_coerce_str(
-                    _first_from(getattr(entry, "standard_item_names", None) or [])
+                standard_item_name=standard_item_name_value,
+                category=_coerce_str(getattr(wm, "discipline", None) if wm else None),
+                standard_type_number=standard_item_id_value,
+                standard_type_name=standard_item_name_value,
+                classification=_coerce_str(
+                    getattr(wm, "cat_large_desc", None) if wm else None
                 ),
+                item_name=_coerce_str(
+                    getattr(wm, "cat_mid_desc", None) if wm else None
+                ),
+                detail_classification=_coerce_str(
+                    getattr(wm, "cat_small_desc", None) if wm else None
+                ),
+                unit=_compose_unit(wm),
                 work_master=wm,
                 calc_dictionary_entries=list(
                     getattr(entry, "calc_dictionary_entries", None) or []
@@ -1332,6 +1380,7 @@ def export_project_db_for_dynamo(
 @router.get(
     "/project/{project_identifier}/export/db-json",
     response_model=schemas.DynamoProjectExportPayload,
+    response_model_by_alias=True,
     tags=["Project Data"],
 )
 def export_project_db_json(

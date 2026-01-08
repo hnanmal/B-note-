@@ -91,6 +91,12 @@ class WorkMasterBrief(BaseModel):
     id: int
     work_master_code: str
     gauge: Optional[str] = None
+    discipline: Optional[str] = None
+    cat_large_desc: Optional[str] = None
+    cat_mid_desc: Optional[str] = None
+    cat_small_desc: Optional[str] = None
+    uom1: Optional[str] = None
+    uom2: Optional[str] = None
 
 
 # WorkMaster cart schemas
@@ -127,13 +133,21 @@ class DynamoWorkMasterCartEntry(BaseModel):
     Dynamo export expects each row to carry a single value/object for these fields.
     """
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     revit_type: Optional[str] = None
     assignment_id: Optional[int] = None
     standard_item_id: Optional[int] = None
     building_name: Optional[str] = None
     formula: Optional[str] = None
+
+    category: Optional[str] = Field(default=None, alias="카테고리")
+    standard_type_number: Optional[int] = Field(default=None, alias="표준타입 번호")
+    standard_type_name: Optional[str] = Field(default=None, alias="표준타입 이름")
+    classification: Optional[str] = Field(default=None, alias="분류")
+    item_name: Optional[str] = Field(default=None, alias="이름")
+    detail_classification: Optional[str] = Field(default=None, alias="상세분류")
+    unit: Optional[str] = Field(default=None, alias="단위")
 
     id: int
     created_at: datetime.datetime
