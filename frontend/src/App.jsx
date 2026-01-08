@@ -427,15 +427,16 @@ function App() {
                 onClick={downloadDbExcel}
                 disabled={!projectApiBase || exportingDbExcel}
                 style={{
-                  height: 28,
-                  padding: '0 10px',
-                  borderRadius: 10,
-                  border: '1px solid #2563eb',
+                  height: 20,
+                  padding: '0 7px',
+                  borderRadius: 8,
+                  border: '0.5px solid #2563eb',
                   background: !projectApiBase || exportingDbExcel ? '#bfdbfe' : '#2563eb',
                   color: '#0b1020',
                   fontWeight: 800,
                   cursor: !projectApiBase || exportingDbExcel ? 'not-allowed' : 'pointer',
-                  fontSize: 12,
+                  fontSize: 11,
+                  lineHeight: 1,
                 }}
                 title="프로젝트 DB 전체 내용을 Excel 보고서로 다운로드"
               >
@@ -446,15 +447,16 @@ function App() {
                 onClick={downloadDynamoJson}
                 disabled={!projectApiBase || exportingDynamoJson}
                 style={{
-                  height: 28,
-                  padding: '0 10px',
-                  borderRadius: 10,
-                  border: '1px solid #10b981',
+                  height: 20,
+                  padding: '0 7px',
+                  borderRadius: 8,
+                  border: '0.5px solid #10b981',
                   background: !projectApiBase || exportingDynamoJson ? '#bbf7d0' : '#10b981',
                   color: '#052e16',
                   fontWeight: 800,
                   cursor: !projectApiBase || exportingDynamoJson ? 'not-allowed' : 'pointer',
-                  fontSize: 12,
+                  fontSize: 11,
+                  lineHeight: 1,
                 }}
                 title="프로젝트 DB 내용을 Dynamo 테스트용 JSON으로 다운로드"
               >
@@ -464,8 +466,8 @@ function App() {
           ) : null}
         </div>
       </header>
-  <div style={{ height: 10 }} />
-      <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100% - 38px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
+  <div style={{ height: 6 }} />
+      <main className="App-main" ref={containerRef} style={{ display: 'flex', height: 'calc(100% - 30px)', flex: 1, minWidth: 0, overflowX: 'hidden' }}>
   {/* Sidebar: Only navigation, toggleable, fixed to left */}
         <div
           className={`sidebar-nav${sidebarOpen ? '' : ' collapsed'}`}
@@ -480,7 +482,7 @@ function App() {
             flexDirection: 'column',
             alignItems: 'center',
             position: 'relative',
-            height: 'calc(100% - 38px)',
+            height: 'calc(100% - 30px)',
             zIndex: 10,
           }}
         >

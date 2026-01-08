@@ -23,7 +23,7 @@
   top: 0;
   left: 0;
   width: 100vw;
-  height: 28px;
+  height: 24px;
   background: #f6d975;
   border-bottom: 1px solid #e0c34d;
   z-index: 100;
@@ -33,10 +33,11 @@
 }
 
 .app-title {
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   font-weight: 600;
   letter-spacing: 0.2px;
   color: #1d1500;
+  line-height: 1;
 }
 .App-header-fixed {
   margin-bottom: 0;
