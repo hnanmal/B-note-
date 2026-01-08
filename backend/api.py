@@ -8,6 +8,8 @@ import io
 import json
 import datetime
 import sqlite3
+import ast
+import operator
 
 from . import crud, project_db, schemas, models
 from .database import SessionLocal
@@ -76,6 +78,103 @@ def _compose_spec_from_work_master_row(row: dict) -> Optional[str]:
     ]
     parts = [p for p in parts if p]
     return " | ".join(parts) if parts else None
+
+
+_ALLOWED_BINOPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+}
+_ALLOWED_UNARYOPS = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+
+
+def _try_parse_float(value) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).strip())
+    except Exception:
+        return None
+
+
+def _safe_eval_numeric_expr(expr: str, variables: dict) -> Optional[float]:
+    """Safely evaluate a numeric expression using only arithmetic + variables.
+
+    Supported:
+      - numbers (int/float)
+      - variables: NAME
+      - operators: + - * / // % ** and unary + -
+      - parentheses
+    """
+
+    expr = (expr or "").strip()
+    if not expr:
+        return None
+
+    direct = _try_parse_float(expr)
+    if direct is not None:
+        return direct
+
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except Exception:
+        return None
+
+    def _eval(node):
+        if isinstance(node, ast.Expression):
+            return _eval(node.body)
+
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, (int, float)):
+                return float(node.value)
+            return None
+
+        if isinstance(node, ast.Num):  # py<3.8
+            return float(node.n)
+
+        if isinstance(node, ast.Name):
+            name = node.id
+            if name not in variables:
+                return None
+            val = variables.get(name)
+            return _try_parse_float(val)
+
+        if isinstance(node, ast.UnaryOp):
+            op = _ALLOWED_UNARYOPS.get(type(node.op))
+            if not op:
+                return None
+            v = _eval(node.operand)
+            if v is None:
+                return None
+            return float(op(v))
+
+        if isinstance(node, ast.BinOp):
+            op = _ALLOWED_BINOPS.get(type(node.op))
+            if not op:
+                return None
+            left = _eval(node.left)
+            right = _eval(node.right)
+            if left is None or right is None:
+                return None
+            try:
+                return float(op(left, right))
+            except Exception:
+                return None
+
+        return None
+
+    result = _eval(tree)
+    if result is None:
+        return None
+    if isinstance(result, float) and (result != result):
+        return None
+    return float(result)
 
 
 def get_project_db_session(project_identifier: str):
@@ -2043,6 +2142,279 @@ def list_calc_result_buildings(
         )
     ).fetchall()
     return [str(r[0]) for r in rows if r and r[0] is not None]
+
+
+@router.post(
+    "/project/{project_identifier}/calc-result/manual-update",
+    response_model=schemas.CalcResultManualUpdateResponse,
+    tags=["Project Data"],
+)
+def manual_update_calc_results(
+    project_identifier: str,
+    rev_key: str = Form(...),
+    db: Session = Depends(get_project_db_session),
+):
+    rev_key = _coerce_str(rev_key)
+    if not rev_key:
+        raise HTTPException(status_code=400, detail="rev_key is required")
+
+    buildings = db.execute(
+        text(
+            "SELECT name FROM building_list WHERE name IS NOT NULL AND TRIM(name) != '' ORDER BY name"
+        )
+    ).fetchall()
+    building_names = [str(r[0]) for r in buildings if r and r[0] is not None]
+    if not building_names:
+        raise HTTPException(status_code=400, detail="No buildings found")
+
+    rows = db.execute(
+        text("SELECT id, payload FROM workmaster_cart_entries ORDER BY id DESC")
+    ).fetchall()
+
+    cart_entries_scanned = 0
+    inserted = 0
+    skipped = 0
+    manual_entries_matched = 0
+
+    # Collect assignment ids for family root lookups
+    cart_entry_payloads = []
+    assignment_ids = set()
+    for row in rows:
+        cart_entries_scanned += 1
+        entry_id = int(row[0])
+        try:
+            payload = json.loads(row[1] or "{}")
+        except Exception:
+            payload = {}
+        normalized = _normalize_cart_payload(payload)
+        aids = normalized.get("assignment_ids") or []
+        for aid in aids:
+            try:
+                assignment_ids.add(int(aid))
+            except Exception:
+                pass
+        cart_entry_payloads.append((entry_id, normalized))
+
+    assignment_family_list_id_by_id = {}
+    family_item_meta_by_id = {}
+    if assignment_ids:
+        assigns = (
+            db.query(models.GwmFamilyAssign)
+            .filter(models.GwmFamilyAssign.id.in_(sorted(assignment_ids)))
+            .all()
+        )
+        for a in assigns:
+            fid = getattr(a, "family_list_id", None)
+            if fid is None:
+                continue
+            try:
+                assignment_family_list_id_by_id[int(a.id)] = int(fid)
+            except Exception:
+                continue
+
+    family_list_ids = sorted(
+        {fid for fid in assignment_family_list_id_by_id.values() if fid}
+    )
+
+    def _load_family_items_with_ancestors(seed_ids):
+        loaded_ids = set(family_item_meta_by_id.keys())
+        pending_ids = {int(fid) for fid in (seed_ids or []) if fid}
+        while pending_ids:
+            batch = sorted(pending_ids - loaded_ids)
+            if not batch:
+                break
+            rows_ = (
+                db.query(
+                    models.FamilyListItem.id,
+                    models.FamilyListItem.parent_id,
+                    models.FamilyListItem.name,
+                    models.FamilyListItem.sequence_number,
+                )
+                .filter(models.FamilyListItem.id.in_(batch))
+                .all()
+            )
+            pending_ids.clear()
+            for fid, parent_id, name, sequence_number in rows_:
+                fid_int = int(fid)
+                loaded_ids.add(fid_int)
+                family_item_meta_by_id[fid_int] = {
+                    "id": fid_int,
+                    "parent_id": int(parent_id) if parent_id is not None else None,
+                    "name": name,
+                    "sequence_number": sequence_number,
+                }
+                if parent_id is not None:
+                    try:
+                        pending_ids.add(int(parent_id))
+                    except Exception:
+                        pass
+
+    _load_family_items_with_ancestors(family_list_ids)
+
+    def _family_root_meta(fid: int):
+        cursor = int(fid)
+        seen = set()
+        root = None
+        while cursor and cursor not in seen:
+            seen.add(cursor)
+            meta = family_item_meta_by_id.get(cursor)
+            if not meta:
+                break
+            root = meta
+            parent_id = meta.get("parent_id")
+            if not parent_id:
+                break
+            cursor = int(parent_id)
+        return root
+
+    def _root_label(root_meta) -> Optional[str]:
+        if not root_meta:
+            return None
+        seq = root_meta.get("sequence_number")
+        name = root_meta.get("name")
+        if seq and name:
+            return f"{str(seq).strip()}.{str(name).strip()}"
+        return str(name).strip() if name else None
+
+    manual_assignment_ids = set()
+    for aid, fid in assignment_family_list_id_by_id.items():
+        root = _family_root_meta(fid)
+        label = _root_label(root)
+        if (label or "").strip() == "14.Manual_Input":
+            manual_assignment_ids.add(int(aid))
+
+    # Calc dictionary vars per family_list_id
+    calc_entries_by_family_list_id = {}
+    if family_list_ids:
+        calc_entries = (
+            db.query(models.CalcDictionaryEntry)
+            .filter(models.CalcDictionaryEntry.family_list_id.in_(family_list_ids))
+            .order_by(
+                models.CalcDictionaryEntry.family_list_id,
+                models.CalcDictionaryEntry.symbol_key,
+            )
+            .all()
+        )
+        for entry in calc_entries:
+            fid = getattr(entry, "family_list_id", None)
+            if fid is None:
+                continue
+            try:
+                fid_int = int(fid)
+            except Exception:
+                continue
+            calc_entries_by_family_list_id.setdefault(fid_int, []).append(entry)
+
+    now_iso = datetime.datetime.utcnow().isoformat()
+
+    for cart_entry_id, normalized in cart_entry_payloads:
+        aids = normalized.get("assignment_ids") or []
+        formula = normalized.get("formula")
+        if not formula:
+            skipped += 1
+            continue
+
+        is_manual = False
+        entry_family_list_ids = set()
+        for aid in aids:
+            try:
+                aid_int = int(aid)
+            except Exception:
+                continue
+            if aid_int in manual_assignment_ids:
+                is_manual = True
+            fid = assignment_family_list_id_by_id.get(aid_int)
+            if fid:
+                entry_family_list_ids.add(int(fid))
+        if not is_manual:
+            skipped += 1
+            continue
+
+        manual_entries_matched += 1
+
+        variables = {}
+        for fid in entry_family_list_ids:
+            for ce in calc_entries_by_family_list_id.get(fid, []):
+                key = getattr(ce, "symbol_key", None)
+                val = getattr(ce, "symbol_value", None)
+                if not key:
+                    continue
+                num = _try_parse_float(val)
+                if num is None:
+                    continue
+                variables[str(key).strip()] = num
+
+        result_val = _safe_eval_numeric_expr(str(formula), variables)
+        if result_val is None:
+            skipped += 1
+            continue
+
+        substituted_formula = str(formula)
+        result_log = f"manual_update:{now_iso}"
+
+        for bname in building_names:
+            key = f"{_sanitize_filename_part(rev_key)}|{_sanitize_filename_part(bname)}|manual|{cart_entry_id}"
+            try:
+                db.execute(
+                    text(
+                        """
+                        INSERT OR REPLACE INTO calc_result (
+                            key, rev_key, building_name, guid, gui, member_name,
+                            category, standard_type_number, standard_type_name,
+                            classification, detail_classification, unit,
+                            formula, substituted_formula, result, result_log,
+                            work_master_id, work_master_code, created_at
+                        ) VALUES (
+                            :key, :rev_key, :building_name, :guid, :gui, :member_name,
+                            :category, :standard_type_number, :standard_type_name,
+                            :classification, :detail_classification, :unit,
+                            :formula, :substituted_formula, :result, :result_log,
+                            :work_master_id, :work_master_code, :created_at
+                        )
+                        """
+                    ),
+                    {
+                        "key": key,
+                        "rev_key": rev_key,
+                        "building_name": bname,
+                        "guid": "__manual__",
+                        "gui": str(cart_entry_id),
+                        "member_name": "Manual_Input",
+                        "category": "14.Manual_Input",
+                        "standard_type_number": None,
+                        "standard_type_name": None,
+                        "classification": "Manual_Input",
+                        "detail_classification": f"cart_entry:{cart_entry_id}",
+                        "unit": None,
+                        "formula": str(formula),
+                        "substituted_formula": substituted_formula,
+                        "result": float(result_val),
+                        "result_log": result_log,
+                        "work_master_id": None,
+                        "work_master_code": None,
+                        "created_at": now_iso,
+                    },
+                )
+                inserted += 1
+            except Exception:
+                skipped += 1
+                continue
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed manual update")
+
+    return {
+        "project_identifier": project_identifier,
+        "rev_key": rev_key,
+        "buildings": len(building_names),
+        "cart_entries_scanned": cart_entries_scanned,
+        "manual_entries_matched": manual_entries_matched,
+        "inserted": inserted,
+        "skipped": skipped,
+    }
 
 
 @router.delete(

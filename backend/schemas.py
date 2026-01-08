@@ -261,6 +261,16 @@ class CalcResultDeleteResponse(BaseModel):
     deleted: int = 0
 
 
+class CalcResultManualUpdateResponse(BaseModel):
+    project_identifier: str
+    rev_key: str
+    buildings: int = 0
+    cart_entries_scanned: int = 0
+    manual_entries_matched: int = 0
+    inserted: int = 0
+    skipped: int = 0
+
+
 class CalcResultRow(BaseModel):
     id: int
     created_at: str

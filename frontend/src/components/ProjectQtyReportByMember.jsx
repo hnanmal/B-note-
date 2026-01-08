@@ -214,6 +214,36 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
     }
   };
 
+  const runManualCalcUpdate = async () => {
+    if (!apiBaseUrl) return;
+    const revKey = (selectedRevKey || '').trim();
+    if (!revKey) return;
+
+    const ok = window.confirm(`수동 산출 업데이트를 실행할까요?\n\nrev_key: ${revKey}\n\n(14.Manual_Input 장바구니 formula를 평가해 모든 건물에 대해 DB에 저장합니다)`);
+    if (!ok) return;
+
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const form = new FormData();
+      form.append('rev_key', revKey);
+
+      const res = await fetch(`${apiBaseUrl}/calc-result/manual-update`, { method: 'POST', body: form });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.detail || '수동 산출 업데이트 실패');
+      }
+
+      await fetchBuildings();
+      await fetchRevKeys(selectedBuilding);
+      await fetchRows({ buildingName: selectedBuilding || '', revKey });
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : '수동 산출 업데이트 실패');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deleteSelectedRevision = async () => {
     if (!apiBaseUrl) return;
     const buildingName = (selectedBuilding || '').trim();
@@ -310,6 +340,16 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
             <option key={k} value={k}>{k}</option>
           ))}
         </select>
+
+        <button
+          type="button"
+          onClick={runManualCalcUpdate}
+          disabled={!selectedRevKey || loading}
+          style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+          title="선택된 rev_key에 대해 14.Manual_Input 수동 산출을 DB에 저장"
+        >
+          Manual Calc Update
+        </button>
 
         {!deleteArmed ? (
           <button
