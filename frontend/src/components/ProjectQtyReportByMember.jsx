@@ -15,6 +15,14 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
   const [loadError, setLoadError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const [pendingImportFile, setPendingImportFile] = useState(null);
+  const [pendingImportBuildingName, setPendingImportBuildingName] = useState('');
+  const [pendingExistingRevKeys, setPendingExistingRevKeys] = useState([]);
+  const [pendingRevMode, setPendingRevMode] = useState('new'); // 'existing' | 'new'
+  const [pendingSelectedExistingRevKey, setPendingSelectedExistingRevKey] = useState('');
+  const [pendingNewRevKey, setPendingNewRevKey] = useState('');
+  const [pendingImportError, setPendingImportError] = useState(null);
+
   const [buildings, setBuildings] = useState([]);
   const [revKeys, setRevKeys] = useState([]);
   const [selectedBuilding, setSelectedBuilding] = useState('');
@@ -137,45 +145,47 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
     });
   };
 
-  const handleFileChange = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const clearPendingImport = () => {
+    setPendingImportFile(null);
+    setPendingImportBuildingName('');
+    setPendingExistingRevKeys([]);
+    setPendingRevMode('new');
+    setPendingSelectedExistingRevKey('');
+    setPendingNewRevKey('');
+    setPendingImportError(null);
+  };
+
+  const runImport = async () => {
     if (!apiBaseUrl) {
-      setLoadError('프로젝트가 선택되지 않았습니다.');
+      setPendingImportError('프로젝트가 선택되지 않았습니다.');
+      return;
+    }
+    if (!pendingImportFile) return;
+
+    const existing = Array.isArray(pendingExistingRevKeys) ? pendingExistingRevKeys : [];
+    const mode = pendingRevMode === 'existing' ? 'overwrite' : 'append';
+    const revKey = (pendingRevMode === 'existing' ? pendingSelectedExistingRevKey : pendingNewRevKey).trim();
+    if (!revKey) {
+      setPendingImportError('rev_key를 선택/입력해 주세요.');
+      return;
+    }
+    if (pendingRevMode === 'new' && existing.includes(revKey)) {
+      setPendingImportError('이미 존재하는 rev_key 입니다. 기존 rev_key에서 선택해 주세요.');
+      return;
+    }
+    if (pendingRevMode === 'existing' && !existing.includes(revKey)) {
+      setPendingImportError('기존 rev_key를 선택해 주세요.');
       return;
     }
 
+    setPendingImportError(null);
     setLoadError(null);
+    setLoading(true);
     try {
-      const text = await file.text();
-      const payload = JSON.parse(text);
-      const nextBuildingName = extractBuildingNameFromJson(payload);
-
-      const existingKeys = await fetchRevKeys(nextBuildingName);
-      const existingLabel = existingKeys.length ? `\n(기존 rev_key: ${existingKeys.join(', ')})` : '';
-      const input = window.prompt(`rev_key를 입력하세요.\nBuilding: ${nextBuildingName || '—'}${existingLabel}`);
-      const revKey = (input ?? '').trim();
-      if (!revKey) return;
-
-      let mode = 'append';
-      if (existingKeys.includes(revKey)) {
-        const ok = window.confirm(`rev_key '${revKey}'가 이미 있습니다.\n해당 Building+rev_key 데이터를 삭제하고 덮어쓸까요?`);
-        if (!ok) {
-          window.alert('덮어쓰지 않으려면 새 rev_key를 입력해 주세요.');
-          return;
-        }
-        mode = 'overwrite';
-      } else {
-        const ok = window.confirm(`새 rev_key '${revKey}'로 추가할까요?`);
-        if (!ok) return;
-        mode = 'append';
-      }
-
-      setLoading(true);
       const form = new FormData();
       form.append('rev_key', revKey);
       form.append('mode', mode);
-      form.append('file', file);
+      form.append('file', pendingImportFile);
 
       const res = await fetch(`${apiBaseUrl}/calc-result/import-json`, { method: 'POST', body: form });
       if (!res.ok) {
@@ -184,14 +194,47 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
       }
 
       await fetchBuildings();
-      setSelectedBuilding(nextBuildingName || '');
+      setSelectedBuilding(pendingImportBuildingName || '');
       setSelectedRevKey(revKey);
-      await fetchRevKeys(nextBuildingName);
-      await fetchRows({ buildingName: nextBuildingName || '', revKey });
+      await fetchRevKeys(pendingImportBuildingName);
+      await fetchRows({ buildingName: pendingImportBuildingName || '', revKey });
+      clearPendingImport();
+    } catch (error) {
+      setPendingImportError(error instanceof Error ? error.message : 'Import 실패');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!apiBaseUrl) {
+      setLoadError('프로젝트가 선택되지 않았습니다.');
+      return;
+    }
+
+    clearPendingImport();
+    setLoadError(null);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const nextBuildingName = extractBuildingNameFromJson(payload);
+
+      const existingKeys = await fetchRevKeys(nextBuildingName);
+      setPendingImportFile(file);
+      setPendingImportBuildingName(nextBuildingName);
+      setPendingExistingRevKeys(existingKeys);
+      if (existingKeys.length) {
+        setPendingRevMode('existing');
+        setPendingSelectedExistingRevKey(existingKeys[0]);
+      } else {
+        setPendingRevMode('new');
+        setPendingNewRevKey('');
+      }
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'JSON을 불러오지 못했습니다.');
     } finally {
-      setLoading(false);
       event.target.value = '';
     }
   };
@@ -281,6 +324,94 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
 
       {loadError && (
         <div style={{ color: '#b91c1c', fontSize: 12 }}>{loadError}</div>
+      )}
+
+      {pendingImportFile && (
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 10, background: '#fff' }}>
+          <div style={{ fontSize: 12, color: '#111827', fontWeight: 700, marginBottom: 6 }}>
+            Import 설정 (Building: {pendingImportBuildingName || '—'})
+          </div>
+
+          {pendingImportError && (
+            <div style={{ color: '#b91c1c', fontSize: 12, marginBottom: 6 }}>{pendingImportError}</div>
+          )}
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+              <input
+                type="radio"
+                name="revKeyMode"
+                checked={pendingRevMode === 'existing'}
+                onChange={() => setPendingRevMode('existing')}
+                disabled={!pendingExistingRevKeys.length}
+              />
+              <span style={{ color: pendingExistingRevKeys.length ? '#111827' : '#9ca3af' }}>기존 리비전 선택(덮어쓰기)</span>
+            </label>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+              <input
+                type="radio"
+                name="revKeyMode"
+                checked={pendingRevMode === 'new'}
+                onChange={() => setPendingRevMode('new')}
+              />
+              <span>신규 리비전 생성(추가)</span>
+            </label>
+          </div>
+
+          {pendingRevMode === 'existing' && (
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {pendingExistingRevKeys.length ? (
+                pendingExistingRevKeys.map((k) => (
+                  <label key={k} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+                    <input
+                      type="radio"
+                      name="existingRevKey"
+                      checked={pendingSelectedExistingRevKey === k}
+                      onChange={() => setPendingSelectedExistingRevKey(k)}
+                    />
+                    <span>{k}</span>
+                  </label>
+                ))
+              ) : (
+                <div style={{ fontSize: 12, color: '#6b7280' }}>기존 rev_key가 없습니다.</div>
+              )}
+            </div>
+          )}
+
+          {pendingRevMode === 'new' && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>rev_key</div>
+              <input
+                value={pendingNewRevKey}
+                onChange={(e) => setPendingNewRevKey(e.target.value)}
+                placeholder="새 rev_key 입력"
+                style={{ height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid #d1d5db', minWidth: 220 }}
+              />
+              <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                (신규는 추가, 기존 선택은 덮어쓰기)
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={runImport}
+              disabled={loading}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+            >
+              Import
+            </button>
+            <button
+              type="button"
+              onClick={clearPendingImport}
+              disabled={loading}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       <div style={{ fontSize: 12, color: '#b91c1c', fontWeight: 600 }}>
