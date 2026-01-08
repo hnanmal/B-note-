@@ -457,10 +457,6 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
         </div>
       )}
 
-      <div style={{ fontSize: 12, color: '#b91c1c', fontWeight: 600 }}>
-        Dynamo에서 물량 산출을 하기 전, 반드시 B-note의 현재 상태를 저장해 주세요!
-      </div>
-
       <div
         style={{
           flex: '1 1 auto',
