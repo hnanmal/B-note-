@@ -2225,6 +2225,7 @@ def manual_update_calc_results(
         {fid for fid in assignment_family_list_id_by_id.values() if fid}
     )
 
+    # Load selected WorkMaster (for wm_code/gauge/spec/add_spec/unit via list endpoint JOIN)
     selected_work_master_by_standard_item_id = {}
     if standard_item_ids:
         rows_wm = (
@@ -2281,6 +2282,86 @@ def manual_update_calc_results(
                 "attr2_spec": _coerce_str(attr2_spec),
                 "attr3_spec": _coerce_str(attr3_spec),
             }
+
+    # Load StandardItem tree info to build detail_classification like Dynamo export
+    standard_item_name_by_id = {}
+    standard_item_raw_name_by_id = {}
+    standard_item_parent_id_by_id = {}
+    standard_item_type_by_id = {}
+    if standard_item_ids:
+        loaded_ids = set()
+        pending_ids = {int(sid) for sid in standard_item_ids if sid}
+        while pending_ids:
+            batch_ids = sorted(pending_ids - loaded_ids)
+            if not batch_ids:
+                break
+            rows_std = (
+                db.query(
+                    models.StandardItem.id,
+                    models.StandardItem.name,
+                    models.StandardItem.type,
+                    models.StandardItem.parent_id,
+                )
+                .filter(models.StandardItem.id.in_(batch_ids))
+                .all()
+            )
+            pending_ids.clear()
+            for sid, name, item_type, parent_id in rows_std:
+                sid_int = int(sid)
+                loaded_ids.add(sid_int)
+                standard_item_name_by_id[sid_int] = name
+                standard_item_raw_name_by_id[sid_int] = name
+                standard_item_parent_id_by_id[sid_int] = (
+                    int(parent_id) if parent_id is not None else None
+                )
+                standard_item_type_by_id[sid_int] = (
+                    item_type.value if hasattr(item_type, "value") else str(item_type)
+                )
+                if parent_id is not None:
+                    try:
+                        pending_ids.add(int(parent_id))
+                    except Exception:
+                        pass
+
+    def _standard_tree_level2_name(standard_item_id: Optional[int]) -> Optional[str]:
+        try:
+            sid = int(standard_item_id) if standard_item_id is not None else 0
+        except Exception:
+            sid = 0
+        if not sid:
+            return None
+        path_ids = []
+        cursor = sid
+        seen = set()
+        while cursor and cursor not in seen:
+            seen.add(cursor)
+            path_ids.append(cursor)
+            cursor = standard_item_parent_id_by_id.get(cursor)
+        path_ids = list(reversed(path_ids))
+        if not path_ids:
+            return None
+        level2_id = path_ids[2] if len(path_ids) > 2 else path_ids[-1]
+        return _coerce_str(standard_item_raw_name_by_id.get(level2_id))
+
+    def _standard_tree_level1_name(standard_item_id: Optional[int]) -> Optional[str]:
+        try:
+            sid = int(standard_item_id) if standard_item_id is not None else 0
+        except Exception:
+            sid = 0
+        if not sid:
+            return None
+        path_ids = []
+        cursor = sid
+        seen = set()
+        while cursor and cursor not in seen:
+            seen.add(cursor)
+            path_ids.append(cursor)
+            cursor = standard_item_parent_id_by_id.get(cursor)
+        path_ids = list(reversed(path_ids))
+        if not path_ids:
+            return None
+        level1_id = path_ids[1] if len(path_ids) > 1 else path_ids[-1]
+        return _coerce_str(standard_item_raw_name_by_id.get(level1_id))
 
     def _compose_unit_from_wm_meta(wm_meta: Optional[dict]) -> Optional[str]:
         if not wm_meta:
@@ -2480,17 +2561,38 @@ def manual_update_calc_results(
 
         # Selected work master info: use first standard_item_id
         wm_meta = None
+        standard_item_id_value = None
         for sid in sids:
             try:
                 sid_int = int(sid)
             except Exception:
                 continue
+            if standard_item_id_value is None:
+                standard_item_id_value = sid_int
             wm_meta = selected_work_master_by_standard_item_id.get(sid_int)
             if wm_meta:
                 break
         work_master_id = wm_meta.get("work_master_id") if wm_meta else None
         work_master_code = wm_meta.get("work_master_code") if wm_meta else None
         unit_val = _compose_unit_from_wm_meta(wm_meta)
+
+        standard_item_type_value = (
+            _coerce_str(standard_item_type_by_id.get(standard_item_id_value))
+            if standard_item_id_value is not None
+            else None
+        )
+        standard_tree_level1_value = _standard_tree_level1_name(standard_item_id_value)
+        standard_tree_level2_value = _standard_tree_level2_name(standard_item_id_value)
+        if standard_tree_level1_value and standard_tree_level2_value:
+            detail_classification_value = (
+                f"{standard_tree_level1_value} | {standard_tree_level2_value}"
+            )
+        else:
+            detail_classification_value = (
+                standard_tree_level2_value
+                or standard_tree_level1_value
+                or _coerce_str(standard_item_name_by_id.get(standard_item_id_value))
+            )
 
         variables = {}
         for fid in entry_family_list_ids:
@@ -2538,13 +2640,13 @@ def manual_update_calc_results(
                         "rev_key": rev_key,
                         "building_name": bname,
                         "guid": "수동항목",
-                        "gui": str(cart_entry_id),
+                        "gui": None,
                         "member_name": "Manual_Input",
                         "category": "14.Manual_Input",
                         "standard_type_number": std_type_number,
                         "standard_type_name": std_type_name,
-                        "classification": "Manual_Input",
-                        "detail_classification": f"cart_entry:{cart_entry_id}",
+                        "classification": standard_item_type_value or "Manual_Input",
+                        "detail_classification": detail_classification_value,
                         "unit": unit_val,
                         "formula": str(formula),
                         "substituted_formula": substituted_formula,
