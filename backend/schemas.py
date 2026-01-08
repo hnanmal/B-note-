@@ -248,6 +248,9 @@ class DynamoProjectExportPayload(BaseModel):
 class CalcResultImportResponse(BaseModel):
     project_identifier: str
     building_name: Optional[str] = None
+    rev_key: Optional[str] = None
+    mode: Optional[str] = None
+    deleted: int = 0
     inserted: int = 0
 
 
@@ -255,6 +258,7 @@ class CalcResultRow(BaseModel):
     id: int
     created_at: str
     building_name: Optional[str] = None
+    rev_key: Optional[str] = None
 
     category: Optional[str] = None
     standard_type_number: Optional[str] = None

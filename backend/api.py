@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Response
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Response, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -1652,9 +1652,18 @@ def export_project_db_json(
 )
 def import_calc_result_json(
     project_identifier: str,
+    rev_key: str = Form(...),
+    mode: str = Form("append"),
     file: UploadFile = File(...),
     db: Session = Depends(get_project_db_session),
 ):
+    rev_key = _coerce_str(rev_key)
+    if not rev_key:
+        raise HTTPException(status_code=400, detail="rev_key is required")
+    mode = (_coerce_str(mode) or "append").lower()
+    if mode not in {"append", "overwrite"}:
+        raise HTTPException(status_code=400, detail="mode must be append|overwrite")
+
     try:
         raw = file.file.read()
         payload = json.loads(raw.decode("utf-8"))
@@ -1694,6 +1703,28 @@ def import_calc_result_json(
                 db.commit()
         except Exception:
             db.rollback()
+
+    deleted = 0
+    if mode == "overwrite":
+        if not building_name:
+            raise HTTPException(
+                status_code=400,
+                detail="building name is required in JSON for overwrite mode",
+            )
+        try:
+            res = db.execute(
+                text(
+                    "DELETE FROM calc_result WHERE building_name = :building_name AND rev_key = :rev_key"
+                ),
+                {"building_name": building_name, "rev_key": rev_key},
+            )
+            deleted = int(getattr(res, "rowcount", 0) or 0)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=500, detail="Failed to overwrite calc results"
+            )
 
     now_iso = datetime.datetime.utcnow().isoformat()
 
@@ -1788,6 +1819,7 @@ def import_calc_result_json(
                 result_float = None
 
         key = _mk_key(
+            rev_key or "",
             building_name or "",
             guid or "",
             gui or "",
@@ -1801,13 +1833,13 @@ def import_calc_result_json(
                 text(
                     """
                     INSERT OR REPLACE INTO calc_result (
-                        key, building_name, guid, gui, member_name,
+                        key, rev_key, building_name, guid, gui, member_name,
                         category, standard_type_number, standard_type_name,
                         classification, detail_classification, unit,
                         formula, substituted_formula, result, result_log,
                         work_master_id, work_master_code, created_at
                     ) VALUES (
-                        :key, :building_name, :guid, :gui, :member_name,
+                        :key, :rev_key, :building_name, :guid, :gui, :member_name,
                         :category, :standard_type_number, :standard_type_name,
                         :classification, :detail_classification, :unit,
                         :formula, :substituted_formula, :result, :result_log,
@@ -1817,6 +1849,7 @@ def import_calc_result_json(
                 ),
                 {
                     "key": key,
+                    "rev_key": rev_key,
                     "building_name": building_name,
                     "guid": guid,
                     "gui": gui,
@@ -1849,6 +1882,9 @@ def import_calc_result_json(
     return {
         "project_identifier": project_identifier,
         "building_name": building_name,
+        "rev_key": rev_key,
+        "mode": mode,
+        "deleted": deleted,
         "inserted": inserted,
     }
 
@@ -1861,6 +1897,7 @@ def import_calc_result_json(
 def list_calc_results(
     project_identifier: str,
     building_name: Optional[str] = None,
+    rev_key: Optional[str] = None,
     limit: int = 2000,
     offset: int = 0,
     db: Session = Depends(get_project_db_session),
@@ -1868,6 +1905,7 @@ def list_calc_results(
     limit = max(1, min(int(limit), 20000))
     offset = max(0, int(offset))
     building_name = _coerce_str(building_name)
+    rev_key = _coerce_str(rev_key)
 
     rows = (
         db.execute(
@@ -1877,6 +1915,7 @@ def list_calc_results(
                 cr.id AS id,
                 cr.created_at AS created_at,
                 cr.building_name AS building_name,
+                cr.rev_key AS rev_key,
                 cr.category AS category,
                 cr.standard_type_number AS standard_type_number,
                 cr.standard_type_name AS standard_type_name,
@@ -1903,12 +1942,18 @@ def list_calc_results(
             LEFT JOIN work_masters wm
               ON (wm.id = cr.work_master_id)
               OR (cr.work_master_id IS NULL AND wm.work_master_code = cr.work_master_code)
-            WHERE (:building_name IS NULL OR cr.building_name = :building_name)
+                        WHERE (:building_name IS NULL OR cr.building_name = :building_name)
+                            AND (:rev_key IS NULL OR cr.rev_key = :rev_key)
             ORDER BY cr.id DESC
             LIMIT :limit OFFSET :offset
             """
             ),
-            {"building_name": building_name, "limit": limit, "offset": offset},
+            {
+                "building_name": building_name,
+                "rev_key": rev_key,
+                "limit": limit,
+                "offset": offset,
+            },
         )
         .mappings()
         .all()
@@ -1922,6 +1967,7 @@ def list_calc_results(
                 id=int(row_dict.get("id")),
                 created_at=str(row_dict.get("created_at")),
                 building_name=_coerce_str(row_dict.get("building_name")),
+                rev_key=_coerce_str(row_dict.get("rev_key")),
                 category=_coerce_str(row_dict.get("category")),
                 standard_type_number=_coerce_str(row_dict.get("standard_type_number")),
                 standard_type_name=_coerce_str(row_dict.get("standard_type_name")),
@@ -1946,6 +1992,54 @@ def list_calc_results(
             )
         )
     return output
+
+
+@router.get(
+    "/project/{project_identifier}/calc-result/rev-keys",
+    response_model=List[str],
+    tags=["Project Data"],
+)
+def list_calc_result_rev_keys(
+    project_identifier: str,
+    building_name: Optional[str] = None,
+    db: Session = Depends(get_project_db_session),
+):
+    building_name = _coerce_str(building_name)
+    rows = db.execute(
+        text(
+            """
+                SELECT DISTINCT rev_key
+                FROM calc_result
+                WHERE rev_key IS NOT NULL AND rev_key != ''
+                  AND (:building_name IS NULL OR building_name = :building_name)
+                ORDER BY rev_key
+                """
+        ),
+        {"building_name": building_name},
+    ).fetchall()
+    return [str(r[0]) for r in rows if r and r[0] is not None]
+
+
+@router.get(
+    "/project/{project_identifier}/calc-result/buildings",
+    response_model=List[str],
+    tags=["Project Data"],
+)
+def list_calc_result_buildings(
+    project_identifier: str,
+    db: Session = Depends(get_project_db_session),
+):
+    rows = db.execute(
+        text(
+            """
+                SELECT DISTINCT building_name
+                FROM calc_result
+                WHERE building_name IS NOT NULL AND building_name != ''
+                ORDER BY building_name
+                """
+        )
+    ).fetchall()
+    return [str(r[0]) for r in rows if r and r[0] is not None]
 
 
 @router.get(

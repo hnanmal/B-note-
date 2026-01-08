@@ -76,6 +76,7 @@ EXTRA_TABLE_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS calc_result (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         key TEXT NOT NULL UNIQUE,
+        rev_key TEXT,
         building_name TEXT,
         guid TEXT,
         gui TEXT,
@@ -208,6 +209,12 @@ def ensure_extra_tables(db_path: Path) -> None:
         cursor = conn.cursor()
         for stmt in EXTRA_TABLE_STATEMENTS:
             cursor.execute(stmt)
+
+        cursor.execute("PRAGMA table_info(calc_result)")
+        calc_result_columns = {row[1] for row in cursor.fetchall()}
+        if "rev_key" not in calc_result_columns:
+            cursor.execute("ALTER TABLE calc_result ADD COLUMN rev_key TEXT")
+
         cursor.execute("PRAGMA table_info(family_revit_type)")
         frt_columns = {row[1] for row in cursor.fetchall()}
         if "building_name" not in frt_columns:
