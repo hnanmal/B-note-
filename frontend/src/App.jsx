@@ -10,6 +10,7 @@ import TeamStandardFamilyList from './components/TeamStandardFamilyList';
 import ProjectInputMain from './components/ProjectInputMain';
 import ProjectFamilyAssign from './components/ProjectFamilyAssign';
 import ProjectInteriorMatrix from './components/ProjectInteriorMatrix';
+import ProjectQtyReportByMember from './components/ProjectQtyReportByMember';
 import ProjectStandardSelect from './components/ProjectStandardSelect';
 import ProjectWmSummary from './components/ProjectWmSummary';
 import ProjectWmPrecheck from './components/ProjectWmPrecheck';
@@ -186,6 +187,9 @@ function App() {
     'project-input-main': 'Project Input Main',
     'project-input-family': 'Project Family Assign',
     'project-input-interior': 'Project Interior Matrix',
+  };
+  const projectReportPages = {
+    'project-report-qty-by-member': "Q'ty Report by Member",
   };
   const fetchCalcDictionaryIndex = useCallback(async () => {
     setCalcDictionaryLoading(true);
@@ -691,6 +695,30 @@ function App() {
                           }}
                         >
                           Project Interior Matrix
+                        </button>
+                      </div>
+                      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', ...groupLabelStyle }}>
+                        <span>Project Report &gt;</span>
+                      </div>
+                      <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => setActivePage('project-report-qty-by-member')}
+                          className={`nav-btn${activePage === 'project-report-qty-by-member' ? ' active' : ''}`}
+                          style={{
+                            width: '100%',
+                            minWidth: 0,
+                            maxWidth: '100%',
+                            padding: '6px 0',
+                            fontWeight: 600,
+                            fontSize: 13,
+                            border: 'none',
+                            background: activePage === 'project-report-qty-by-member' ? '#f7c748' : '#f1f1f1',
+                            color: activePage === 'project-report-qty-by-member' ? '#2c1b00' : '#1d4ed8',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Q'ty Report by Member
                         </button>
                       </div>
                     </>
@@ -1267,6 +1295,10 @@ function App() {
               <ProjectInteriorMatrix apiBaseUrl={projectApiBase} />
             </div>
           )
+        ) : projectReportPages[activePage] ? (
+          <div className="panel project-report" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
+            <ProjectQtyReportByMember />
+          </div>
         ) : activePage === 'project-main' ? (
           <div className="panel project-main" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
             <ProjectMain apiBaseUrl={projectApiBase} />
