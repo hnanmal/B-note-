@@ -845,19 +845,15 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     return map;
   }, [standardItemById, standardItemWorkMasters]);
 
-  const buildItemPath = (standardItem) => {
+  const buildItemPath = useCallback((standardItem) => {
     if (!standardItem) return '—';
     const isDerived = Boolean(standardItem.derive_from);
     if (isDerived) {
       const deriveFromItem = standardItemLookupById.get(standardItem.derive_from);
       const itemLevel2Name = deriveFromItem?.name;
-      const itemLevel1Name = deriveFromItem?.parent_id
-        ? standardItemLookupById.get(deriveFromItem.parent_id)?.name
-        : undefined;
       const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
       const childName = (standardItem.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || standardItem.name;
-      const derivedLabel = `${itemLevel2Name ?? '부모'}${abbrPart}::${childName}`;
-      return itemLevel1Name ? `${itemLevel1Name} | ${derivedLabel}` : derivedLabel;
+      return `${itemLevel2Name ?? '부모'}${abbrPart}::${childName}`;
     }
     const level2 = standardItem.name ?? '—';
     if (!standardItem.parent_id) return level2;
@@ -865,7 +861,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     const level1 = parent?.name;
     const parts = [level1, level2].filter(Boolean);
     return parts.length ? parts.join(' | ') : level2;
-  };
+  }, [projectAbbr, standardItemLookupById]);
 
   const assignmentRowsByType = useMemo(() => {
     const buildRows = (assignments, { onlyDerivedLeaves = false } = {}) => {
@@ -909,6 +905,12 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
 
       rows.forEach((row) => {
         row.hasChildren = Boolean(row.children.length);
+        if (row.hasChildren && row.discipline === 'SWM' && row.standardItemId) {
+          const std = standardItemLookupById.get(row.standardItemId);
+          if (std?.name) {
+            row.item = std.name;
+          }
+        }
       });
 
       const isRoot = (row) => {
@@ -936,7 +938,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       GWM: buildRows(assignmentGroups.GWM),
       SWM: buildRows(assignmentGroups.SWM, { onlyDerivedLeaves: true }),
     };
-  }, [assignmentGroups]);
+  }, [assignmentGroups, buildItemPath, standardItemLookupById]);
 
   const swmParentsWithoutDerivedLeaves = useMemo(() => {
     const rows = assignmentRowsByType.SWM ?? [];
