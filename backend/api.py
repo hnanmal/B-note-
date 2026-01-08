@@ -2178,9 +2178,10 @@ def manual_update_calc_results(
     skipped = 0
     manual_entries_matched = 0
 
-    # Collect assignment ids for family root lookups
+    # Collect ids for family + selected work master lookups
     cart_entry_payloads = []
     assignment_ids = set()
+    standard_item_ids = set()
     for row in rows:
         cart_entries_scanned += 1
         entry_id = int(row[0])
@@ -2193,6 +2194,12 @@ def manual_update_calc_results(
         for aid in aids:
             try:
                 assignment_ids.add(int(aid))
+            except Exception:
+                pass
+        sids = normalized.get("standard_item_ids") or []
+        for sid in sids:
+            try:
+                standard_item_ids.add(int(sid))
             except Exception:
                 pass
         cart_entry_payloads.append((entry_id, normalized))
@@ -2217,6 +2224,73 @@ def manual_update_calc_results(
     family_list_ids = sorted(
         {fid for fid in assignment_family_list_id_by_id.values() if fid}
     )
+
+    selected_work_master_by_standard_item_id = {}
+    if standard_item_ids:
+        rows_wm = (
+            db.query(
+                models.StandardItemWorkMasterSelect.standard_item_id,
+                models.WorkMaster.id,
+                models.WorkMaster.work_master_code,
+                models.WorkMaster.gauge,
+                models.WorkMaster.add_spec,
+                models.WorkMaster.uom1,
+                models.WorkMaster.cat_large_desc,
+                models.WorkMaster.cat_mid_desc,
+                models.WorkMaster.cat_small_desc,
+                models.WorkMaster.attr1_spec,
+                models.WorkMaster.attr2_spec,
+                models.WorkMaster.attr3_spec,
+            )
+            .join(
+                models.WorkMaster,
+                models.WorkMaster.id
+                == models.StandardItemWorkMasterSelect.work_master_id,
+            )
+            .filter(
+                models.StandardItemWorkMasterSelect.standard_item_id.in_(
+                    sorted(standard_item_ids)
+                )
+            )
+            .all()
+        )
+        for (
+            sid,
+            wm_id,
+            wm_code,
+            gauge,
+            add_spec,
+            uom1,
+            cat_large_desc,
+            cat_mid_desc,
+            cat_small_desc,
+            attr1_spec,
+            attr2_spec,
+            attr3_spec,
+        ) in rows_wm:
+            selected_work_master_by_standard_item_id[int(sid)] = {
+                "work_master_id": int(wm_id) if wm_id is not None else None,
+                "work_master_code": _coerce_str(wm_code),
+                "gauge": _coerce_str(gauge),
+                "add_spec": _coerce_str(add_spec),
+                "uom1": _coerce_str(uom1),
+                "cat_large_desc": _coerce_str(cat_large_desc),
+                "cat_mid_desc": _coerce_str(cat_mid_desc),
+                "cat_small_desc": _coerce_str(cat_small_desc),
+                "attr1_spec": _coerce_str(attr1_spec),
+                "attr2_spec": _coerce_str(attr2_spec),
+                "attr3_spec": _coerce_str(attr3_spec),
+            }
+
+    def _compose_unit_from_wm_meta(wm_meta: Optional[dict]) -> Optional[str]:
+        if not wm_meta:
+            return None
+        return _coerce_str(wm_meta.get("uom1"))
+
+    def _compose_spec_from_wm_meta(wm_meta: Optional[dict]) -> Optional[str]:
+        if not wm_meta:
+            return None
+        return _compose_spec_from_work_master_row(wm_meta)
 
     def _load_family_items_with_ancestors(seed_ids):
         loaded_ids = set(family_item_meta_by_id.keys())
@@ -2269,6 +2343,46 @@ def manual_update_calc_results(
             cursor = int(parent_id)
         return root
 
+    def _family_path(fid: int):
+        if not fid:
+            return []
+        path = []
+        cursor = int(fid)
+        seen = set()
+        while cursor and cursor not in seen:
+            seen.add(cursor)
+            meta = family_item_meta_by_id.get(cursor)
+            if not meta:
+                break
+            path.append(meta)
+            cursor = meta.get("parent_id")
+        return list(reversed(path))
+
+    def _parse_standard_type_from_family(level2_meta):
+        if not level2_meta:
+            return (None, None)
+        seq = level2_meta.get("sequence_number")
+        name = level2_meta.get("name")
+        if seq:
+            seq = str(seq).strip() or None
+        if name:
+            name = str(name).strip() or None
+        if seq or name:
+            return (seq, name)
+
+        combined = str(level2_meta.get("name") or "").strip()
+        if not combined:
+            return (None, None)
+        import re
+
+        m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)*)\s+(.+?)\s*$", combined)
+        if m:
+            return (m.group(1), m.group(2))
+        m = re.match(r"^\s*([0-9]+)\.(.+?)\s*$", combined)
+        if m:
+            return (m.group(1), m.group(2).strip())
+        return (None, combined)
+
     def _root_label(root_meta) -> Optional[str]:
         if not root_meta:
             return None
@@ -2317,6 +2431,7 @@ def manual_update_calc_results(
 
     for cart_entry_id, normalized in cart_entry_payloads:
         aids = normalized.get("assignment_ids") or []
+        sids = normalized.get("standard_item_ids") or []
         formula = normalized.get("formula")
         if not formula:
             skipped += 1
@@ -2339,6 +2454,43 @@ def manual_update_calc_results(
             continue
 
         manual_entries_matched += 1
+
+        # Standard type info: pick a representative family_list_id from the entry
+        std_type_number = None
+        std_type_name = None
+        manual_fid = None
+        for aid in aids:
+            try:
+                aid_int = int(aid)
+            except Exception:
+                continue
+            if aid_int not in manual_assignment_ids:
+                continue
+            fid = assignment_family_list_id_by_id.get(aid_int)
+            if fid:
+                manual_fid = int(fid)
+                break
+        if manual_fid:
+            path = _family_path(manual_fid)
+            if path:
+                level2_meta = path[2] if len(path) > 2 else path[-1]
+                std_type_number, std_type_name = _parse_standard_type_from_family(
+                    level2_meta
+                )
+
+        # Selected work master info: use first standard_item_id
+        wm_meta = None
+        for sid in sids:
+            try:
+                sid_int = int(sid)
+            except Exception:
+                continue
+            wm_meta = selected_work_master_by_standard_item_id.get(sid_int)
+            if wm_meta:
+                break
+        work_master_id = wm_meta.get("work_master_id") if wm_meta else None
+        work_master_code = wm_meta.get("work_master_code") if wm_meta else None
+        unit_val = _compose_unit_from_wm_meta(wm_meta)
 
         variables = {}
         for fid in entry_family_list_ids:
@@ -2389,17 +2541,17 @@ def manual_update_calc_results(
                         "gui": str(cart_entry_id),
                         "member_name": "Manual_Input",
                         "category": "14.Manual_Input",
-                        "standard_type_number": None,
-                        "standard_type_name": None,
+                        "standard_type_number": std_type_number,
+                        "standard_type_name": std_type_name,
                         "classification": "Manual_Input",
                         "detail_classification": f"cart_entry:{cart_entry_id}",
-                        "unit": None,
+                        "unit": unit_val,
                         "formula": str(formula),
                         "substituted_formula": substituted_formula,
                         "result": float(result_val),
                         "result_log": result_log,
-                        "work_master_id": None,
-                        "work_master_code": None,
+                        "work_master_id": work_master_id,
+                        "work_master_code": work_master_code,
                         "created_at": now_iso,
                     },
                 )
