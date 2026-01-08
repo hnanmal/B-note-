@@ -330,7 +330,7 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ fontWeight: 700, fontSize: 16 }}>Qty Report by Member</div>
         <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-          <span style={{ color: '#6b7280' }}>Load JSON</span>
+          <span style={{ color: '#6b7280' }}>건물별 다이나모 산출결과 불러오기</span>
           <input type="file" accept="application/json" onChange={handleFileChange} disabled={!apiBaseUrl || loading} />
         </label>
       </div>
