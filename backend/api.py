@@ -1608,6 +1608,7 @@ def export_project_db_excel(project_identifier: str):
 
     project_db.ensure_extra_tables(db_path)
 
+    pjt_abbr = None
     try:
         from openpyxl import Workbook
         from openpyxl.utils import get_column_letter
@@ -2687,6 +2688,14 @@ def export_project_db_excel(project_identifier: str):
         df_cart = pd.DataFrame(cart_rows)
         _write_sheet_from_df("CartEntries", df_cart)
         summary_ws.append(["CartEntries", int(len(df_cart.index))])
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT pjt_abbr FROM project_metadata ORDER BY id LIMIT 1")
+            row = cur.fetchone()
+            if row and row[0]:
+                pjt_abbr = str(row[0]).strip() or None
+        except Exception:
+            pjt_abbr = None
     finally:
         conn.close()
 
@@ -2696,7 +2705,19 @@ def export_project_db_excel(project_identifier: str):
 
     now = datetime.datetime.now()
     stamp = now.strftime("%Y%m%d_%H%M%S")
-    filename = f"db_report_{project_identifier}_{stamp}.xlsx"
+    safe_abbr = (pjt_abbr or project_identifier or "project").strip()
+    safe_abbr = (
+        safe_abbr.replace("\\", "_")
+        .replace("/", "_")
+        .replace(":", "_")
+        .replace("*", "_")
+        .replace("?", "_")
+        .replace('"', "_")
+        .replace("<", "_")
+        .replace(">", "_")
+        .replace("|", "_")
+    )
+    filename = f"DB_{safe_abbr}_{stamp}.xlsx"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return StreamingResponse(
         output,

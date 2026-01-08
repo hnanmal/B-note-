@@ -136,7 +136,7 @@ function App() {
       const pad = (n) => String(n).padStart(2, '0');
       const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
       const safeProject = (projectRouteIdentifier ?? 'project').replace(/[\\/:*?"<>|]+/g, '_');
-      const filename = match?.[1] || `db_report_${safeProject}_${stamp}.xlsx`;
+      const filename = match?.[1] || `DB_${safeProject}_${stamp}.xlsx`;
 
       const a = document.createElement('a');
       a.href = url;
