@@ -91,7 +91,10 @@ function App() {
       const pad = (n) => String(n).padStart(2, '0');
       const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
       const safeProject = (projectRouteIdentifier ?? 'project').replace(/[\\/:*?"<>|]+/g, '_');
-      const filename = `dynamo_export_${safeProject}_${stamp}.json`;
+
+      const header = response.headers.get('Content-Disposition') || '';
+      const match = header.match(/filename="?([^";]+)"?/i);
+      const filename = match?.[1] || `Bnote_${safeProject}_${stamp}.json`;
 
       const a = document.createElement('a');
       a.href = url;

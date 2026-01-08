@@ -1012,6 +1012,7 @@ def get_project_work_master_selection_summary(
 )
 def export_project_db_for_dynamo(
     project_identifier: str,
+    response: Response,
     db: Session = Depends(get_project_db_session),
 ):
     """Dynamo 테스트를 위한 프로젝트 DB JSON 추출 엔드포인트.
@@ -1033,6 +1034,26 @@ def export_project_db_for_dynamo(
             pjt_abbr = str(pjt_abbr_row[0]).strip() or None
     except Exception:
         pjt_abbr = None
+
+    try:
+        now = datetime.datetime.now()
+        stamp = now.strftime("%Y%m%d_%H%M%S")
+        safe_abbr = (pjt_abbr or project_identifier or "project").strip()
+        safe_abbr = (
+            safe_abbr.replace("\\", "_")
+            .replace("/", "_")
+            .replace(":", "_")
+            .replace("*", "_")
+            .replace("?", "_")
+            .replace('"', "_")
+            .replace("<", "_")
+            .replace(">", "_")
+            .replace("|", "_")
+        )
+        filename = f"Bnote_{safe_abbr}_{stamp}.json"
+        response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    except Exception:
+        pass
 
     assignment_ids = sorted(
         {
@@ -1556,6 +1577,7 @@ def export_project_db_for_dynamo(
 )
 def export_project_db_json(
     project_identifier: str,
+    response: Response,
     db: Session = Depends(get_project_db_session),
 ):
     """Compatibility alias for the Dynamo JSON export.
@@ -1563,7 +1585,9 @@ def export_project_db_json(
     Frontend uses `/export/db-json` for the Dynamo download button.
     """
 
-    return export_project_db_for_dynamo(project_identifier=project_identifier, db=db)
+    return export_project_db_for_dynamo(
+        project_identifier=project_identifier, response=response, db=db
+    )
 
 
 @router.get(
