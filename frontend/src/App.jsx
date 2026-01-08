@@ -1297,7 +1297,7 @@ function App() {
           )
         ) : projectReportPages[activePage] ? (
           <div className="panel project-report" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
-            <ProjectQtyReportByMember />
+            <ProjectQtyReportByMember apiBaseUrl={projectApiBase} />
           </div>
         ) : activePage === 'project-main' ? (
           <div className="panel project-main" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>

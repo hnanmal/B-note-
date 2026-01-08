@@ -72,6 +72,29 @@ EXTRA_TABLE_STATEMENTS = [
         updated_at TEXT NOT NULL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS calc_result (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT NOT NULL UNIQUE,
+        building_name TEXT,
+        guid TEXT,
+        gui TEXT,
+        member_name TEXT,
+        category TEXT,
+        standard_type_number TEXT,
+        standard_type_name TEXT,
+        classification TEXT,
+        detail_classification TEXT,
+        unit TEXT,
+        formula TEXT,
+        substituted_formula TEXT,
+        result REAL,
+        result_log TEXT,
+        work_master_id INTEGER,
+        work_master_code TEXT,
+        created_at TEXT NOT NULL
+    )
+    """,
 ]
 
 

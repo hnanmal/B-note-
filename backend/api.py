@@ -23,6 +23,61 @@ def get_db():
         db.close()
 
 
+def _coerce_str(value) -> Optional[str]:
+    if value is None:
+        return None
+    text_value = str(value).strip()
+    return text_value or None
+
+
+def _payload_get(obj, *keys):
+    if not isinstance(obj, dict):
+        return None
+    for key in keys:
+        if key in obj:
+            value = obj.get(key)
+            if value is not None and value != "":
+                return value
+    return None
+
+
+def _sanitize_filename_part(value: str) -> str:
+    raw = (value or "").strip() or "project"
+    return (
+        raw.replace("\\", "_")
+        .replace("/", "_")
+        .replace(":", "_")
+        .replace("*", "_")
+        .replace("?", "_")
+        .replace('"', "_")
+        .replace("<", "_")
+        .replace(">", "_")
+        .replace("|", "_")
+    )
+
+
+def _wm_trim(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    if not cleaned or cleaned == "-":
+        return None
+    return cleaned
+
+
+def _compose_spec_from_work_master_row(row: dict) -> Optional[str]:
+    parts = [
+        _wm_trim(row.get("cat_large_desc")),
+        _wm_trim(row.get("cat_mid_desc")),
+        _wm_trim(row.get("cat_small_desc")),
+        _wm_trim(row.get("attr1_spec")),
+        _wm_trim(row.get("attr2_spec")),
+        _wm_trim(row.get("attr3_spec")),
+    ]
+    parts = [p for p in parts if p]
+    return " | ".join(parts) if parts else None
+
+
 def get_project_db_session(project_identifier: str):
     try:
         db_path = project_db.resolve_project_db_path(project_identifier)
@@ -1588,6 +1643,309 @@ def export_project_db_json(
     return export_project_db_for_dynamo(
         project_identifier=project_identifier, response=response, db=db
     )
+
+
+@router.post(
+    "/project/{project_identifier}/calc-result/import-json",
+    response_model=schemas.CalcResultImportResponse,
+    tags=["Project Data"],
+)
+def import_calc_result_json(
+    project_identifier: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_project_db_session),
+):
+    try:
+        raw = file.file.read()
+        payload = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+    project_info = payload.get("project_info") if isinstance(payload, dict) else None
+    building_name = _coerce_str(
+        _payload_get(
+            project_info or {},
+            "building name",
+            "building_name",
+            "buildingName",
+        )
+    )
+    results = None
+    if isinstance(payload, dict):
+        results = payload.get("calculation result")
+        if results is None:
+            results = payload.get("calculation_result")
+        if results is None:
+            results = payload.get("calculationResult")
+    if results is None and isinstance(payload, list):
+        results = payload
+    if not isinstance(results, list):
+        results = []
+
+    if building_name:
+        try:
+            existing = (
+                db.query(models.BuildingList)
+                .filter(models.BuildingList.name == building_name)
+                .first()
+            )
+            if not existing:
+                db.add(models.BuildingList(name=building_name))
+                db.commit()
+        except Exception:
+            db.rollback()
+
+    now_iso = datetime.datetime.utcnow().isoformat()
+
+    def _resolve_work_master_id(
+        work_master_id: Optional[int], work_master_code: Optional[str]
+    ) -> Optional[int]:
+        if work_master_id:
+            return int(work_master_id)
+        code = _coerce_str(work_master_code)
+        if not code:
+            return None
+        try:
+            row = db.execute(
+                text(
+                    "SELECT id FROM work_masters WHERE work_master_code = :code LIMIT 1"
+                ),
+                {"code": code},
+            ).fetchone()
+            return int(row[0]) if row and row[0] is not None else None
+        except Exception:
+            return None
+
+    def _mk_key(*parts) -> str:
+        return "|".join([_sanitize_filename_part(_coerce_str(p) or "") for p in parts])
+
+    inserted = 0
+    for entry in results:
+        if not isinstance(entry, dict):
+            continue
+        wm_payload = (
+            entry.get("work_master")
+            if isinstance(entry.get("work_master"), dict)
+            else {}
+        )
+
+        work_master_id = _payload_get(
+            wm_payload, "id", "work_master_id", "workMasterId"
+        )
+        work_master_code = _coerce_str(
+            _payload_get(
+                wm_payload, "work_master_code", "workMasterCode", "wm_code", "wmCode"
+            )
+        )
+        resolved_wm_id = _resolve_work_master_id(
+            (
+                int(work_master_id)
+                if work_master_id is not None and str(work_master_id).isdigit()
+                else None
+            ),
+            work_master_code,
+        )
+
+        guid = _coerce_str(_payload_get(entry, "GUID", "guid"))
+        gui = _coerce_str(_payload_get(entry, "GUI", "gui"))
+        member_name = _coerce_str(
+            _payload_get(entry, "name", "member", "member_name", "memberName")
+        )
+        category = _coerce_str(_payload_get(entry, "카테고리", "category"))
+        std_num = _coerce_str(
+            _payload_get(
+                entry, "표준타입 번호", "standard_type_number", "standardTypeNumber"
+            )
+        )
+        std_name = _coerce_str(
+            _payload_get(
+                entry, "표준타입 이름", "standard_type_name", "standardTypeName"
+            )
+        )
+        classification = _coerce_str(_payload_get(entry, "분류", "classification"))
+        detail = _coerce_str(
+            _payload_get(
+                entry, "상세분류", "detail_classification", "detailClassification"
+            )
+        )
+        unit = _coerce_str(_payload_get(entry, "단위", "unit"))
+        formula = _coerce_str(_payload_get(entry, "수식", "formula"))
+        substituted = _coerce_str(
+            _payload_get(entry, "대입수식", "substituted_formula", "substitutedFormula")
+        )
+        result_val = _payload_get(entry, "산출결과", "result")
+        result_log = _coerce_str(
+            _payload_get(entry, "산출로그", "result_log", "resultLog")
+        )
+
+        result_float = None
+        if isinstance(result_val, (int, float)):
+            result_float = float(result_val)
+        elif result_val is not None:
+            try:
+                result_float = float(str(result_val).strip())
+            except Exception:
+                result_float = None
+
+        key = _mk_key(
+            building_name or "",
+            guid or "",
+            gui or "",
+            formula or "",
+            work_master_code or str(resolved_wm_id or ""),
+            detail or "",
+        )
+
+        try:
+            db.execute(
+                text(
+                    """
+                    INSERT OR REPLACE INTO calc_result (
+                        key, building_name, guid, gui, member_name,
+                        category, standard_type_number, standard_type_name,
+                        classification, detail_classification, unit,
+                        formula, substituted_formula, result, result_log,
+                        work_master_id, work_master_code, created_at
+                    ) VALUES (
+                        :key, :building_name, :guid, :gui, :member_name,
+                        :category, :standard_type_number, :standard_type_name,
+                        :classification, :detail_classification, :unit,
+                        :formula, :substituted_formula, :result, :result_log,
+                        :work_master_id, :work_master_code, :created_at
+                    )
+                    """
+                ),
+                {
+                    "key": key,
+                    "building_name": building_name,
+                    "guid": guid,
+                    "gui": gui,
+                    "member_name": member_name,
+                    "category": category,
+                    "standard_type_number": std_num,
+                    "standard_type_name": std_name,
+                    "classification": classification,
+                    "detail_classification": detail,
+                    "unit": unit,
+                    "formula": formula,
+                    "substituted_formula": substituted,
+                    "result": result_float,
+                    "result_log": result_log,
+                    "work_master_id": resolved_wm_id,
+                    "work_master_code": work_master_code,
+                    "created_at": now_iso,
+                },
+            )
+            inserted += 1
+        except Exception:
+            continue
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to store calc results")
+
+    return {
+        "project_identifier": project_identifier,
+        "building_name": building_name,
+        "inserted": inserted,
+    }
+
+
+@router.get(
+    "/project/{project_identifier}/calc-result",
+    response_model=List[schemas.CalcResultRow],
+    tags=["Project Data"],
+)
+def list_calc_results(
+    project_identifier: str,
+    building_name: Optional[str] = None,
+    limit: int = 2000,
+    offset: int = 0,
+    db: Session = Depends(get_project_db_session),
+):
+    limit = max(1, min(int(limit), 20000))
+    offset = max(0, int(offset))
+    building_name = _coerce_str(building_name)
+
+    rows = (
+        db.execute(
+            text(
+                """
+            SELECT
+                cr.id AS id,
+                cr.created_at AS created_at,
+                cr.building_name AS building_name,
+                cr.category AS category,
+                cr.standard_type_number AS standard_type_number,
+                cr.standard_type_name AS standard_type_name,
+                cr.classification AS classification,
+                cr.detail_classification AS detail_classification,
+                cr.unit AS unit,
+                cr.formula AS formula,
+                cr.substituted_formula AS substituted_formula,
+                cr.result AS result,
+                cr.result_log AS result_log,
+                cr.guid AS guid,
+                cr.gui AS gui,
+                cr.member_name AS member_name,
+                COALESCE(wm.work_master_code, cr.work_master_code) AS wm_code,
+                wm.gauge AS gauge,
+                wm.add_spec AS add_spec,
+                wm.cat_large_desc AS cat_large_desc,
+                wm.cat_mid_desc AS cat_mid_desc,
+                wm.cat_small_desc AS cat_small_desc,
+                wm.attr1_spec AS attr1_spec,
+                wm.attr2_spec AS attr2_spec,
+                wm.attr3_spec AS attr3_spec
+            FROM calc_result cr
+            LEFT JOIN work_masters wm
+              ON (wm.id = cr.work_master_id)
+              OR (cr.work_master_id IS NULL AND wm.work_master_code = cr.work_master_code)
+            WHERE (:building_name IS NULL OR cr.building_name = :building_name)
+            ORDER BY cr.id DESC
+            LIMIT :limit OFFSET :offset
+            """
+            ),
+            {"building_name": building_name, "limit": limit, "offset": offset},
+        )
+        .mappings()
+        .all()
+    )
+
+    output: List[schemas.CalcResultRow] = []
+    for row in rows:
+        row_dict = dict(row)
+        output.append(
+            schemas.CalcResultRow(
+                id=int(row_dict.get("id")),
+                created_at=str(row_dict.get("created_at")),
+                building_name=_coerce_str(row_dict.get("building_name")),
+                category=_coerce_str(row_dict.get("category")),
+                standard_type_number=_coerce_str(row_dict.get("standard_type_number")),
+                standard_type_name=_coerce_str(row_dict.get("standard_type_name")),
+                classification=_coerce_str(row_dict.get("classification")),
+                description=_coerce_str(row_dict.get("detail_classification")),
+                guid=_coerce_str(row_dict.get("guid")),
+                gui=_coerce_str(row_dict.get("gui")),
+                member_name=_coerce_str(row_dict.get("member_name")),
+                wm_code=_coerce_str(row_dict.get("wm_code")),
+                gauge=_coerce_str(row_dict.get("gauge")),
+                spec=_compose_spec_from_work_master_row(row_dict),
+                add_spec=_coerce_str(row_dict.get("add_spec")),
+                formula=_coerce_str(row_dict.get("formula")),
+                substituted_formula=_coerce_str(row_dict.get("substituted_formula")),
+                result=(
+                    float(row_dict["result"])
+                    if row_dict.get("result") is not None
+                    else None
+                ),
+                result_log=_coerce_str(row_dict.get("result_log")),
+                unit=_coerce_str(row_dict.get("unit")),
+            )
+        )
+    return output
 
 
 @router.get(

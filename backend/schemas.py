@@ -245,6 +245,39 @@ class DynamoProjectExportPayload(BaseModel):
     wm_selection_summary: Optional[WorkMasterSummaryResponse] = None
 
 
+class CalcResultImportResponse(BaseModel):
+    project_identifier: str
+    building_name: Optional[str] = None
+    inserted: int = 0
+
+
+class CalcResultRow(BaseModel):
+    id: int
+    created_at: str
+    building_name: Optional[str] = None
+
+    category: Optional[str] = None
+    standard_type_number: Optional[str] = None
+    standard_type_name: Optional[str] = None
+    classification: Optional[str] = None
+    description: Optional[str] = None
+
+    guid: Optional[str] = None
+    gui: Optional[str] = None
+    member_name: Optional[str] = None
+
+    wm_code: Optional[str] = None
+    gauge: Optional[str] = None
+    spec: Optional[str] = None
+    add_spec: Optional[str] = None
+
+    formula: Optional[str] = None
+    substituted_formula: Optional[str] = None
+    result: Optional[float] = None
+    result_log: Optional[str] = None
+    unit: Optional[str] = None
+
+
 class DerivedStandardItemCreate(BaseModel):
     suffix_description: str
     work_master_id: Optional[int] = None

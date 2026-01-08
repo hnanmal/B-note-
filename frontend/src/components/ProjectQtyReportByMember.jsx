@@ -1,33 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 const safeText = (value) => (value == null ? '' : String(value));
 const normalizeKey = (value) => safeText(value).trim();
 
-const extractRowsFromJson = (payload) => {
-  if (Array.isArray(payload)) return payload;
-  if (payload && typeof payload === 'object') {
-    const entries = payload.workmaster_cart_entries ?? payload.workMasterCartEntries;
-    if (Array.isArray(entries)) return entries;
-  }
-  return [];
-};
-
-const get = (row, ...keys) => {
-  for (const key of keys) {
-    if (row && Object.prototype.hasOwnProperty.call(row, key)) {
-      const value = row[key];
-      if (value != null && value !== '') return value;
-    }
-  }
-  return null;
-};
-
-export default function ProjectQtyReportByMember() {
-  const [rawRows, setRawRows] = useState([]);
+export default function ProjectQtyReportByMember({ apiBaseUrl }) {
+  const [rows, setRows] = useState([]);
   const [loadError, setLoadError] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   const [searchText, setSearchText] = useState('');
+  const [buildingName, setBuildingName] = useState('');
   const [filters, setFilters] = useState({
     category: '',
     standardTypeNumber: '',
@@ -36,56 +19,92 @@ export default function ProjectQtyReportByMember() {
     detailClassification: '',
   });
 
+  const fetchRows = async (nextBuildingName = buildingName) => {
+    if (!apiBaseUrl) return;
+    setLoadError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', '20000');
+      if (nextBuildingName) params.set('building_name', nextBuildingName);
+      const response = await fetch(`${apiBaseUrl}/calc-result?${params.toString()}`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.detail || body?.message || 'DB에서 산출 결과를 불러오지 못했습니다.';
+        throw new Error(message);
+      }
+      const data = await response.json();
+      setRows(asArray(data));
+    } catch (error) {
+      setRows([]);
+      setLoadError(error instanceof Error ? error.message : 'DB에서 산출 결과를 불러오지 못했습니다.');
+    }
+  };
+
+  useEffect(() => {
+    fetchRows('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBaseUrl]);
+
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (!apiBaseUrl) return;
     setLoadError(null);
+    setImporting(true);
     try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      const rows = extractRowsFromJson(json);
-      if (!rows.length) {
-        setRawRows([]);
-        setLoadError('JSON에서 row 배열을 찾지 못했습니다.');
-        return;
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`${apiBaseUrl}/calc-result/import-json`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.detail || body?.message || 'JSON Import에 실패했습니다.';
+        throw new Error(message);
       }
-      setRawRows(rows);
+      const result = await response.json();
+      const nextBuildingName = safeText(result?.building_name || result?.buildingName || '').trim();
+      setBuildingName(nextBuildingName);
+      await fetchRows(nextBuildingName);
     } catch (error) {
-      setRawRows([]);
-      setLoadError(error instanceof Error ? error.message : 'JSON을 불러오지 못했습니다.');
+      setLoadError(error instanceof Error ? error.message : 'JSON Import에 실패했습니다.');
     } finally {
+      setImporting(false);
       event.target.value = '';
     }
   };
 
   const normalizedRows = useMemo(() =>
-    asArray(rawRows)
+    asArray(rows)
       .filter(Boolean)
-      .map((row, idx) => {
-        const workMaster = row.work_master ?? row.workMaster ?? null;
-        return {
-          _idx: idx,
-          category: get(row, '카테고리', 'category'),
-          standardTypeNumber: get(row, '표준타입 번호', 'standard_type_number', 'standardTypeNumber'),
-          standardTypeName: get(row, '표준타입 이름', 'standard_type_name', 'standardTypeName'),
-          classification: get(row, '분류', 'classification'),
-          detailClassification: get(row, '상세분류', 'detail_classification', 'detailClassification'),
-          unit: get(row, '단위', 'unit'),
-          guid: get(row, 'GUID', 'guid'),
-          gui: get(row, 'GUI', 'gui'),
-          name: get(row, 'name', '이름', 'standard_item_name', 'standardItemName'),
-          formula: get(row, '수식', 'formula'),
-          substitutedFormula: get(row, '대입수식', 'substituted_formula', 'substitutedFormula'),
-          result: get(row, '산출결과', 'result'),
-          resultLog: get(row, '산출로그', 'result_log', 'resultLog'),
-          wmCode: get(workMaster, 'work_master_code', 'workMasterCode', 'wm_code', 'wmCode'),
-          gauge: get(workMaster, 'gauge'),
-          description: get(workMaster, 'description', 'Description'),
-          spec: get(workMaster, 'add_spec', 'spec'),
-          addSpec: get(workMaster, 'add_spec', 'add_spec_2', 'addSpec'),
-        };
-      }),
-  [rawRows]);
+      .map((row, idx) => ({
+        _idx: row.id ?? idx,
+        createdAt: row.created_at,
+        buildingName: row.building_name,
+
+        category: row.category,
+        standardTypeNumber: row.standard_type_number ?? row.standardTypeNumber ?? row.standard_type_number,
+        standardTypeName: row.standard_type_name ?? row.standardTypeName ?? row.standard_type_name,
+        classification: row.classification,
+        detailClassification: row.description,
+
+        guid: row.guid,
+        gui: row.gui,
+
+        wmCode: row.wm_code,
+        gauge: row.gauge,
+        description: row.description,
+        spec: row.spec,
+        addSpec: row.add_spec,
+
+        formula: row.formula,
+        substitutedFormula: row.substituted_formula,
+        result: row.result,
+        resultLog: row.result_log,
+        unit: row.unit,
+      })),
+  [rows]);
 
   const options = useMemo(() => {
     const uniq = (key) =>
@@ -93,6 +112,7 @@ export default function ProjectQtyReportByMember() {
         new Set(normalizedRows.map((r) => normalizeKey(r[key])).filter(Boolean))
       ).sort((a, b) => a.localeCompare(b));
     return {
+      buildingName: uniq('buildingName'),
       category: uniq('category'),
       standardTypeNumber: uniq('standardTypeNumber'),
       standardTypeName: uniq('standardTypeName'),
@@ -104,6 +124,7 @@ export default function ProjectQtyReportByMember() {
   const filteredRows = useMemo(() => {
     const needle = searchText.trim().toLowerCase();
     return normalizedRows.filter((row) => {
+      if (buildingName && normalizeKey(row.buildingName) !== buildingName) return false;
       if (filters.category && normalizeKey(row.category) !== filters.category) return false;
       if (filters.standardTypeNumber && normalizeKey(row.standardTypeNumber) !== filters.standardTypeNumber) return false;
       if (filters.standardTypeName && normalizeKey(row.standardTypeName) !== filters.standardTypeName) return false;
@@ -116,17 +137,21 @@ export default function ProjectQtyReportByMember() {
         row.standardTypeName,
         row.classification,
         row.detailClassification,
-        row.name,
         row.gui,
         row.guid,
         row.wmCode,
         row.description,
+        row.spec,
+        row.addSpec,
+        row.formula,
+        row.substitutedFormula,
+        row.resultLog,
       ]
         .map((v) => safeText(v).toLowerCase())
         .join(' ');
       return haystack.includes(needle);
     });
-  }, [filters, normalizedRows, searchText]);
+  }, [buildingName, filters, normalizedRows, searchText]);
 
   const clearFilters = () => {
     setFilters({
@@ -143,8 +168,8 @@ export default function ProjectQtyReportByMember() {
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ fontWeight: 700, fontSize: 16 }}>Qty Report by Member</div>
         <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-          <span style={{ color: '#6b7280' }}>Load JSON</span>
-          <input type="file" accept="application/json" onChange={handleFileChange} />
+          <span style={{ color: '#6b7280' }}>{importing ? 'Importing…' : 'Load JSON'}</span>
+          <input type="file" accept="application/json" onChange={handleFileChange} disabled={!apiBaseUrl || importing} />
         </label>
       </div>
 
@@ -176,6 +201,12 @@ export default function ProjectQtyReportByMember() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <select value={buildingName} onChange={(e) => setBuildingName(e.target.value)}>
+          <option value="">건물(전체)</option>
+          {options.buildingName.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
         <select value={filters.category} onChange={(e) => setFilters((p) => ({ ...p, category: e.target.value }))}>
           <option value="">카테고리(전체)</option>
           {options.category.map((v) => (
@@ -232,9 +263,11 @@ export default function ProjectQtyReportByMember() {
                 'gauge',
                 'Description',
                 'Spec',
+                'Add Spec.',
                 '수식',
                 '대입수식',
                 '산출결과',
+                '산출로그',
                 '단위',
               ].map((h) => (
                 <th key={h} style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{h}</th>
@@ -255,16 +288,18 @@ export default function ProjectQtyReportByMember() {
                 <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{safeText(row.gauge) || '—'}</td>
                 <td style={{ padding: '6px 8px', minWidth: 200 }}>{safeText(row.description) || '—'}</td>
                 <td style={{ padding: '6px 8px', minWidth: 160 }}>{safeText(row.spec) || '—'}</td>
+                <td style={{ padding: '6px 8px', minWidth: 160 }}>{safeText(row.addSpec) || '—'}</td>
                 <td style={{ padding: '6px 8px', minWidth: 200 }}>{safeText(row.formula) || '—'}</td>
                 <td style={{ padding: '6px 8px', minWidth: 220 }}>{safeText(row.substitutedFormula) || '—'}</td>
                 <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{row.result ?? '—'}</td>
+                <td style={{ padding: '6px 8px', minWidth: 280 }}>{safeText(row.resultLog) || '—'}</td>
                 <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{safeText(row.unit) || '—'}</td>
               </tr>
             ))}
             {!filteredRows.length && (
               <tr>
-                <td colSpan={15} style={{ padding: 14, color: '#6b7280' }}>
-                  데이터가 없습니다. 상단의 Load JSON으로 파일을 불러오세요.
+                <td colSpan={17} style={{ padding: 14, color: '#6b7280' }}>
+                  데이터가 없습니다. 상단의 Load JSON으로 Import 하거나, 기존 저장 데이터를 확인하세요.
                 </td>
               </tr>
             )}
