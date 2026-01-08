@@ -142,10 +142,9 @@ class DynamoWorkMasterCartEntry(BaseModel):
     formula: Optional[str] = None
 
     category: Optional[str] = Field(default=None, alias="카테고리")
-    standard_type_number: Optional[int] = Field(default=None, alias="표준타입 번호")
+    standard_type_number: Optional[str] = Field(default=None, alias="표준타입 번호")
     standard_type_name: Optional[str] = Field(default=None, alias="표준타입 이름")
     classification: Optional[str] = Field(default=None, alias="분류")
-    item_name: Optional[str] = Field(default=None, alias="이름")
     detail_classification: Optional[str] = Field(default=None, alias="상세분류")
     unit: Optional[str] = Field(default=None, alias="단위")
 

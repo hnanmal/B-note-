@@ -1054,6 +1054,7 @@ def export_project_db_for_dynamo(
     assignment_label_by_id = {}
     assignment_family_list_id_by_id = {}
     family_name_by_family_list_id = {}
+    family_item_meta_by_id = {}
     assignment_standard_item_ids = set()
     assignment_family_name_by_id = {}
     assignment_standard_item_id_by_id = {}
@@ -1090,42 +1091,54 @@ def export_project_db_for_dynamo(
                         family_name_by_family_list_id[family_list_id_int] = family_name
 
     standard_item_name_by_id = {}
+    standard_item_raw_name_by_id = {}
+    standard_item_parent_id_by_id = {}
+    standard_item_type_by_id = {}
     standard_item_ids_to_load = sorted(
         set(standard_item_ids) | set(assignment_standard_item_ids)
     )
     if standard_item_ids_to_load:
-        items = (
-            db.query(models.StandardItem)
-            .filter(models.StandardItem.id.in_(standard_item_ids_to_load))
-            .all()
-        )
+        loaded_standard_ids = set()
+        pending_standard_ids = {int(sid) for sid in standard_item_ids_to_load}
         derive_from_by_id = {}
-        for item in items:
-            standard_item_name_by_id[int(item.id)] = item.name
-            derive_from_by_id[int(item.id)] = getattr(item, "derive_from", None)
-
-        parent_ids = sorted(
-            {
-                int(pid)
-                for pid in (derive_from_by_id.values() or [])
-                if pid is not None
-                and (
-                    isinstance(pid, int)
-                    or (isinstance(pid, str) and str(pid).isdigit())
+        while pending_standard_ids:
+            batch_ids = sorted(pending_standard_ids - loaded_standard_ids)
+            if not batch_ids:
+                break
+            rows = (
+                db.query(
+                    models.StandardItem.id,
+                    models.StandardItem.name,
+                    models.StandardItem.type,
+                    models.StandardItem.parent_id,
+                    models.StandardItem.derive_from,
                 )
-            }
-        )
-        missing_parent_ids = [
-            pid for pid in parent_ids if pid not in standard_item_name_by_id
-        ]
-        if missing_parent_ids:
-            parent_items = (
-                db.query(models.StandardItem)
-                .filter(models.StandardItem.id.in_(missing_parent_ids))
+                .filter(models.StandardItem.id.in_(batch_ids))
                 .all()
             )
-            for parent in parent_items:
-                standard_item_name_by_id[int(parent.id)] = parent.name
+            pending_standard_ids.clear()
+            for sid, name, item_type, parent_id, derive_from in rows:
+                sid_int = int(sid)
+                loaded_standard_ids.add(sid_int)
+                standard_item_name_by_id[sid_int] = name
+                standard_item_raw_name_by_id[sid_int] = name
+                standard_item_parent_id_by_id[sid_int] = (
+                    int(parent_id) if parent_id is not None else None
+                )
+                standard_item_type_by_id[sid_int] = (
+                    item_type.value if hasattr(item_type, "value") else str(item_type)
+                )
+                derive_from_by_id[sid_int] = derive_from
+                if parent_id is not None:
+                    try:
+                        pending_standard_ids.add(int(parent_id))
+                    except (TypeError, ValueError):
+                        pass
+                if derive_from is not None:
+                    try:
+                        pending_standard_ids.add(int(derive_from))
+                    except (TypeError, ValueError):
+                        pass
 
         formatted_name_by_id = {}
         for item_id, name in list(standard_item_name_by_id.items()):
@@ -1220,6 +1233,105 @@ def export_project_db_for_dynamo(
 
     calc_dictionary_entries_by_family_list_id = {}
     family_list_ids = sorted({fid for fid in assignment_family_list_id_by_id.values()})
+
+    def _load_family_items_with_ancestors(seed_ids):
+        loaded_ids = set(family_item_meta_by_id.keys())
+        pending_ids = {int(fid) for fid in (seed_ids or []) if fid}
+        while pending_ids:
+            batch = sorted(pending_ids - loaded_ids)
+            if not batch:
+                break
+            rows = (
+                db.query(
+                    models.FamilyListItem.id,
+                    models.FamilyListItem.parent_id,
+                    models.FamilyListItem.name,
+                    models.FamilyListItem.sequence_number,
+                )
+                .filter(models.FamilyListItem.id.in_(batch))
+                .all()
+            )
+            pending_ids.clear()
+            for fid, parent_id, name, sequence_number in rows:
+                fid_int = int(fid)
+                loaded_ids.add(fid_int)
+                family_item_meta_by_id[fid_int] = {
+                    "id": fid_int,
+                    "parent_id": int(parent_id) if parent_id is not None else None,
+                    "name": name,
+                    "sequence_number": sequence_number,
+                }
+                if parent_id is not None:
+                    try:
+                        pending_ids.add(int(parent_id))
+                    except (TypeError, ValueError):
+                        pass
+
+    _load_family_items_with_ancestors(family_list_ids)
+
+    def _family_path(fid):
+        if not fid:
+            return []
+        path = []
+        cursor = int(fid)
+        seen = set()
+        while cursor and cursor not in seen:
+            seen.add(cursor)
+            meta = family_item_meta_by_id.get(cursor)
+            if not meta:
+                break
+            path.append(meta)
+            cursor = meta.get("parent_id")
+        return list(reversed(path))
+
+    def _category_label_from_family_root(root_meta):
+        if not root_meta:
+            return None
+        seq = root_meta.get("sequence_number")
+        name = root_meta.get("name")
+        if seq and name:
+            return f"{str(seq).strip()}.{str(name).strip()}"
+        return str(name).strip() if name else None
+
+    def _parse_standard_type_from_family(level2_meta):
+        if not level2_meta:
+            return (None, None)
+        seq = level2_meta.get("sequence_number")
+        name = level2_meta.get("name")
+        if seq:
+            seq = str(seq).strip() or None
+        if name:
+            name = str(name).strip() or None
+        if seq or name:
+            return (seq, name)
+
+        combined = str(level2_meta.get("name") or "").strip()
+        if not combined:
+            return (None, None)
+        import re
+
+        m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)*)\s+(.+?)\s*$", combined)
+        if m:
+            return (m.group(1), m.group(2))
+        m = re.match(r"^\s*([0-9]+)\.(.+?)\s*$", combined)
+        if m:
+            return (m.group(1), m.group(2).strip())
+        return (None, combined)
+
+    assignment_category_by_id = {}
+    assignment_family_std_type_number_by_id = {}
+    assignment_family_std_type_name_by_id = {}
+    if assignment_ids:
+        for aid in assignment_ids:
+            fid = assignment_family_list_id_by_id.get(aid)
+            path = _family_path(fid)
+            if not path:
+                continue
+            assignment_category_by_id[aid] = _category_label_from_family_root(path[0])
+            level2_meta = path[2] if len(path) > 2 else path[-1]
+            std_no, std_name = _parse_standard_type_from_family(level2_meta)
+            assignment_family_std_type_number_by_id[aid] = std_no
+            assignment_family_std_type_name_by_id[aid] = std_name
     if family_list_ids:
         calc_entries = (
             db.query(models.CalcDictionaryEntry)
@@ -1308,13 +1420,27 @@ def export_project_db_for_dynamo(
         text_value = str(value).strip()
         return text_value or None
 
+    def _standard_tree_level2_name(standard_item_id):
+        sid = _coerce_int(standard_item_id)
+        if not sid:
+            return None
+        path_ids = []
+        cursor = sid
+        seen = set()
+        while cursor and cursor not in seen:
+            seen.add(cursor)
+            path_ids.append(cursor)
+            cursor = standard_item_parent_id_by_id.get(cursor)
+        path_ids = list(reversed(path_ids))
+        if not path_ids:
+            return None
+        level2_id = path_ids[2] if len(path_ids) > 2 else path_ids[-1]
+        return _coerce_str(standard_item_raw_name_by_id.get(level2_id))
+
     def _compose_unit(wm_obj):
         if wm_obj is None:
             return None
-        u1 = _coerce_str(getattr(wm_obj, "uom1", None))
-        u2 = _coerce_str(getattr(wm_obj, "uom2", None))
-        parts = [v for v in (u1, u2) if v]
-        return " / ".join(parts) if parts else None
+        return _coerce_str(getattr(wm_obj, "uom1", None))
 
     dynamo_cart_entries = []
     for entry in cart_entries:
@@ -1332,6 +1458,30 @@ def export_project_db_for_dynamo(
             _first_from(getattr(entry, "standard_item_names", None) or [])
         )
 
+        assignment_id_value = _coerce_int(
+            _first_from(getattr(entry, "assignment_ids", None) or [])
+        )
+        family_category_value = (
+            assignment_category_by_id.get(assignment_id_value)
+            if assignment_id_value is not None
+            else None
+        )
+        family_std_type_number_value = (
+            assignment_family_std_type_number_by_id.get(assignment_id_value)
+            if assignment_id_value is not None
+            else None
+        )
+        family_std_type_name_value = (
+            assignment_family_std_type_name_by_id.get(assignment_id_value)
+            if assignment_id_value is not None
+            else None
+        )
+        standard_item_type_value = (
+            _coerce_str(standard_item_type_by_id.get(standard_item_id_value))
+            if standard_item_id_value is not None
+            else None
+        )
+
         dynamo_cart_entries.append(
             schemas.DynamoWorkMasterCartEntry(
                 id=int(getattr(entry, "id")),
@@ -1340,9 +1490,7 @@ def export_project_db_for_dynamo(
                 revit_type=_coerce_str(
                     _first_from(getattr(entry, "revit_types", None) or [])
                 ),
-                assignment_id=_coerce_int(
-                    _first_from(getattr(entry, "assignment_ids", None) or [])
-                ),
+                assignment_id=assignment_id_value,
                 standard_item_id=standard_item_id_value,
                 building_name=_coerce_str(
                     _first_from(getattr(entry, "building_names", None) or [])
@@ -1351,17 +1499,12 @@ def export_project_db_for_dynamo(
                     _first_from(getattr(entry, "assignment_labels", None) or [])
                 ),
                 standard_item_name=standard_item_name_value,
-                category=_coerce_str(getattr(wm, "discipline", None) if wm else None),
-                standard_type_number=standard_item_id_value,
-                standard_type_name=standard_item_name_value,
-                classification=_coerce_str(
-                    getattr(wm, "cat_large_desc", None) if wm else None
-                ),
-                item_name=_coerce_str(
-                    getattr(wm, "cat_mid_desc", None) if wm else None
-                ),
-                detail_classification=_coerce_str(
-                    getattr(wm, "cat_small_desc", None) if wm else None
+                category=_coerce_str(family_category_value),
+                standard_type_number=_coerce_str(family_std_type_number_value),
+                standard_type_name=_coerce_str(family_std_type_name_value),
+                classification=standard_item_type_value,
+                detail_classification=_standard_tree_level2_name(
+                    standard_item_id_value
                 ),
                 unit=_compose_unit(wm),
                 work_master=wm,
