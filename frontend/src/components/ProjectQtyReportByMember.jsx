@@ -234,6 +234,14 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
         throw new Error(body?.detail || '수동 산출 업데이트 실패');
       }
 
+      const body = await res.json().catch(() => null);
+      if (body && typeof body === 'object') {
+        const inserted = body.inserted ?? 0;
+        const skipped = body.skipped ?? 0;
+        const matched = body.manual_entries_matched ?? 0;
+        window.alert(`수동 산출 업데이트 완료\n\nmatched: ${matched}\ninserted: ${inserted}\nskipped: ${skipped}`);
+      }
+
       await fetchBuildings();
       await fetchRevKeys(selectedBuilding);
       await fetchRows({ buildingName: selectedBuilding || '', revKey });

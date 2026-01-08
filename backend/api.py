@@ -114,6 +114,8 @@ def _safe_eval_numeric_expr(expr: str, variables: dict) -> Optional[float]:
     """
 
     expr = (expr or "").strip()
+    if expr.startswith("="):
+        expr = expr[1:].strip()
     if not expr:
         return None
 
@@ -2276,11 +2278,17 @@ def manual_update_calc_results(
             return f"{str(seq).strip()}.{str(name).strip()}"
         return str(name).strip() if name else None
 
+    def _norm_label(value: Optional[str]) -> str:
+        raw = (value or "").strip().lower()
+        # keep only a-z/0-9 and '.' so "14. Manual_Input" == "14.manual_input"
+        cleaned = "".join(ch for ch in raw if ch.isalnum() or ch == ".")
+        return cleaned
+
     manual_assignment_ids = set()
     for aid, fid in assignment_family_list_id_by_id.items():
         root = _family_root_meta(fid)
         label = _root_label(root)
-        if (label or "").strip() == "14.Manual_Input":
+        if _norm_label(label) == _norm_label("14.Manual_Input"):
             manual_assignment_ids.add(int(aid))
 
     # Calc dictionary vars per family_list_id
@@ -2377,7 +2385,7 @@ def manual_update_calc_results(
                         "key": key,
                         "rev_key": rev_key,
                         "building_name": bname,
-                        "guid": "__manual__",
+                        "guid": "수동항목",
                         "gui": str(cart_entry_id),
                         "member_name": "Manual_Input",
                         "category": "14.Manual_Input",
