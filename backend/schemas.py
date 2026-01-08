@@ -254,6 +254,13 @@ class CalcResultImportResponse(BaseModel):
     inserted: int = 0
 
 
+class CalcResultDeleteResponse(BaseModel):
+    project_identifier: str
+    building_name: str
+    rev_key: str
+    deleted: int = 0
+
+
 class CalcResultRow(BaseModel):
     id: int
     created_at: str

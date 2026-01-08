@@ -2045,6 +2045,45 @@ def list_calc_result_buildings(
     return [str(r[0]) for r in rows if r and r[0] is not None]
 
 
+@router.delete(
+    "/project/{project_identifier}/calc-result",
+    response_model=schemas.CalcResultDeleteResponse,
+    tags=["Project Data"],
+)
+def delete_calc_results_by_revision(
+    project_identifier: str,
+    building_name: str,
+    rev_key: str,
+    db: Session = Depends(get_project_db_session),
+):
+    building_name = _coerce_str(building_name)
+    rev_key = _coerce_str(rev_key)
+    if not building_name:
+        raise HTTPException(status_code=400, detail="building_name is required")
+    if not rev_key:
+        raise HTTPException(status_code=400, detail="rev_key is required")
+
+    try:
+        res = db.execute(
+            text(
+                "DELETE FROM calc_result WHERE TRIM(COALESCE(building_name,'')) = TRIM(:building_name) AND rev_key = :rev_key"
+            ),
+            {"building_name": building_name, "rev_key": rev_key},
+        )
+        deleted = int(getattr(res, "rowcount", 0) or 0)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete calc results")
+
+    return {
+        "project_identifier": project_identifier,
+        "building_name": building_name,
+        "rev_key": rev_key,
+        "deleted": deleted,
+    }
+
+
 @router.get(
     "/project/{project_identifier}/export/db-excel",
     tags=["Project Data"],

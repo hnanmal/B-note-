@@ -206,6 +206,39 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
     }
   };
 
+  const deleteSelectedRevision = async () => {
+    if (!apiBaseUrl) return;
+    const buildingName = (selectedBuilding || '').trim();
+    const revKey = (selectedRevKey || '').trim();
+    if (!buildingName || !revKey) return;
+
+    const ok = window.confirm(`삭제하시겠습니까?\n\nBuilding: ${buildingName}\nrev_key: ${revKey}\n\n(해당 Building+rev_key 물량이 DB에서 삭제됩니다)`);
+    if (!ok) return;
+
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('building_name', buildingName);
+      params.set('rev_key', revKey);
+
+      const res = await fetch(`${apiBaseUrl}/calc-result?${params.toString()}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.detail || '삭제 실패');
+      }
+
+      await fetchBuildings();
+      await fetchRevKeys(buildingName);
+      setSelectedRevKey('');
+      await fetchRows({ buildingName, revKey: '' });
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : '삭제 실패');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -265,6 +298,16 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
             <option key={k} value={k}>{k}</option>
           ))}
         </select>
+
+        <button
+          type="button"
+          onClick={deleteSelectedRevision}
+          disabled={!selectedBuilding || !selectedRevKey || loading}
+          style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ef4444', background: '#fff', cursor: 'pointer' }}
+          title="선택된 Building + rev_key 데이터 삭제"
+        >
+          Delete (Building+rev)
+        </button>
 
         <button
           type="button"
