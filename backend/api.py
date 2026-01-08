@@ -1437,6 +1437,23 @@ def export_project_db_for_dynamo(
         level2_id = path_ids[2] if len(path_ids) > 2 else path_ids[-1]
         return _coerce_str(standard_item_raw_name_by_id.get(level2_id))
 
+    def _standard_tree_level1_name(standard_item_id):
+        sid = _coerce_int(standard_item_id)
+        if not sid:
+            return None
+        path_ids = []
+        cursor = sid
+        seen = set()
+        while cursor and cursor not in seen:
+            seen.add(cursor)
+            path_ids.append(cursor)
+            cursor = standard_item_parent_id_by_id.get(cursor)
+        path_ids = list(reversed(path_ids))
+        if not path_ids:
+            return None
+        level1_id = path_ids[1] if len(path_ids) > 1 else path_ids[-1]
+        return _coerce_str(standard_item_raw_name_by_id.get(level1_id))
+
     def _compose_unit(wm_obj):
         if wm_obj is None:
             return None
@@ -1482,6 +1499,19 @@ def export_project_db_for_dynamo(
             else None
         )
 
+        standard_tree_level1_value = _standard_tree_level1_name(standard_item_id_value)
+        standard_tree_level2_value = _standard_tree_level2_name(standard_item_id_value)
+        if standard_tree_level1_value and standard_tree_level2_value:
+            detail_classification_value = (
+                f"{standard_tree_level1_value} | {standard_tree_level2_value}"
+            )
+        else:
+            detail_classification_value = (
+                standard_tree_level2_value
+                or standard_tree_level1_value
+                or standard_item_name_value
+            )
+
         dynamo_cart_entries.append(
             schemas.DynamoWorkMasterCartEntry(
                 id=int(getattr(entry, "id")),
@@ -1503,9 +1533,7 @@ def export_project_db_for_dynamo(
                 standard_type_number=_coerce_str(family_std_type_number_value),
                 standard_type_name=_coerce_str(family_std_type_name_value),
                 classification=standard_item_type_value,
-                detail_classification=_standard_tree_level2_name(
-                    standard_item_id_value
-                ),
+                detail_classification=detail_classification_value,
                 unit=_compose_unit(wm),
                 work_master=wm,
                 calc_dictionary_entries=list(
