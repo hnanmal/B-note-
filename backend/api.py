@@ -1714,7 +1714,7 @@ def import_calc_result_json(
         try:
             res = db.execute(
                 text(
-                    "DELETE FROM calc_result WHERE building_name = :building_name AND rev_key = :rev_key"
+                    "DELETE FROM calc_result WHERE TRIM(COALESCE(building_name,'')) = TRIM(:building_name) AND rev_key = :rev_key"
                 ),
                 {"building_name": building_name, "rev_key": rev_key},
             )
@@ -2011,7 +2011,10 @@ def list_calc_result_rev_keys(
                 SELECT DISTINCT rev_key
                 FROM calc_result
                 WHERE rev_key IS NOT NULL AND rev_key != ''
-                  AND (:building_name IS NULL OR building_name = :building_name)
+                                    AND (
+                                        :building_name IS NULL
+                                        OR TRIM(COALESCE(building_name, '')) = TRIM(:building_name)
+                                    )
                 ORDER BY rev_key
                 """
         ),

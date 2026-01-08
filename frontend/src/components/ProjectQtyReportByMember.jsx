@@ -221,7 +221,10 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
       const payload = JSON.parse(text);
       const nextBuildingName = extractBuildingNameFromJson(payload);
 
-      const existingKeys = await fetchRevKeys(nextBuildingName);
+      let existingKeys = await fetchRevKeys(nextBuildingName);
+      if (!existingKeys.length) {
+        existingKeys = await fetchRevKeys('');
+      }
       setPendingImportFile(file);
       setPendingImportBuildingName(nextBuildingName);
       setPendingExistingRevKeys(existingKeys);
@@ -359,22 +362,19 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
           </div>
 
           {pendingRevMode === 'existing' && (
-            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-              {pendingExistingRevKeys.length ? (
-                pendingExistingRevKeys.map((k) => (
-                  <label key={k} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
-                    <input
-                      type="radio"
-                      name="existingRevKey"
-                      checked={pendingSelectedExistingRevKey === k}
-                      onChange={() => setPendingSelectedExistingRevKey(k)}
-                    />
-                    <span>{k}</span>
-                  </label>
-                ))
-              ) : (
-                <div style={{ fontSize: 12, color: '#6b7280' }}>기존 rev_key가 없습니다.</div>
-              )}
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>rev_key</div>
+              <select
+                value={pendingSelectedExistingRevKey}
+                onChange={(e) => setPendingSelectedExistingRevKey(e.target.value)}
+              >
+                {pendingExistingRevKeys.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                (선택 시 해당 Building+rev_key 데이터를 삭제 후 덮어쓰기)
+              </div>
             </div>
           )}
 
