@@ -270,10 +270,19 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
       setStandardItemWorkMasters({});
       return undefined;
     }
+    const primaryIds = new Set(
+      familyAssignments
+        .map((assignment) => assignment?.standard_item?.id)
+        .filter((id) => Number.isFinite(id))
+    );
+
     const ids = Array.from(
       new Set(
         familyAssignments
-          .map((assignment) => assignment?.standard_item?.id)
+          .flatMap((assignment) => {
+            const std = assignment?.standard_item;
+            return [std?.id, std?.parent_id, std?.derive_from];
+          })
           .filter((id) => Number.isFinite(id))
       )
     );
@@ -292,7 +301,7 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
               const data = await res.json();
               let selectedWorkMaster = null;
               const selectedId = data?.selected_work_master_id;
-              if (selectedId) {
+              if (primaryIds.has(id) && selectedId) {
                 try {
                   const wmRes = await fetch(`${apiBaseUrl}/work-masters/${selectedId}`);
                   if (wmRes.ok) {
@@ -825,18 +834,34 @@ export default function ProjectFamilyAssign({ apiBaseUrl }) {
     return map;
   }, [familyAssignments]);
 
+  const standardItemLookupById = useMemo(() => {
+    const map = new Map(standardItemById);
+    Object.values(standardItemWorkMasters).forEach((entry) => {
+      const std = entry?.standardItem;
+      if (std?.id != null) {
+        map.set(std.id, std);
+      }
+    });
+    return map;
+  }, [standardItemById, standardItemWorkMasters]);
+
   const buildItemPath = (standardItem) => {
     if (!standardItem) return '—';
     const isDerived = Boolean(standardItem.derive_from);
     if (isDerived) {
-      const parentName = standardItemById.get(standardItem.derive_from)?.name;
+      const deriveFromItem = standardItemLookupById.get(standardItem.derive_from);
+      const itemLevel2Name = deriveFromItem?.name;
+      const itemLevel1Name = deriveFromItem?.parent_id
+        ? standardItemLookupById.get(deriveFromItem.parent_id)?.name
+        : undefined;
       const abbrPart = projectAbbr ? ` [${projectAbbr}]` : '';
       const childName = (standardItem.name || '').replace(/\s*\[[^\]]*]\s*$/, '').trim() || standardItem.name;
-      return `${parentName ?? '부모'}${abbrPart}::${childName}`;
+      const derivedLabel = `${itemLevel2Name ?? '부모'}${abbrPart}::${childName}`;
+      return itemLevel1Name ? `${itemLevel1Name} | ${derivedLabel}` : derivedLabel;
     }
     const level2 = standardItem.name ?? '—';
     if (!standardItem.parent_id) return level2;
-    const parent = standardItemById.get(standardItem.parent_id);
+    const parent = standardItemLookupById.get(standardItem.parent_id);
     const level1 = parent?.name;
     const parts = [level1, level2].filter(Boolean);
     return parts.length ? parts.join(' | ') : level2;
