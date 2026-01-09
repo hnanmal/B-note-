@@ -1,7 +1,6 @@
 A. 서버가 외부에서 보이게 바인딩
 FastAPI(uvicorn)라면 보통 이렇게 필요합니다:
-
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
+venv\scripts\activate
 uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
 

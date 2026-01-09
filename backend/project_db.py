@@ -13,7 +13,7 @@ MANIFEST_PATH = PROJECT_DB_DIR / "project_db_manifest.json"
 TEMPLATE_DB = PROJECT_DIR / "b-note-dev.db"
 ADMIN_KEY = "HECBIM"
 
-FILENAME_PATTERN = re.compile(r"^[0-9a-z_\-]+\.db$")
+FILENAME_PATTERN = re.compile(r'^[^<>:"/\\|\?\*\x00-\x1F]+\.db$', re.IGNORECASE)
 EXTRA_TABLE_STATEMENTS = [
     """
     CREATE TABLE IF NOT EXISTS project_metadata (
@@ -114,17 +114,10 @@ def _write_manifest(data: Dict[str, Dict[str, str]]) -> None:
     )
 
 
-def _slugify(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
-    if not slug:
-        slug = "project"
-    return slug
-
-
 def _next_available_path(
     display_name: str, *, allow_same: Optional[str] = None
 ) -> Path:
-    base = _slugify(display_name)
+    base = _sanitize_display_name_for_filename(display_name)
     candidate = PROJECT_DB_DIR / f"{base}.db"
     if allow_same and candidate.name == allow_same:
         return candidate
@@ -151,9 +144,46 @@ def _resolve_path(file_name: str) -> Path:
     return resolved
 
 
+def _resolve_any_filename(file_name: str) -> Path:
+    if not file_name or file_name in {".", ".."}:
+        raise ValueError("잘못된 경로입니다.")
+    # Prevent path traversal / absolute paths.
+    if "/" in file_name or "\\" in file_name:
+        raise ValueError("잘못된 경로입니다.")
+    if _WINDOWS_INVALID_FILENAME_CHARS.search(file_name):
+        raise ValueError("파일 이름이 유효하지 않습니다.")
+    candidate = PROJECT_DB_DIR / file_name
+    if not candidate.exists():
+        raise FileNotFoundError("요청하신 프로젝트 DB를 찾을 수 없습니다.")
+    resolved = candidate.resolve()
+    if resolved.parent != PROJECT_DB_DIR.resolve():
+        raise ValueError("잘못된 경로입니다.")
+    if not resolved.is_file():
+        raise FileNotFoundError("요청하신 프로젝트 DB를 찾을 수 없습니다.")
+    return resolved
+
+
+def _looks_like_sqlite_db(path: Path) -> bool:
+    try:
+        with path.open("rb") as fp:
+            header = fp.read(16)
+        return header.startswith(b"SQLite format 3\x00")
+    except OSError:
+        return False
+
+
 def resolve_project_db_path(identifier: str) -> Path:
-    candidate_file = identifier if identifier.endswith(".db") else f"{identifier}.db"
-    return _resolve_path(candidate_file)
+    # Historical behavior: accept both "foo" (routes) and "foo.db" (file name).
+    if identifier.endswith(".db"):
+        return _resolve_path(identifier)
+    try:
+        return _resolve_path(f"{identifier}.db")
+    except FileNotFoundError:
+        # Be robust to accidental extension removal (Windows Explorer often hides extensions).
+        resolved = _resolve_any_filename(identifier)
+        if not _looks_like_sqlite_db(resolved):
+            raise FileNotFoundError("요청하신 프로젝트 DB를 찾을 수 없습니다.")
+        return resolved
 
 
 def _register_entry(
@@ -196,7 +226,20 @@ def _entry_from_path(file_name: str, metadata: Dict[str, str]) -> Dict[str, str]
 def list_project_dbs() -> List[Dict[str, str]]:
     items: List[Dict[str, str]] = []
     manifest = _read_manifest()
-    for file_path in sorted(PROJECT_DB_DIR.glob("*.db")):
+    candidates: List[Path] = []
+    for child in PROJECT_DB_DIR.iterdir():
+        if not child.is_file():
+            continue
+        if child.name == MANIFEST_PATH.name:
+            continue
+        if child.suffix.lower() == ".db":
+            candidates.append(child)
+            continue
+        # Include extensionless SQLite DB files (accidental rename can drop ".db").
+        if child.suffix == "" and _looks_like_sqlite_db(child):
+            candidates.append(child)
+
+    for file_path in sorted(candidates, key=lambda p: p.name.lower()):
         metadata = manifest.get(file_path.name, {})
         items.append(_entry_from_path(file_path.name, metadata))
     items.sort(key=lambda item: item["created_at"], reverse=True)
