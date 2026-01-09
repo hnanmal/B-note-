@@ -408,7 +408,7 @@ function WorkMasterManager({ apiBaseUrl = API_BASE_URL, selectedFamilyNode = nul
     );
 }
 
-const tableHeaderStyle = { padding: '8px', border: '1px solid #ddd', textAlign: 'left' };
-const tableCellStyle = { padding: '8px', border: '1px solid #ddd' };
+const tableHeaderStyle = { padding: '6px 8px', border: '1px solid #ddd', textAlign: 'left', fontSize: 12 };
+const tableCellStyle = { padding: '6px 8px', border: '1px solid #ddd', fontSize: 12 };
 
 export default WorkMasterManager;
