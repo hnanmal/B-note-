@@ -200,6 +200,7 @@ export default function ProjectPage() {
         method: 'DELETE',
       });
       await parseResponse(response);
+      setAdminKey('');
       setStatus({ type: 'success', message: `’${displayName}’ 프로젝트 DB가 삭제되었습니다.` });
       await fetchProjectDbs();
     } catch (error) {
