@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 
 const baseHeaders = [
   'Work Master Code',
@@ -19,6 +20,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [aggregatedRows, setAggregatedRows] = useState([]);
   const [midOrder, setMidOrder] = useState({});
+  const [pjtAbbr, setPjtAbbr] = useState('');
 
   useEffect(() => {
     if (!apiBaseUrl) return;
@@ -43,6 +45,14 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setRevKeys(data);
+      })
+      .catch(() => {});
+
+    // fetch project abbreviation for filename
+    fetch(`${apiBaseUrl}/metadata/abbr`)
+      .then(r => (r.ok ? r.json().catch(() => null) : null))
+      .then(md => {
+        if (md && md.pjt_abbr) setPjtAbbr(String(md.pjt_abbr));
       })
       .catch(() => {});
   }, [apiBaseUrl]);
@@ -175,6 +185,133 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
 
   const displayedBuildings = selectedBuilding ? [selectedBuilding] : buildingNames;
 
+  const exportToExcel = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // build header row
+      const headers = [...baseHeaders, ...displayedBuildings];
+      const data = [headers];
+
+      // helper to format number as in table
+      const fmt = (v) => {
+        if (v == null || v === '') return '';
+        return Number.isInteger(v) ? v : Number(v).toFixed(3);
+      };
+
+      for (const [groupName, items] of aggregatedRows) {
+        // group header row
+        const gh = new Array(headers.length).fill('');
+        gh[2] = groupName || '(Uncategorized)';
+        data.push(gh);
+
+        // group mid mapping and ordering
+        const midMap = new Map();
+        for (const it of items) {
+          const mid = (it.cat_mid_desc || '').trim();
+          if (!midMap.has(mid)) midMap.set(mid, []);
+          midMap.get(mid).push(it);
+        }
+        const midsForLarge = (midOrder && midOrder[groupName]) || [];
+        const allMids = Array.from(midMap.keys());
+        const remaining = allMids.filter(m => !midsForLarge.includes(m)).sort((a,b)=> (a||'').localeCompare(b||''));
+        const orderedMidNames = [
+          ...midsForLarge.filter(m => midMap.has(m)),
+          ...remaining,
+        ];
+
+        for (const midName of orderedMidNames) {
+          const midRow = new Array(headers.length).fill('');
+          midRow[2] = midName || '(Uncategorized Mid)';
+          data.push(midRow);
+
+          const rows = midMap.get(midName) || [];
+          for (const row of rows) {
+            const r = [
+              row.wm_code || '',
+              row.gauge || '',
+              row.description || '',
+              row.spec || '',
+              row.add_spec || '',
+              row.reference_to || '',
+              row.uom || '',
+              fmt(row.total),
+            ];
+            for (const b of displayedBuildings) r.push(fmt(row.byBuilding[b] || 0));
+            data.push(r);
+          }
+        }
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+
+      // apply simple styles: headers, group header, mid header
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = ws[cellAddress];
+          if (!cell) continue;
+          // header row
+          if (R === 0) {
+            cell.s = cell.s || {};
+            cell.s.font = { bold: true, color: { rgb: '2C1B00' } };
+            cell.s.fill = { fgColor: { rgb: 'F7C748'.replace('#','') } };
+          }
+        }
+      }
+
+      // Post-process to style group and mid headers by simple heuristic: rows where first two cols empty and desc is set and Total col empty
+      for (let R = 1; R <= range.e.r; ++R) {
+        const c0 = XLSX.utils.encode_cell({ r: R, c: 0 });
+        const c1 = XLSX.utils.encode_cell({ r: R, c: 1 });
+        const c7 = XLSX.utils.encode_cell({ r: R, c: 7 });
+        const desc = ws[XLSX.utils.encode_cell({ r: R, c: 2 })];
+        const v0 = ws[c0] && String(ws[c0].v || '').trim();
+        const v1 = ws[c1] && String(ws[c1].v || '').trim();
+        const v7 = ws[c7] && String(ws[c7].v || '').trim();
+        if ((!v0 && !v1) && desc && (!v7)) {
+          // treat as group header (level1) or mid header depending on next row existence
+          // if next row has wm_code filled -> this is mid header? We will detect mid if the next non-empty desc is the same
+          const nextRow = R + 1;
+          const nextC0 = ws[XLSX.utils.encode_cell({ r: nextRow, c: 0 })];
+          // choose color: if nextC0 exists and has wm_code => mid header, else group header
+          const isMid = nextC0 && nextC0.v;
+          const fillColor = isMid ? { fgColor: { rgb: 'FFF9E6'.replace('#','') } } : { fgColor: { rgb: 'E6F9E6'.replace('#','') } };
+          // style the whole row
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const ca = XLSX.utils.encode_cell({ r: R, c: C });
+            const cc = ws[ca];
+            if (!cc) continue;
+            cc.s = cc.s || {};
+            cc.s.fill = fillColor;
+            cc.s.font = { bold: true };
+          }
+        }
+      }
+
+      // column widths approximate
+      const colWidths = [];
+      for (let i = 0; i < headers.length; ++i) {
+        if (i === 0) colWidths.push({ wch: 18 });
+        else if (i === 1) colWidths.push({ wch: 6 });
+        else if (i === 2) colWidths.push({ wch: 35 });
+        else colWidths.push({ wch: 12 });
+      }
+      ws['!cols'] = colWidths;
+
+      XLSX.utils.book_append_sheet(wb, ws, 'QtyReport');
+      // filename: "프로젝트약호_Total BOQ_rev(리비전 정보)"
+      const abbr = (pjtAbbr || '프로젝트').replace(/\s+/g, '_');
+      const revPart = selectedRevKey ? String(selectedRevKey) : 'rev';
+      const fileName = `${abbr}_Total BOQ_rev(${revPart}).xlsx`;
+      XLSX.writeFile(wb, fileName, { bookType: 'xlsx', cellStyles: true });
+    } catch (e) {
+      console.error('Export failed', e);
+      alert('Excel export failed. See console for details.');
+    }
+  };
+
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #0001', padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
@@ -193,6 +330,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
             ))}
           </select>
         </div>
+        
         <div>
           <select
             value={selectedBuilding}
@@ -205,6 +343,17 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               <option key={b} value={b}>{b}</option>
             ))}
           </select>
+        </div>
+        <div style={{ marginLeft: 'auto' }}>
+          <button
+            type="button"
+            onClick={() => exportToExcel()}
+            disabled={!aggregatedRows.length}
+            style={{ height: 28, fontSize: 13, padding: '0 10px', borderRadius: 6, border: '1px solid #374151', background: '#fff', cursor: 'pointer' }}
+            title="Export current sheet to Excel (with styles)"
+          >
+            Export to Excel
+          </button>
         </div>
       </div>
       <div style={{ flex: '1 1 auto', overflow: 'auto' }}>
