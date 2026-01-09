@@ -4706,6 +4706,20 @@ def rename_project_database(file_name: str, payload: schemas.ProjectDbRename):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@router.post(
+    "/project-db/{file_name}/backup",
+    response_model=schemas.ProjectDbBackupResponse,
+    tags=["Project DB"],
+)
+def backup_project_database(file_name: str):
+    try:
+        return project_db.backup_project_db(file_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @router.delete("/project-db/{file_name}", tags=["Project DB"])
 def delete_project_database(file_name: str, admin_key: str):
     if admin_key != project_db.ADMIN_KEY:

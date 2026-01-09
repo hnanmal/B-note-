@@ -361,6 +361,51 @@ def delete_project_db(file_name: str) -> None:
     _remove_entry(file_name)
 
 
+_WINDOWS_INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|\?\*\x00-\x1F]')
+
+
+def _sanitize_display_name_for_filename(value: str) -> str:
+    raw = (value or "").strip() or "project"
+    raw = _WINDOWS_INVALID_FILENAME_CHARS.sub("_", raw)
+    raw = raw.rstrip(" .")
+    return raw or "project"
+
+
+def backup_project_db(source_file: str) -> Dict[str, str]:
+    source_path = _resolve_path(source_file)
+    metadata = _metadata_for(source_file)
+    display_name = metadata.get("display_name", source_path.stem)
+
+    backup_dir = PROJECT_DB_DIR / "backup"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_display = _sanitize_display_name_for_filename(display_name)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    candidate = backup_dir / f"{safe_display}_{timestamp}.db"
+    counter = 1
+    while candidate.exists():
+        candidate = backup_dir / f"{safe_display}_{timestamp}_{counter}.db"
+        counter += 1
+
+    src_conn = sqlite3.connect(source_path.as_posix())
+    try:
+        dst_conn = sqlite3.connect(candidate.as_posix())
+        try:
+            src_conn.backup(dst_conn)
+            dst_conn.commit()
+        finally:
+            dst_conn.close()
+    finally:
+        src_conn.close()
+
+    return {
+        "file_name": source_file,
+        "display_name": display_name,
+        "backup_file_name": candidate.name,
+        "backup_created_at": datetime.now().isoformat(),
+    }
+
+
 def _fetch_metadata_row(conn: sqlite3.Connection):
     cursor = conn.cursor()
     cursor.execute(

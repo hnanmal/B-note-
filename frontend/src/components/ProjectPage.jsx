@@ -107,6 +107,27 @@ export default function ProjectPage() {
     }
   };
 
+  const handleBackup = async (fileName, displayName) => {
+    setActionPending(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-db/${encodeURIComponent(fileName)}/backup`, {
+        method: 'POST',
+      });
+      const result = await parseResponse(response);
+      const backupFileName = result?.backup_file_name;
+      setStatus({
+        type: 'success',
+        message: backupFileName
+          ? `’${displayName}’ 백업 완료: ${backupFileName}`
+          : `’${displayName}’ 백업이 생성되었습니다.`,
+      });
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message });
+    } finally {
+      setActionPending(false);
+    }
+  };
+
   const startRename = (db) => {
     setRenameTarget(db.file_name);
     setRenameValue(db.display_name);
@@ -231,7 +252,24 @@ export default function ProjectPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12 }}>
           {projectDbs.map((db) => (
             <article key={db.file_name} style={{ borderRadius: 10, border: '1px solid rgba(15,23,42,0.12)', padding: 12, display: 'flex', flexDirection: 'column', gap: 6, background: '#f8fafc' }}>
-              <div style={{ fontSize: 16, fontWeight: 600 }}>{db.display_name}</div>
+              <button
+                type="button"
+                onClick={() => handleOpenProjectRoute(db)}
+                disabled={actionPending}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  textAlign: 'left',
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  cursor: actionPending ? 'not-allowed' : 'pointer',
+                }}
+                title="프로젝트 편집 열기"
+              >
+                {db.display_name}
+              </button>
               <div style={{ fontSize: 12, color: '#475467' }}>파일: {db.file_name}</div>
               <div style={{ fontSize: 12, color: '#475467' }}>생성일: {formatDate(db.created_at)} · 크기: {formatBytes(db.size)}</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -241,6 +279,13 @@ export default function ProjectPage() {
                   onClick={() => handleCopy(db.file_name, db.display_name)}
                 >
                   복사
+                </button>
+                <button
+                  style={{ border: 'none', borderRadius: 6, padding: '4px 8px', background: '#e0e7ff', color: '#1d4ed8', cursor: actionPending ? 'not-allowed' : 'pointer', fontSize: 12 }}
+                  disabled={actionPending}
+                  onClick={() => handleBackup(db.file_name, db.display_name)}
+                >
+                  백업
                 </button>
                 <button
                   style={{ border: 'none', borderRadius: 6, padding: '4px 8px', background: '#e0f2fe', color: '#0f172a', cursor: actionPending ? 'not-allowed' : 'pointer', fontSize: 12 }}
@@ -255,13 +300,6 @@ export default function ProjectPage() {
                   onClick={() => handleDelete(db.file_name, db.display_name)}
                 >
                   삭제
-                </button>
-                <button
-                  style={{ border: 'none', borderRadius: 6, padding: '4px 8px', background: '#eef2ff', color: '#1d4ed8', cursor: actionPending ? 'not-allowed' : 'pointer', fontSize: 12 }}
-                  disabled={actionPending}
-                  onClick={() => handleOpenProjectRoute(db)}
-                >
-                  프로젝트 편집
                 </button>
               </div>
               {renameTarget === db.file_name && (
