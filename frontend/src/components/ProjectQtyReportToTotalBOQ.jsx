@@ -69,6 +69,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
           const key = `${code}||${gauge}`;
           const building = r.building_name || '';
           const qty = Number(r.result) || 0;
+          const cat = (r.cat_large_desc || r.category || '').trim();
           if (!map.has(key)) {
             map.set(key, {
               wm_code: code,
@@ -80,6 +81,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               uom: r.unit || r.uom || '',
               total: 0,
               byBuilding: {},
+              cat_large_desc: cat,
             });
           }
           const item = map.get(key);
@@ -90,7 +92,46 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
         const out = Array.from(map.values());
         // sort by wm_code
         out.sort((a, b) => (a.wm_code || '').localeCompare(b.wm_code || ''));
-        setAggregatedRows(out);
+        // try to enrich items with cat_large_desc by looking up work_masters
+        const normalize = (s) => (s || '').toString().trim();
+        fetch(`${apiBaseUrl}/work-masters/`)
+          .then((r) => (r.ok ? r.json().catch(() => []) : []))
+          .then((wms) => {
+            const wmMap = new Map();
+            if (Array.isArray(wms)) {
+              for (const wm of wms) {
+                const key = `${normalize(wm.work_master_code)}||${normalize(wm.gauge)}`;
+                wmMap.set(key, wm);
+              }
+            }
+
+            for (const item of out) {
+              const key = `${normalize(item.wm_code)}||${normalize(item.gauge)}`;
+              let wm = wmMap.get(key);
+              if (!wm) {
+                // try uppercase gauge fallback
+                wm = wmMap.get(`${normalize(item.wm_code)}||${normalize(item.gauge).toUpperCase()}`) || wmMap.get(`${normalize(item.wm_code).toUpperCase()}||${normalize(item.gauge).toUpperCase()}`);
+              }
+              item.cat_large_desc = (wm && (wm.cat_large_desc || wm.cat_large_code || '')) || item.cat_large_desc || '';
+            }
+
+            const grouped = new Map();
+            for (const item of out) {
+              const g = item.cat_large_desc || '';
+              if (!grouped.has(g)) grouped.set(g, []);
+              grouped.get(g).push(item);
+            }
+            setAggregatedRows(Array.from(grouped.entries()));
+          })
+          .catch(() => {
+            const grouped = new Map();
+            for (const item of out) {
+              const g = item.cat_large_desc || '';
+              if (!grouped.has(g)) grouped.set(g, []);
+              grouped.get(g).push(item);
+            }
+            setAggregatedRows(Array.from(grouped.entries()));
+          });
       })
       .catch(() => setAggregatedRows([]));
   }, [apiBaseUrl, selectedRevKey]);
@@ -140,25 +181,45 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               </td>
             </tr>
           ) : (
-            aggregatedRows.map((row, idx) => {
+            aggregatedRows.map(([groupName, items], groupIdx) => {
               const fmt = (v) => {
                 if (v == null || v === '') return '';
                 return Number.isInteger(v) ? String(v) : (Number(v).toFixed(3));
               };
               return (
-                <tr key={`${row.wm_code}||${row.gauge}||${idx}`}>
-                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.wm_code}</td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.gauge}</td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.description}</td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{''}</td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.uom}</td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.total)}</td>
-                  {buildingNames.map((b) => (
-                    <td key={b} style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.byBuilding[b] || 0)}</td>
+                // fragment for group header + rows
+                <React.Fragment key={`group-${groupIdx}-${groupName}`}>
+                  <tr>
+                    {/* empty cells for first two columns */}
+                    <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
+                    <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
+                    <td style={{ padding: '8px 10px', border: '1px solid #e6e6e6', background: '#f3f4f6', fontWeight: 700 }}>
+                      {groupName || '(Uncategorized)'}
+                    </td>
+                    {/* remaining base header cells (Description already used) */}
+                    {Array.from({ length: baseHeaders.length - 3 }).map((_, i) => (
+                      <td key={`gh-${groupIdx}-${i}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
+                    ))}
+                    {buildingNames.map((b) => (
+                      <td key={`gh-b-${groupIdx}-${b}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
+                    ))}
+                  </tr>
+                  {items.map((row, idx) => (
+                    <tr key={`${row.wm_code}||${row.gauge}||${groupIdx}||${idx}`}>
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.wm_code}</td>
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.gauge}</td>
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.description}</td>
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{''}</td>
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.uom}</td>
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.total)}</td>
+                      {buildingNames.map((b) => (
+                        <td key={`val-${groupIdx}-${idx}-${b}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.byBuilding[b] || 0)}</td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
+                </React.Fragment>
               );
             })
           )}
