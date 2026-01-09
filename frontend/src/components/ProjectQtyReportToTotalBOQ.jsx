@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
+// use the browser-ready bundle of ExcelJS to avoid bundler resolution/polyfill issues
+import ExcelJS from 'exceljs/dist/exceljs.min.js';
+import { saveAs } from 'file-saver';
 
 const baseHeaders = [
   'Work Master Code',
@@ -185,33 +188,59 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
 
   const displayedBuildings = selectedBuilding ? [selectedBuilding] : buildingNames;
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     try {
-      const wb = XLSX.utils.book_new();
-
-      // build header row
       const headers = [...baseHeaders, ...displayedBuildings];
-      const data = [headers];
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'B-note';
+      const sheet = workbook.addWorksheet('QtyReport');
 
-      // helper to produce numeric values (rounded to 3 decimals) for numeric cells
+      // define fills and styles
+      // header background: gray (#E5E7EB), header font size 10
+      const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+      const groupFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F9E6' } };
+      const midFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF9E6' } };
+      const headerFont = { bold: true, color: { argb: 'FF2C1B00' }, size: 10 };
+      const groupFont = { bold: true, size: 9 };
+      const numFmt = '#,##0.###';
+
+      // set columns with widths
+      sheet.columns = headers.map((h, i) => {
+        if (i === 0) return { header: h, key: `c${i}`, width: 18 };
+        if (i === 1) return { header: h, key: `c${i}`, width: 6 };
+        if (i === 2) return { header: h, key: `c${i}`, width: 35 };
+        return { header: h, key: `c${i}`, width: 12 };
+      });
+
+      // add header row separately to apply style
+      const headerRow = sheet.getRow(1);
+      headers.forEach((h, idx) => {
+        const cell = headerRow.getCell(idx + 1);
+        cell.value = h;
+        cell.font = headerFont; // size 10
+        cell.fill = headerFill; // gray background
+        cell.alignment = { vertical: 'middle', horizontal: idx >= 7 ? 'right' : 'left' };
+      });
+      headerRow.commit();
+
+      // helper numeric
       const numVal = (v) => {
         if (v == null || v === '') return 0;
         const n = Number(v) || 0;
         return Math.round(n * 1000) / 1000;
       };
-      // string formatter for non-numeric display cells when needed
-      const fmtStr = (v) => {
-        if (v == null || v === '') return '';
-        return Number.isInteger(v) ? String(v) : Number(v).toFixed(3);
-      };
 
+      // data rows starting at rowIndex
       for (const [groupName, items] of aggregatedRows) {
-        // group header row
-        const gh = new Array(headers.length).fill('');
-        gh[2] = groupName || '(Uncategorized)';
-        data.push(gh);
+        // group header row (empty first two, groupName in third)
+        const gRow = sheet.addRow([ '', '', groupName, ...Array(headers.length - 3).fill('') ]);
+        gRow.eachCell((cell) => {
+          cell.fill = groupFill;
+          cell.font = groupFont; // size 9, bold
+        });
+        gRow.commit();
 
-        // group mid mapping and ordering
+        // mids
         const midMap = new Map();
         for (const it of items) {
           const mid = (it.cat_mid_desc || '').trim();
@@ -221,19 +250,19 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
         const midsForLarge = (midOrder && midOrder[groupName]) || [];
         const allMids = Array.from(midMap.keys());
         const remaining = allMids.filter(m => !midsForLarge.includes(m)).sort((a,b)=> (a||'').localeCompare(b||''));
-        const orderedMidNames = [
-          ...midsForLarge.filter(m => midMap.has(m)),
-          ...remaining,
-        ];
+        const orderedMidNames = [ ...midsForLarge.filter(m => midMap.has(m)), ...remaining ];
 
         for (const midName of orderedMidNames) {
-          const midRow = new Array(headers.length).fill('');
-          midRow[2] = midName || '(Uncategorized Mid)';
-          data.push(midRow);
+          const mr = sheet.addRow([ '', '', midName, ...Array(headers.length - 3).fill('') ]);
+          mr.eachCell((cell) => {
+            cell.fill = midFill;
+            cell.font = groupFont; // size 9, bold
+          });
+          mr.commit();
 
           const rows = midMap.get(midName) || [];
           for (const row of rows) {
-            const r = [
+            const dataRow = [
               row.wm_code || '',
               row.gauge || '',
               row.description || '',
@@ -243,102 +272,35 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               row.uom || '',
               numVal(row.total),
             ];
-            for (const b of displayedBuildings) r.push(numVal((row.byBuilding && row.byBuilding[b]) || 0));
-            data.push(r);
-          }
-        }
-      }
-
-      const ws = XLSX.utils.aoa_to_sheet(data);
-
-      // apply simple styles: headers, group header, mid header, and numeric formatting
-      const range = XLSX.utils.decode_range(ws['!ref']);
-      const headerFill = { fgColor: { rgb: 'F7C748' } };
-      const groupFill = { fgColor: { rgb: 'E6F9E6' } };
-      const midFill = { fgColor: { rgb: 'FFF9E6' } };
-      const numFmt = '#,##0.###';
-
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-          let cell = ws[cellAddress];
-          // ensure cell exists for numeric columns so we can style them
-          if (!cell) {
-            // if this is a numeric column (Total or building cols), create zero cell
-            if (R > 0 && C >= 7) {
-              cell = { t: 'n', v: 0 };
-              ws[cellAddress] = cell;
-            } else {
-              continue;
+            for (const b of displayedBuildings) dataRow.push(numVal((row.byBuilding && row.byBuilding[b]) || 0));
+            const dr = sheet.addRow(dataRow);
+            // set row font size 9 for data rows
+            dr.eachCell((cell) => {
+              // skip overriding header-style cells; for data rows use size 9
+              cell.font = { size: 9 };
+            });
+            // format numeric cells
+            const totalCell = dr.getCell(8);
+            totalCell.numFmt = numFmt;
+            totalCell.alignment = { horizontal: 'right' };
+            for (let ci = 9; ci <= headers.length; ++ci) {
+              const nc = dr.getCell(ci);
+              nc.numFmt = numFmt;
+              nc.alignment = { horizontal: 'right' };
             }
-          }
-
-          // convert numeric-looking strings to numbers for proper formatting
-          if (cell.t === 's' || typeof cell.v === 'string') {
-            const parsed = parseFloat(String(cell.v).replace(/,/g, ''));
-            if (!Number.isNaN(parsed) && C >= 7) {
-              cell.v = Math.round(parsed * 1000) / 1000;
-              cell.t = 'n';
-            }
-          }
-
-          // header row
-          if (R === 0) {
-            cell.s = cell.s || {};
-            cell.s.font = { bold: true, color: { rgb: '2C1B00' } };
-            cell.s.fill = headerFill;
-          }
-
-          // numeric columns: Total (C===7) and building columns (C>=8)
-          if (R >= 1 && C >= 7) {
-            cell.s = cell.s || {};
-            cell.s.numFmt = numFmt;
-            cell.s.alignment = { horizontal: 'right' };
+            dr.commit();
           }
         }
       }
 
-      // Post-process to style group and mid headers by simple heuristic: rows where first two cols empty and desc is set and Total col empty
-      for (let R = 1; R <= range.e.r; ++R) {
-        const c0 = XLSX.utils.encode_cell({ r: R, c: 0 });
-        const c1 = XLSX.utils.encode_cell({ r: R, c: 1 });
-        const c7 = XLSX.utils.encode_cell({ r: R, c: 7 });
-        const descCell = ws[XLSX.utils.encode_cell({ r: R, c: 2 })];
-        const v0 = ws[c0] && String(ws[c0].v || '').trim();
-        const v1 = ws[c1] && String(ws[c1].v || '').trim();
-        const v7 = ws[c7] && (ws[c7].t === 'n' ? String(ws[c7].v) : String(ws[c7].v || '')).trim();
-        if ((!v0 && !v1) && descCell && (!v7 || v7 === '0')) {
-          const nextRow = R + 1;
-          const nextC0 = ws[XLSX.utils.encode_cell({ r: nextRow, c: 0 })];
-          const isMid = nextC0 && nextC0.v;
-          const fill = isMid ? midFill : groupFill;
-          for (let C = range.s.c; C <= range.e.c; ++C) {
-            const ca = XLSX.utils.encode_cell({ r: R, c: C });
-            const cc = ws[ca];
-            if (!cc) continue;
-            cc.s = cc.s || {};
-            cc.s.fill = fill;
-            cc.s.font = { bold: true };
-          }
-        }
-      }
-
-      // column widths approximate
-      const colWidths = [];
-      for (let i = 0; i < headers.length; ++i) {
-        if (i === 0) colWidths.push({ wch: 18 });
-        else if (i === 1) colWidths.push({ wch: 6 });
-        else if (i === 2) colWidths.push({ wch: 35 });
-        else colWidths.push({ wch: 12 });
-      }
-      ws['!cols'] = colWidths;
-
-      XLSX.utils.book_append_sheet(wb, ws, 'QtyReport');
       // filename: "프로젝트약호_Total BOQ_rev(리비전 정보)"
       const abbr = (pjtAbbr || '프로젝트').replace(/\s+/g, '_');
       const revPart = selectedRevKey ? String(selectedRevKey) : 'rev';
       const fileName = `${abbr}_Total BOQ_rev(${revPart}).xlsx`;
-      XLSX.writeFile(wb, fileName, { bookType: 'xlsx', cellStyles: true });
+
+      const buf = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, fileName);
     } catch (e) {
       console.error('Export failed', e);
       alert('Excel export failed. See console for details.');
