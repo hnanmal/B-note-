@@ -193,10 +193,16 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
       const headers = [...baseHeaders, ...displayedBuildings];
       const data = [headers];
 
-      // helper to format number as in table
-      const fmt = (v) => {
+      // helper to produce numeric values (rounded to 3 decimals) for numeric cells
+      const numVal = (v) => {
+        if (v == null || v === '') return 0;
+        const n = Number(v) || 0;
+        return Math.round(n * 1000) / 1000;
+      };
+      // string formatter for non-numeric display cells when needed
+      const fmtStr = (v) => {
         if (v == null || v === '') return '';
-        return Number.isInteger(v) ? v : Number(v).toFixed(3);
+        return Number.isInteger(v) ? String(v) : Number(v).toFixed(3);
       };
 
       for (const [groupName, items] of aggregatedRows) {
@@ -235,9 +241,9 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               row.add_spec || '',
               row.reference_to || '',
               row.uom || '',
-              fmt(row.total),
+              numVal(row.total),
             ];
-            for (const b of displayedBuildings) r.push(fmt(row.byBuilding[b] || 0));
+            for (const b of displayedBuildings) r.push(numVal((row.byBuilding && row.byBuilding[b]) || 0));
             data.push(r);
           }
         }
@@ -245,18 +251,49 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
 
       const ws = XLSX.utils.aoa_to_sheet(data);
 
-      // apply simple styles: headers, group header, mid header
+      // apply simple styles: headers, group header, mid header, and numeric formatting
       const range = XLSX.utils.decode_range(ws['!ref']);
+      const headerFill = { fgColor: { rgb: 'F7C748' } };
+      const groupFill = { fgColor: { rgb: 'E6F9E6' } };
+      const midFill = { fgColor: { rgb: 'FFF9E6' } };
+      const numFmt = '#,##0.###';
+
       for (let R = range.s.r; R <= range.e.r; ++R) {
         for (let C = range.s.c; C <= range.e.c; ++C) {
           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-          const cell = ws[cellAddress];
-          if (!cell) continue;
+          let cell = ws[cellAddress];
+          // ensure cell exists for numeric columns so we can style them
+          if (!cell) {
+            // if this is a numeric column (Total or building cols), create zero cell
+            if (R > 0 && C >= 7) {
+              cell = { t: 'n', v: 0 };
+              ws[cellAddress] = cell;
+            } else {
+              continue;
+            }
+          }
+
+          // convert numeric-looking strings to numbers for proper formatting
+          if (cell.t === 's' || typeof cell.v === 'string') {
+            const parsed = parseFloat(String(cell.v).replace(/,/g, ''));
+            if (!Number.isNaN(parsed) && C >= 7) {
+              cell.v = Math.round(parsed * 1000) / 1000;
+              cell.t = 'n';
+            }
+          }
+
           // header row
           if (R === 0) {
             cell.s = cell.s || {};
             cell.s.font = { bold: true, color: { rgb: '2C1B00' } };
-            cell.s.fill = { fgColor: { rgb: 'F7C748'.replace('#','') } };
+            cell.s.fill = headerFill;
+          }
+
+          // numeric columns: Total (C===7) and building columns (C>=8)
+          if (R >= 1 && C >= 7) {
+            cell.s = cell.s || {};
+            cell.s.numFmt = numFmt;
+            cell.s.alignment = { horizontal: 'right' };
           }
         }
       }
@@ -266,25 +303,21 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
         const c0 = XLSX.utils.encode_cell({ r: R, c: 0 });
         const c1 = XLSX.utils.encode_cell({ r: R, c: 1 });
         const c7 = XLSX.utils.encode_cell({ r: R, c: 7 });
-        const desc = ws[XLSX.utils.encode_cell({ r: R, c: 2 })];
+        const descCell = ws[XLSX.utils.encode_cell({ r: R, c: 2 })];
         const v0 = ws[c0] && String(ws[c0].v || '').trim();
         const v1 = ws[c1] && String(ws[c1].v || '').trim();
-        const v7 = ws[c7] && String(ws[c7].v || '').trim();
-        if ((!v0 && !v1) && desc && (!v7)) {
-          // treat as group header (level1) or mid header depending on next row existence
-          // if next row has wm_code filled -> this is mid header? We will detect mid if the next non-empty desc is the same
+        const v7 = ws[c7] && (ws[c7].t === 'n' ? String(ws[c7].v) : String(ws[c7].v || '')).trim();
+        if ((!v0 && !v1) && descCell && (!v7 || v7 === '0')) {
           const nextRow = R + 1;
           const nextC0 = ws[XLSX.utils.encode_cell({ r: nextRow, c: 0 })];
-          // choose color: if nextC0 exists and has wm_code => mid header, else group header
           const isMid = nextC0 && nextC0.v;
-          const fillColor = isMid ? { fgColor: { rgb: 'FFF9E6'.replace('#','') } } : { fgColor: { rgb: 'E6F9E6'.replace('#','') } };
-          // style the whole row
+          const fill = isMid ? midFill : groupFill;
           for (let C = range.s.c; C <= range.e.c; ++C) {
             const ca = XLSX.utils.encode_cell({ r: R, c: C });
             const cc = ws[ca];
             if (!cc) continue;
             cc.s = cc.s || {};
-            cc.s.fill = fillColor;
+            cc.s.fill = fill;
             cc.s.font = { bold: true };
           }
         }
