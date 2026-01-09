@@ -689,8 +689,10 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div style={{ fontSize: 11, color: '#475467' }}>추가 Spec</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <div style={{ fontSize: 11, color: '#475467', fontWeight: 600, paddingTop: 6, whiteSpace: 'nowrap' }}>
+              추가 Spec
+            </div>
             <textarea
               value={specValue}
               onChange={(e) => handleWorkMasterSpecChange(workMaster.id, e.target.value)}
@@ -726,6 +728,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
                 cursor: selectionLoading || isSpecSaving ? 'not-allowed' : 'pointer',
                 height: 'fit-content',
                 alignSelf: 'flex-start',
+                whiteSpace: 'nowrap',
               }}
             >
               {isSpecSaving ? '저장 중...' : '저장'}
