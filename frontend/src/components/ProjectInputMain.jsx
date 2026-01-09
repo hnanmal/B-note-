@@ -4,22 +4,65 @@ export default function ProjectInputMain({ apiBaseUrl }) {
   const [buildings, setBuildings] = useState([]);
   const [buildingName, setBuildingName] = useState('');
   const [selectedBuildingId, setSelectedBuildingId] = useState(null);
-  const [buildingSortOrder, setBuildingSortOrder] = useState('asc');
+  const [buildingSortMode, setBuildingSortMode] = useState('created_asc');
   const [statusMessage, setStatusMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const sortModeLabel = useMemo(() => {
+    switch (buildingSortMode) {
+      case 'created_asc':
+        return '오래된→최근';
+      case 'created_desc':
+        return '최근→오래된';
+      case 'name_asc':
+        return 'A→Z';
+      case 'name_desc':
+        return 'Z→A';
+      default:
+        return '오래된→최근';
+    }
+  }, [buildingSortMode]);
+
+  const cycleSortMode = useCallback(() => {
+    setBuildingSortMode((prev) => {
+      switch (prev) {
+        case 'created_asc':
+          return 'created_desc';
+        case 'created_desc':
+          return 'name_asc';
+        case 'name_asc':
+          return 'name_desc';
+        case 'name_desc':
+        default:
+          return 'created_asc';
+      }
+    });
+  }, []);
 
   const sortedBuildings = useMemo(() => {
     const list = [...buildings];
     return list.sort((a, b) => {
       const aDate = new Date(a?.created_at || 0).getTime();
       const bDate = new Date(b?.created_at || 0).getTime();
+
+      if (buildingSortMode === 'name_asc' || buildingSortMode === 'name_desc') {
+        const aName = String(a?.name || '').trim();
+        const bName = String(b?.name || '').trim();
+        const nameDiff = aName.localeCompare(bName, 'ko-KR', { numeric: true, sensitivity: 'base' });
+        if (nameDiff !== 0) return buildingSortMode === 'name_asc' ? nameDiff : -nameDiff;
+
+        const dateDiff = aDate - bDate;
+        if (dateDiff !== 0) return dateDiff;
+        return (a?.id || 0) - (b?.id || 0);
+      }
+
       const dateDiff = aDate - bDate;
-      if (dateDiff !== 0) return buildingSortOrder === 'asc' ? dateDiff : -dateDiff;
+      if (dateDiff !== 0) return buildingSortMode === 'created_asc' ? dateDiff : -dateDiff;
       const idDiff = (a?.id || 0) - (b?.id || 0);
-      return buildingSortOrder === 'asc' ? idDiff : -idDiff;
+      return buildingSortMode === 'created_asc' ? idDiff : -idDiff;
     });
-  }, [buildings, buildingSortOrder]);
+  }, [buildings, buildingSortMode]);
 
   const fetchBuildings = useCallback(async () => {
     setLoading(true);
@@ -99,7 +142,7 @@ export default function ProjectInputMain({ apiBaseUrl }) {
           <h2 style={{ margin: 0, fontSize: 24, color: '#0f172a' }}>Building List</h2>
           <button
             type="button"
-            onClick={() => setBuildingSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+            onClick={cycleSortMode}
             style={{
               padding: '8px 12px',
               borderRadius: 6,
@@ -110,9 +153,9 @@ export default function ProjectInputMain({ apiBaseUrl }) {
               cursor: 'pointer',
               fontSize: 13,
             }}
-            aria-label="빌딩 정렬 순서 변경"
+            aria-label="빌딩 정렬 변경"
           >
-            정렬: {buildingSortOrder === 'asc' ? '오래된→최근' : '최근→오래된'}
+            정렬: {sortModeLabel}
           </button>
         </div>
         <p style={{ margin: '6px 0 12px 0', color: '#475467' }}>Enter Building Name:</p>
