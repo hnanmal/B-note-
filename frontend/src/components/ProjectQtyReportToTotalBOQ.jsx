@@ -218,13 +218,13 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               return (
                 // fragment for group header + rows
                 <React.Fragment key={`group-${groupIdx}-${groupName}`}>
-                  <tr>
-                    {/* empty cells for first two columns */}
-                    <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
-                    <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
-                    <td style={{ padding: '8px 10px', border: '1px solid #e6e6e6', background: '#f3f4f6', fontWeight: 700 }}>
-                      {groupName || '(Uncategorized)'}
-                    </td>
+                    <tr style={{ background: '#e6f9e6' }}>
+                      {/* empty cells for first two columns */}
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
+                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
+                      <td style={{ padding: '8px 10px', border: '1px solid #e6e6e6', fontWeight: 700 }}>
+                        {groupName || '(Uncategorized)'}
+                      </td>
                     {/* remaining base header cells (Description already used) */}
                     {Array.from({ length: baseHeaders.length - 3 }).map((_, i) => (
                       <td key={`gh-${groupIdx}-${i}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
