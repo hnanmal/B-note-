@@ -19,7 +19,16 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
     fetch(`${apiBaseUrl}/calc-result/buildings`)
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) setBuildingNames(data);
+        // 생성 순서(원본 순서)로, 중복 없이
+        if (Array.isArray(data)) {
+          const seen = new Set();
+          const ordered = data.filter(b => {
+            if (!b || seen.has(b)) return false;
+            seen.add(b);
+            return true;
+          });
+          setBuildingNames(ordered);
+        }
       });
   }, [apiBaseUrl]);
 

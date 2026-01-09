@@ -1547,7 +1547,7 @@ function App() {
               <ProjectQtyReportByMember apiBaseUrl={projectApiBase} />
             )}
             {activePage === 'project-report-qty-to-total-boq' && (
-              <ProjectQtyReportToTotalBOQ />
+              <ProjectQtyReportToTotalBOQ apiBaseUrl={projectApiBase} />
             )}
           </div>
         ) : activePage === 'project-main' ? (
