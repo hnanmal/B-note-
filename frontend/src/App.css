@@ -3,7 +3,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: rgba(246, 217, 117, 0.2);
+  /* use transparent so parent sidebar background (project vs team) controls appearance */
+  background: transparent;
   border-right: 1px solid #eee;
   width: 100%;
   min-width: 0;
@@ -14,8 +15,15 @@
   transition: background 0.15s;
 }
 .nav-btn.active {
-  background: #f0f0f0;
-  color: #222;
+  background: var(--nav-active-bg, #f0f0f0);
+  color: var(--nav-active-color, #222);
+}
+
+/* Provide fallbacks for the theme variables; JavaScript sets these on the sidebar container */
+.side-nav {
+  /* nav-specific variables (defaults to yellow theme) */
+  --nav-active-bg: #f7c748;
+  --nav-active-color: #2c1b00;
 }
 /* Fixed header styles */
 .App-header-fixed {

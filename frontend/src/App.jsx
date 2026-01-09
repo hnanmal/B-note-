@@ -397,6 +397,15 @@ function App() {
     background: isProjectEditorRoute ? '#d6c7ff' : '#f6d975',
     borderBottom: isProjectEditorRoute ? '1px solid #b59ae9' : '#e0c34d',
   };
+  // project theme colors
+  const PROJECT_ACTIVE_BG = '#F3E8FF';
+  const PROJECT_ACTIVE_BORDER = '#B59AE9';
+  const PROJECT_ACTIVE_TEXT = '#2c1b00';
+  const PROJECT_INACTIVE_TEXT = '#6D28D9';
+  const PROJECT_INACTIVE_BG = '#FBF7FF';
+  if (isProjectEditorRoute) {
+    groupLabelStyle.color = '#4b3266';
+  }
   const commonAriaLabel = commonButtonLabel;
   const calcAriaLabel = calcButtonLabel;
   const familyAriaLabel = familyButtonLabel;
@@ -725,7 +734,7 @@ function App() {
             minWidth: sidebarOpen ? SIDEBAR_OPEN_WIDTH : SIDEBAR_COLLAPSED_WIDTH,
             maxWidth: sidebarOpen ? SIDEBAR_OPEN_WIDTH : SIDEBAR_COLLAPSED_WIDTH,
             transition: 'width 0.2s',
-            background: 'rgba(246, 217, 117, 0.25)',
+            background: isProjectEditorRoute ? 'rgba(214,199,255,0.22)' : 'rgba(246, 217, 117, 0.25)',
             borderRight: '1px solid #eee',
             display: 'flex',
             flexDirection: 'column',
@@ -733,6 +742,9 @@ function App() {
             position: 'relative',
             height: 'calc(100% - 30px)',
             zIndex: 10,
+            // CSS variables for nav button theming; JS will override these when appropriate
+            ['--nav-active-bg']: isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748',
+            ['--nav-active-color']: isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00',
           }}
         >
           <button
@@ -764,7 +776,7 @@ function App() {
           {sidebarOpen ? (
             <nav className="side-nav" style={{ marginTop: 56, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
               {isTeamEntryRoute ? (
-                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                   <div style={{ ...groupLabelStyle, fontWeight: 600 }}>Project User &gt;</div>
                   <button
                     type="button"
@@ -773,13 +785,13 @@ function App() {
                       width: '80%',
                       padding: '8px 0',
                       borderRadius: 8,
-                      border: '1px solid #f7c748',
-                      background: '#f7c748',
+                      border: isProjectEditorRoute ? `1px solid ${PROJECT_ACTIVE_BORDER}` : '1px solid #f7c748',
+                      background: isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748',
                       fontWeight: 700,
                       cursor: 'pointer',
                       textAlign: 'center',
                       fontSize: 13,
-                      color: '#2c1b00',
+                      color: isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00',
                     }}
                   >
                     Project Select
@@ -802,8 +814,8 @@ function App() {
                         fontWeight: 600,
                         fontSize: 12,
                         border: 'none',
-                        background: activePage === item.id ? '#f7c748' : '#f1f1f1',
-                        color: activePage === item.id ? '#2c1b00' : '#1d4ed8',
+                        background: activePage === item.id ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
+                        color: activePage === item.id ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                         cursor: 'pointer',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -821,17 +833,17 @@ function App() {
                       onClick={() => setActivePage('common')}
                       className={`nav-btn${activePage === 'common' ? ' active' : ''}`}
                       style={{
-                        width: '100%',
-                        minWidth: 0,
-                        maxWidth: '100%',
-                        padding: '6px 0',
-                        fontWeight: 600,
-                        fontSize: 13,
-                        border: 'none',
-                        background: activePage === 'common' ? '#f7c748' : '#f1f1f1',
-                        color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
-                        cursor: 'pointer',
-                      }}
+                          width: '100%',
+                          minWidth: 0,
+                          maxWidth: '100%',
+                          padding: '6px 0',
+                          fontWeight: 600,
+                          fontSize: 13,
+                          border: 'none',
+                          background: activePage === 'common' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
+                          color: activePage === 'common' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                          cursor: 'pointer',
+                        }}
                     >
                       {commonButtonLabel}
                     </button>
@@ -860,17 +872,17 @@ function App() {
                       onClick={() => setActivePage('family')}
                       className={`nav-btn${activePage === 'family' ? ' active' : ''}`}
                       style={{
-                        width: '100%',
-                        minWidth: 0,
-                        maxWidth: '100%',
-                        padding: '6px 0',
-                        fontWeight: 600,
-                        fontSize: 13,
-                        border: 'none',
-                        background: activePage === 'family' ? '#f7c748' : '#f1f1f1',
-                        color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
-                        cursor: 'pointer',
-                      }}
+                          width: '100%',
+                          minWidth: 0,
+                          maxWidth: '100%',
+                          padding: '6px 0',
+                          fontWeight: 600,
+                          fontSize: 13,
+                          border: 'none',
+                          background: activePage === 'family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
+                          color: activePage === 'family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                          cursor: 'pointer',
+                        }}
                     >
                       {familyButtonLabel}
                     </button>
@@ -893,8 +905,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-input-main' ? '#f7c748' : '#f1f1f1',
-                            color: activePage === 'project-input-main' ? '#2c1b00' : '#1d4ed8',
+                            background: activePage === 'project-input-main' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
+                            color: activePage === 'project-input-main' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
@@ -912,8 +924,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-input-family' ? '#f7c748' : '#f1f1f1',
-                            color: activePage === 'project-input-family' ? '#2c1b00' : '#1d4ed8',
+                            background: activePage === 'project-input-family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
+                            color: activePage === 'project-input-family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
@@ -931,8 +943,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-input-interior' ? '#f7c748' : '#f1f1f1',
-                            color: activePage === 'project-input-interior' ? '#2c1b00' : '#1d4ed8',
+                            background: activePage === 'project-input-interior' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
+                            color: activePage === 'project-input-interior' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
@@ -955,8 +967,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-report-qty-by-member' ? '#f7c748' : '#f1f1f1',
-                            color: activePage === 'project-report-qty-by-member' ? '#2c1b00' : '#1d4ed8',
+                            background: activePage === 'project-report-qty-by-member' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
+                            color: activePage === 'project-report-qty-by-member' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
@@ -974,8 +986,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-report-qty-to-total-boq' ? '#f7c748' : '#f1f1f1',
-                            color: activePage === 'project-report-qty-to-total-boq' ? '#2c1b00' : '#1d4ed8',
+                            background: activePage === 'project-report-qty-to-total-boq' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
+                            color: activePage === 'project-report-qty-to-total-boq' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
@@ -993,14 +1005,14 @@ function App() {
                         width: '80%',
                         padding: '6px 0',
                         borderRadius: 8,
-                        border: '1px solid #f7c748',
-                        background: activePage === 'project' ? '#f7c748' : '#fff',
+                        border: isProjectEditorRoute ? `1px solid ${PROJECT_ACTIVE_BORDER}` : '1px solid #f7c748',
+                        background: activePage === 'project' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : '#fff',
                         fontWeight: 600,
                         cursor: 'pointer',
                         transition: 'background 0.2s',
                         textAlign: 'center',
                         fontSize: 13,
-                        color: activePage === 'project' ? '#2c1b00' : '#1d4ed8',
+                        color: activePage === 'project' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                       }}
                     >
                       Project Select
@@ -1021,8 +1033,8 @@ function App() {
                       width: 32,
                       height: 32,
                       borderRadius: 8,
-                      border: '1px solid #f7c748',
-                      background: '#f7c748',
+                      border: isProjectEditorRoute ? `1px solid ${PROJECT_ACTIVE_BORDER}` : '1px solid #f7c748',
+                      background: isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748',
                       fontWeight: 700,
                       cursor: 'pointer',
                       textAlign: 'center',
@@ -1030,7 +1042,7 @@ function App() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#2c1b00',
+                      color: isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00',
                     }}
                     aria-label="Project Select"
                   >
@@ -1076,21 +1088,21 @@ function App() {
                       type="button"
                       onClick={() => setActivePage('common')}
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        border: '1px solid #f7c748',
-                        background: activePage === 'common' ? '#f7c748' : '#fff',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'background 0.2s',
-                        textAlign: 'center',
-                        fontSize: 12,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: activePage === 'common' ? '#2c1b00' : '#1d4ed8',
-                      }}
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          border: isProjectEditorRoute ? `1px solid ${PROJECT_ACTIVE_BORDER}` : '1px solid #f7c748',
+                          background: activePage === 'common' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : '#fff',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'background 0.2s',
+                          textAlign: 'center',
+                          fontSize: 12,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: activePage === 'common' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                        }}
                       aria-label={commonAriaLabel}
                     >
                       C
@@ -1131,8 +1143,8 @@ function App() {
                         width: 32,
                         height: 32,
                         borderRadius: 8,
-                        border: '1px solid #f7c748',
-                        background: activePage === 'family' ? '#f7c748' : '#fff',
+                        border: isProjectEditorRoute ? `1px solid ${PROJECT_ACTIVE_BORDER}` : '1px solid #f7c748',
+                        background: activePage === 'family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : '#fff',
                         fontWeight: 600,
                         cursor: 'pointer',
                         transition: 'background 0.2s',
@@ -1141,7 +1153,7 @@ function App() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: activePage === 'family' ? '#2c1b00' : '#1d4ed8',
+                        color: activePage === 'family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                       }}
                       aria-label={familyAriaLabel}
                     >
@@ -1157,8 +1169,8 @@ function App() {
                         width: 32,
                         height: 32,
                         borderRadius: 8,
-                        border: '1px solid #f7c748',
-                        background: activePage === 'project' ? '#f7c748' : '#fff',
+                        border: isProjectEditorRoute ? `1px solid ${PROJECT_ACTIVE_BORDER}` : '1px solid #f7c748',
+                        background: activePage === 'project' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : '#fff',
                         fontWeight: 600,
                         cursor: 'pointer',
                         transition: 'background 0.2s',
@@ -1167,7 +1179,7 @@ function App() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: activePage === 'project' ? '#2c1b00' : '#1d4ed8',
+                        color: activePage === 'project' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                       }}
                     >
                       P
