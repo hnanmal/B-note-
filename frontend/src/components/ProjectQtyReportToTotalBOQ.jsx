@@ -13,13 +13,15 @@ const baseHeaders = [
 
 export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
   const [buildingNames, setBuildingNames] = useState([]);
+  const [revKeys, setRevKeys] = useState([]);
+  const [selectedRevKey, setSelectedRevKey] = useState('');
 
   useEffect(() => {
     if (!apiBaseUrl) return;
+    // building names (existing behavior)
     fetch(`${apiBaseUrl}/calc-result/buildings`)
       .then(res => res.json())
       .then(data => {
-        // 생성 순서(원본 순서)로, 중복 없이
         if (Array.isArray(data)) {
           const seen = new Set();
           const ordered = data.filter(b => {
@@ -29,13 +31,36 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
           });
           setBuildingNames(ordered);
         }
-      });
+      })
+      .catch(() => {});
+
+    // fetch rev keys for dropdown (safe, non-blocking)
+    fetch(`${apiBaseUrl}/calc-result/rev-keys`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setRevKeys(data);
+      })
+      .catch(() => {});
   }, [apiBaseUrl]);
 
   return (
     <div style={{ width: '100%', overflowX: 'auto', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #0001', padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16, color: '#d97706' }}>
-        Q'ty Report to Total BOQ
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 18, color: '#d97706' }}>
+          Q'ty Report to Total BOQ
+        </div>
+        <div>
+          <select
+            value={selectedRevKey}
+            onChange={e => setSelectedRevKey(e.target.value)}
+            style={{ height: 32, fontSize: 15, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 140 }}
+          >
+            <option value="">rev 선택</option>
+            {revKeys.map((rev) => (
+              <option key={rev} value={rev}>{rev}</option>
+            ))}
+          </select>
+        </div>
       </div>
       <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 14 }}>
         <thead>
