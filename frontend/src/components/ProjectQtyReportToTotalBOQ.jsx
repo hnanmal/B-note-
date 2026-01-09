@@ -185,7 +185,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
         </div>
       </div>
       <div style={{ flex: '1 1 auto', overflow: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 10 }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 11 }}>
         <thead>
           <tr style={{ background: '#f7c748', color: '#2c1b00' }}>
             {baseHeaders.map((h, i) => {
