@@ -279,10 +279,27 @@ function WorkMasterManager({ apiBaseUrl = API_BASE_URL, selectedFamilyNode = nul
         <div>
             <h2>WorkMaster 관리</h2>
             
-            <form onSubmit={handleUpload} style={{ marginBottom: '20px' }}>
-                <h3>엑셀 업로드</h3>
-                <input type="file" onChange={handleFileChange} accept=".xlsx" />
-                <button type="submit">업로드</button>
+            <form
+                onSubmit={handleUpload}
+                style={{
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    flexWrap: 'nowrap',
+                    overflowX: 'auto',
+                }}
+            >
+                <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>엑셀 업로드</div>
+                <input
+                    type="file"
+                    onChange={handleFileChange}
+                    accept=".xlsx"
+                    style={{ fontSize: 12, flex: '0 1 auto' }}
+                />
+                <button type="submit" style={{ fontSize: 12, padding: '4px 10px', whiteSpace: 'nowrap' }}>
+                    업로드
+                </button>
             </form>
 
             {message && <p><strong>상태:</strong> {message}</p>}
