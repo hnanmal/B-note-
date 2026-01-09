@@ -4,6 +4,7 @@ export default function ProjectInputMain({ apiBaseUrl }) {
   const [buildings, setBuildings] = useState([]);
   const [buildingName, setBuildingName] = useState('');
   const [selectedBuildingId, setSelectedBuildingId] = useState(null);
+  const [buildingSortOrder, setBuildingSortOrder] = useState('asc');
   const [statusMessage, setStatusMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -13,10 +14,12 @@ export default function ProjectInputMain({ apiBaseUrl }) {
     return list.sort((a, b) => {
       const aDate = new Date(a?.created_at || 0).getTime();
       const bDate = new Date(b?.created_at || 0).getTime();
-      if (aDate !== bDate) return aDate - bDate;
-      return (a?.id || 0) - (b?.id || 0);
+      const dateDiff = aDate - bDate;
+      if (dateDiff !== 0) return buildingSortOrder === 'asc' ? dateDiff : -dateDiff;
+      const idDiff = (a?.id || 0) - (b?.id || 0);
+      return buildingSortOrder === 'asc' ? idDiff : -idDiff;
     });
-  }, [buildings]);
+  }, [buildings, buildingSortOrder]);
 
   const fetchBuildings = useCallback(async () => {
     setLoading(true);
@@ -92,7 +95,26 @@ export default function ProjectInputMain({ apiBaseUrl }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16, minHeight: 0 }}>
       <div>
-        <h2 style={{ margin: 0, fontSize: 24, color: '#0f172a' }}>Building List</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0, fontSize: 24, color: '#0f172a' }}>Building List</h2>
+          <button
+            type="button"
+            onClick={() => setBuildingSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: '1px solid #cbd5f5',
+              background: '#fff',
+              color: '#0f172a',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: 13,
+            }}
+            aria-label="빌딩 정렬 순서 변경"
+          >
+            정렬: {buildingSortOrder === 'asc' ? '오래된→최근' : '최근→오래된'}
+          </button>
+        </div>
         <p style={{ margin: '6px 0 12px 0', color: '#475467' }}>Enter Building Name:</p>
         <form onSubmit={handleAdd} style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <input
