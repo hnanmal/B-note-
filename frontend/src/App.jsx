@@ -69,6 +69,42 @@ function App() {
     ? `${API_BASE_URL}/project/${encodeURIComponent(projectRouteIdentifier)}`
     : API_BASE_URL;
 
+  const [projectTabAbbr, setProjectTabAbbr] = useState('');
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!isProjectEditorRoute) {
+      setProjectTabAbbr('');
+      document.title = 'B-note+';
+      return;
+    }
+
+    let cancelled = false;
+    document.title = projectTabAbbr ? `B-note+ - ${projectTabAbbr}` : 'B-note+';
+
+    (async () => {
+      try {
+        const response = await fetch(`${projectApiBase}/metadata/abbr`);
+        if (!response.ok) return;
+        const payload = await response.json().catch(() => null);
+        const abbr = String(payload?.pjt_abbr ?? '').trim();
+        if (!cancelled) setProjectTabAbbr(abbr);
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isProjectEditorRoute, projectApiBase]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!isProjectEditorRoute) return;
+    document.title = projectTabAbbr ? `B-note+ - ${projectTabAbbr}` : 'B-note+';
+  }, [isProjectEditorRoute, projectTabAbbr]);
+
   const [exportingDynamoJson, setExportingDynamoJson] = useState(false);
   const downloadDynamoJson = useCallback(async () => {
     if (!isProjectEditorRoute || !projectRouteIdentifier) return;

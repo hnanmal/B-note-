@@ -8,6 +8,12 @@ export default function ProjectMain({ apiBaseUrl }) {
   const [statusMessage, setStatusMessage] = useState('');
   const [statusType, setStatusType] = useState('');
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const trimmed = (abbr || '').trim();
+    document.title = trimmed ? `B-note+ - ${trimmed}` : 'B-note+';
+  }, [abbr]);
+
   const loadAbbreviation = useCallback(async () => {
     setStatusMessage('');
     setStatusType('');
