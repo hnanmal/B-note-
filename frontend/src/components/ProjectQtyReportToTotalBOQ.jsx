@@ -63,6 +63,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
         const map = new Map();
         for (const r of rows) {
           const code = (r.wm_code || '').trim();
+          // skip rows without Work Master Code
+          if (!code) continue;
           const gauge = (r.gauge || '').trim();
           const key = `${code}||${gauge}`;
           const building = r.building_name || '';
@@ -73,7 +75,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               gauge: gauge,
               description: r.description || '',
               spec: r.spec || r.add_spec || '',
-              reference_to: r.member_name || r.guid || r.gui || '',
+              // reference column intentionally left empty
+              reference_to: '',
               uom: r.unit || r.uom || '',
               total: 0,
               byBuilding: {},
