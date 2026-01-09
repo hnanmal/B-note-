@@ -27,6 +27,7 @@ const NAV_ITEMS = [
 const PROJECT_ROUTE_PREFIX = '/project';
 
 const PROJECT_UI_STATE_STORAGE_PREFIX = 'bnote:project-ui-state:';
+const GLOBAL_UI_STATE_KEY = 'bnote:ui-state';
 
 const isSupportedProjectPage = (value) => {
   return [
@@ -43,6 +44,7 @@ const isSupportedProjectPage = (value) => {
     'project-input-family',
     'project-input-interior',
     'project-report-qty-by-member',
+    'project-report-qty-to-total-boq',
     'project',
   ].includes(value);
 };
@@ -64,14 +66,21 @@ function App() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [activePage, setActivePage] = useState(() => {
     const fallback = isProjectEditorRoute ? 'project-main' : 'project';
-    if (!isProjectEditorRoute || !projectUiStateKey) return fallback;
-
     try {
-      const raw = window.sessionStorage.getItem(projectUiStateKey);
-      if (!raw) return fallback;
-      const parsed = JSON.parse(raw);
-      const page = typeof parsed?.activePage === 'string' ? parsed.activePage : '';
-      return isSupportedProjectPage(page) ? page : fallback;
+      if (isProjectEditorRoute && projectUiStateKey) {
+        const raw = window.sessionStorage.getItem(projectUiStateKey);
+        if (!raw) return fallback;
+        const parsed = JSON.parse(raw);
+        const page = typeof parsed?.activePage === 'string' ? parsed.activePage : '';
+        return isSupportedProjectPage(page) ? page : fallback;
+      }
+
+      // Fallback: try global UI state so non-project routes can also preserve
+      const rawGlobal = window.sessionStorage.getItem(GLOBAL_UI_STATE_KEY);
+      if (!rawGlobal) return fallback;
+      const parsedGlobal = JSON.parse(rawGlobal);
+      const pageGlobal = typeof parsedGlobal?.activePage === 'string' ? parsedGlobal.activePage : '';
+      return isSupportedProjectPage(pageGlobal) ? pageGlobal : fallback;
     } catch {
       return fallback;
     }
@@ -137,9 +146,13 @@ function App() {
   }, [isProjectEditorRoute, projectApiBase]);
 
   useEffect(() => {
-    if (!isProjectEditorRoute || !projectUiStateKey) return;
     try {
-      window.sessionStorage.setItem(projectUiStateKey, JSON.stringify({ activePage }));
+      if (isProjectEditorRoute && projectUiStateKey) {
+        window.sessionStorage.setItem(projectUiStateKey, JSON.stringify({ activePage }));
+      } else {
+        // persist globally so refresh preserves non-project pages as well
+        window.sessionStorage.setItem(GLOBAL_UI_STATE_KEY, JSON.stringify({ activePage }));
+      }
     } catch {
       // ignore
     }
@@ -231,12 +244,14 @@ function App() {
   }, [isProjectEditorRoute, projectApiBase, projectDbNeedsRefresh, syncProjectDbRevision]);
 
   const reloadProjectPage = useCallback(() => {
-    if (isProjectEditorRoute && projectUiStateKey) {
-      try {
+    try {
+      if (isProjectEditorRoute && projectUiStateKey) {
         window.sessionStorage.setItem(projectUiStateKey, JSON.stringify({ activePage }));
-      } catch {
-        // ignore
+      } else {
+        window.sessionStorage.setItem(GLOBAL_UI_STATE_KEY, JSON.stringify({ activePage }));
       }
+    } catch {
+      // ignore
     }
     window.location.reload();
   }, [activePage, isProjectEditorRoute, projectUiStateKey]);
