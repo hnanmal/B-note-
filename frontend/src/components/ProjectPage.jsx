@@ -44,6 +44,7 @@ export default function ProjectPage() {
   const [loadingList, setLoadingList] = useState(false);
   const [actionPending, setActionPending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [projectMetadataByFile, setProjectMetadataByFile] = useState({});
   const [backupModalOpen, setBackupModalOpen] = useState(false);
   const [backupItems, setBackupItems] = useState([]);
   const [loadingBackups, setLoadingBackups] = useState(false);
@@ -64,6 +65,35 @@ export default function ProjectPage() {
   useEffect(() => {
     fetchProjectDbs();
   }, [fetchProjectDbs]);
+
+  const fetchProjectMetadata = useCallback(async (fileName) => {
+    if (!fileName) return null;
+    const identifier = String(fileName).replace(/\.db$/i, '');
+    try {
+      const response = await fetch(`${API_BASE_URL}/project/${encodeURIComponent(identifier)}/metadata/abbr`);
+      const payload = (await parseResponse(response)) || {};
+      const normalized = {
+        pjt_abbr: payload.pjt_abbr ?? '',
+        pjt_description: payload.pjt_description ?? '',
+      };
+      setProjectMetadataByFile((prev) => ({ ...prev, [fileName]: normalized }));
+      return normalized;
+    } catch {
+      // ignore metadata errors per DB
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!projectDbs.length) return;
+    // Load metadata for DB cards (abbr/description). Cache by file_name.
+    projectDbs.forEach((db) => {
+      const fileName = db?.file_name;
+      if (!fileName) return;
+      if (projectMetadataByFile[fileName]) return;
+      void fetchProjectMetadata(fileName);
+    });
+  }, [fetchProjectMetadata, projectDbs, projectMetadataByFile]);
 
   const fetchBackups = useCallback(async () => {
     setLoadingBackups(true);
@@ -232,9 +262,12 @@ export default function ProjectPage() {
     return projectDbs.filter((db) => {
       const display = (db.display_name || '').toLowerCase();
       const file = (db.file_name || '').toLowerCase();
-      return display.includes(q) || file.includes(q);
+      const meta = projectMetadataByFile[db.file_name] || {};
+      const abbr = (meta.pjt_abbr || '').toLowerCase();
+      const desc = (meta.pjt_description || '').toLowerCase();
+      return display.includes(q) || file.includes(q) || abbr.includes(q) || desc.includes(q);
     });
-  }, [projectDbs, searchTerm]);
+  }, [projectDbs, projectMetadataByFile, searchTerm]);
   const filteredCount = filteredProjectDbs.length;
   const totalSize = useMemo(() => {
     if (!projectDbs.length) return '0 KB';
@@ -323,6 +356,18 @@ export default function ProjectPage() {
               >
                 {db.display_name}
               </button>
+              {(() => {
+                const meta = projectMetadataByFile[db.file_name];
+                const abbr = meta?.pjt_abbr;
+                const desc = meta?.pjt_description;
+                if (!abbr && !desc) return null;
+                return (
+                  <div style={{ fontSize: 12, color: '#475467', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {abbr ? <div>약호: {abbr}</div> : null}
+                    {desc ? <div>설명: {desc}</div> : null}
+                  </div>
+                );
+              })()}
               <div style={{ fontSize: 12, color: '#475467' }}>파일: {db.file_name}</div>
               <div style={{ fontSize: 12, color: '#475467' }}>생성일: {formatDate(db.created_at)} · 크기: {formatBytes(db.size)}</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
