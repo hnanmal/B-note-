@@ -10,6 +10,10 @@
   min-width: 0;
   box-sizing: border-box;
   padding: 0 4px;
+  /* default nav button variables (can be overridden by JS on the sidebar element) */
+  --nav-bg: #f1f1f1;
+  --nav-active-bg: #f7c748;
+  --nav-active-color: #2c1b00;
 }
 .nav-btn {
   transition: background 0.15s;

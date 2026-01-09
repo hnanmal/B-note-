@@ -743,6 +743,7 @@ function App() {
             height: 'calc(100% - 30px)',
             zIndex: 10,
             // CSS variables for nav button theming; JS will override these when appropriate
+            ['--nav-bg']: isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#b798bbff',
             ['--nav-active-bg']: isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748',
             ['--nav-active-color']: isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00',
           }}
@@ -814,8 +815,8 @@ function App() {
                         fontWeight: 600,
                         fontSize: 12,
                         border: 'none',
-                        background: activePage === item.id ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
-                        color: activePage === item.id ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                        background: activePage === item.id ? 'var(--nav-active-bg)' : 'var(--nav-bg)',
+                        color: activePage === item.id ? 'var(--nav-active-color)' : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                         cursor: 'pointer',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -840,8 +841,8 @@ function App() {
                           fontWeight: 600,
                           fontSize: 13,
                           border: 'none',
-                          background: activePage === 'common' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
-                          color: activePage === 'common' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                          background: activePage === 'common' ? 'var(--nav-active-bg)' : 'var(--nav-bg)',
+                          color: activePage === 'common' ? 'var(--nav-active-color)' : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                           cursor: 'pointer',
                         }}
                     >
@@ -879,8 +880,8 @@ function App() {
                           fontWeight: 600,
                           fontSize: 13,
                           border: 'none',
-                          background: activePage === 'family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
-                          color: activePage === 'family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                          background: activePage === 'family' ? 'var(--nav-active-bg)' : 'var(--nav-bg)',
+                          color: activePage === 'family' ? 'var(--nav-active-color)' : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                           cursor: 'pointer',
                         }}
                     >
@@ -905,8 +906,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-input-main' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
-                            color: activePage === 'project-input-main' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                            background: activePage === 'project-input-main' ? 'var(--nav-active-bg)' : 'var(--nav-bg)',
+                            color: activePage === 'project-input-main' ? 'var(--nav-active-color)' : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
@@ -924,8 +925,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-input-family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
-                            color: activePage === 'project-input-family' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                            background: activePage === 'project-input-family' ? 'var(--nav-active-bg)' : 'var(--nav-bg)',
+                            color: activePage === 'project-input-family' ? 'var(--nav-active-color)' : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
@@ -943,8 +944,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-input-interior' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
-                            color: activePage === 'project-input-interior' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                            background: activePage === 'project-input-interior' ? 'var(--nav-active-bg)' : 'var(--nav-bg)',
+                            color: activePage === 'project-input-interior' ? 'var(--nav-active-color)' : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
@@ -967,8 +968,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-report-qty-by-member' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
-                            color: activePage === 'project-report-qty-by-member' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                            background: activePage === 'project-report-qty-by-member' ? 'var(--nav-active-bg)' : 'var(--nav-bg)',
+                            color: activePage === 'project-report-qty-by-member' ? 'var(--nav-active-color)' : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
@@ -986,8 +987,8 @@ function App() {
                             fontWeight: 600,
                             fontSize: 13,
                             border: 'none',
-                            background: activePage === 'project-report-qty-to-total-boq' ? (isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748') : (isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1'),
-                            color: activePage === 'project-report-qty-to-total-boq' ? (isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00') : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
+                            background: activePage === 'project-report-qty-to-total-boq' ? 'var(--nav-active-bg)' : 'var(--nav-bg)',
+                            color: activePage === 'project-report-qty-to-total-boq' ? 'var(--nav-active-color)' : (isProjectEditorRoute ? PROJECT_INACTIVE_TEXT : '#1d4ed8'),
                             cursor: 'pointer',
                           }}
                         >
