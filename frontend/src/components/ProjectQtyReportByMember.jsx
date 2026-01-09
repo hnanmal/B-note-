@@ -258,10 +258,10 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
     const revKey = (selectedRevKey || '').trim();
     if (!buildingName || !revKey) return;
 
-    if (normalizeKey(deleteConfirmText) !== normalizeKey(revKey)) {
-      setLoadError('삭제하려면 선택된 rev_key를 정확히 입력해 주세요.');
-      return;
-    }
+      if (deleteConfirmText.trim() !== 'HECBIM') {
+        setLoadError('HECBIM을 정확히 입력해야 삭제됩니다.');
+        return;
+      }
 
     setLoading(true);
     setLoadError(null);
@@ -373,20 +373,20 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
           </button>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>rev_key 입력</div>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>HECBIM 입력</div>
             <input
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder={selectedRevKey ? `"${selectedRevKey}"` : 'rev_key'}
+              placeholder="HECBIM"
               style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', minWidth: 180 }}
               disabled={loading}
             />
             <button
               type="button"
               onClick={deleteSelectedRevision}
-              disabled={!selectedBuilding || !selectedRevKey || loading || normalizeKey(deleteConfirmText) !== normalizeKey(selectedRevKey)}
+              disabled={!selectedBuilding || !selectedRevKey || loading || deleteConfirmText.trim() !== 'HECBIM'}
               style={{ height: 32, fontSize: 14, padding: '0 16px', borderRadius: 6, border: '1px solid #ef4444', background: '#fff', cursor: 'pointer' }}
-              title="rev_key가 일치하면 삭제됩니다"
+              title="HECBIM을 입력해야 삭제됩니다"
             >
               Confirm Delete
             </button>
