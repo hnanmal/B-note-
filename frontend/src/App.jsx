@@ -100,6 +100,8 @@ function App() {
   });
   const [deletingCalcEntryId, setDeletingCalcEntryId] = useState(null);
   const containerRef = useRef(null);
+  const rawFetchRef = useRef(null);
+  const syncRevisionInFlightRef = useRef(false);
   const SIDEBAR_OPEN_WIDTH = 180;
   const SIDEBAR_COLLAPSED_WIDTH = 64;
   const PANEL_LEFT_WIDTH = 560;
@@ -112,6 +114,26 @@ function App() {
   const [projectDbRevision, setProjectDbRevision] = useState('');
   const [projectDbNeedsRefresh, setProjectDbNeedsRefresh] = useState(false);
   const [refreshBlinkOn, setRefreshBlinkOn] = useState(false);
+
+  const syncProjectDbRevision = useCallback(async () => {
+    if (!isProjectEditorRoute || !projectApiBase) return;
+    if (syncRevisionInFlightRef.current) return;
+
+    syncRevisionInFlightRef.current = true;
+    try {
+      const fetchImpl = rawFetchRef.current ?? window.fetch;
+      const response = await fetchImpl(`${projectApiBase}/db-revision`);
+      if (!response.ok) return;
+      const payload = await response.json().catch(() => null);
+      const revision = String(payload?.revision ?? '');
+      if (!revision) return;
+      setProjectDbRevision(revision);
+    } catch {
+      // ignore
+    } finally {
+      syncRevisionInFlightRef.current = false;
+    }
+  }, [isProjectEditorRoute, projectApiBase]);
 
   useEffect(() => {
     if (!isProjectEditorRoute || !projectUiStateKey) return;
@@ -174,6 +196,38 @@ function App() {
       controller.abort();
     };
   }, [isProjectEditorRoute, projectRouteIdentifier, projectApiBase]);
+
+  useEffect(() => {
+    if (!isProjectEditorRoute || !projectApiBase) return undefined;
+
+    const originalFetch = window.fetch.bind(window);
+    if (!rawFetchRef.current) rawFetchRef.current = originalFetch;
+
+    const base = String(projectApiBase);
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input?.url;
+      const methodRaw =
+        (init?.method ?? (typeof input === 'object' && input ? input.method : undefined) ?? 'GET');
+      const method = String(methodRaw || 'GET').toUpperCase();
+      const isMutation = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+      const isProjectRequest = typeof url === 'string' && url.startsWith(base);
+      const isRevisionRequest = typeof url === 'string' && url.startsWith(base) && url.includes('/db-revision');
+
+      const response = await originalFetch(input, init);
+
+      if (!projectDbNeedsRefresh && isMutation && isProjectRequest && !isRevisionRequest && response?.ok) {
+        // Best-effort: treat our own successful saves as the new baseline.
+        // If a refresh warning is already ON, keep it (could be an external update).
+        syncProjectDbRevision();
+      }
+
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [isProjectEditorRoute, projectApiBase, projectDbNeedsRefresh, syncProjectDbRevision]);
 
   const reloadProjectPage = useCallback(() => {
     if (isProjectEditorRoute && projectUiStateKey) {
