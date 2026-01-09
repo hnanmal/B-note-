@@ -1880,7 +1880,9 @@ def import_calc_result_json(
         )
 
         # Try to extract gauge from the work_master payload or entry payload
-        gauge = _coerce_str(_payload_get(wm_payload, "gauge", "gauge_code", "gaugeCode", "G"))
+        gauge = _coerce_str(
+            _payload_get(wm_payload, "gauge", "gauge_code", "gaugeCode", "G")
+        )
         if not gauge:
             gauge = _coerce_str(_payload_get(entry, "gauge", "게이지", "gauge"))
 

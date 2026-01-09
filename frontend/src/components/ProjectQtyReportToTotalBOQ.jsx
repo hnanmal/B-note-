@@ -89,7 +89,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               wm_code: code,
               gauge: gauge,
               description: r.description || '',
-              spec: r.spec || r.add_spec || '',
+              spec: r.spec || '',
+              add_spec: r.add_spec || '',
               // reference column intentionally left empty
               reference_to: '',
               uom: r.unit || r.uom || '',
@@ -127,6 +128,14 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                 wm = wmMap.get(`${normalize(item.wm_code)}||${normalize(item.gauge).toUpperCase()}`) || wmMap.get(`${normalize(item.wm_code).toUpperCase()}||${normalize(item.gauge).toUpperCase()}`);
               }
               item.cat_large_desc = (wm && (wm.cat_large_desc || wm.cat_large_code || '')) || item.cat_large_desc || '';
+              // Use work_masters.cat_small_desc as Description when available
+              if (wm && (wm.cat_small_desc || wm.cat_small_code)) {
+                item.description = wm.cat_small_desc || wm.cat_small_code || item.description || '';
+              }
+              // Use work_masters.add_spec as Additional Spec. when available
+              if (wm && wm.add_spec) {
+                item.add_spec = wm.add_spec || item.add_spec || '';
+              }
             }
 
             const grouped = new Map();
@@ -248,7 +257,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                       <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.gauge}</td>
                       <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.description}</td>
                       <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{''}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.add_spec || ''}</td>
                       <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
                       <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.uom}</td>
                       <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.total)}</td>
