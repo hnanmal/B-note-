@@ -15,6 +15,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
   const [buildingNames, setBuildingNames] = useState([]);
   const [revKeys, setRevKeys] = useState([]);
   const [selectedRevKey, setSelectedRevKey] = useState('');
+  const [aggregatedRows, setAggregatedRows] = useState([]);
 
   useEffect(() => {
     if (!apiBaseUrl) return;
@@ -42,6 +43,54 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
       })
       .catch(() => {});
   }, [apiBaseUrl]);
+
+  useEffect(() => {
+    if (!apiBaseUrl) return;
+    if (!selectedRevKey) {
+      setAggregatedRows([]);
+      return;
+    }
+
+    const qs = `?rev_key=${encodeURIComponent(selectedRevKey)}&limit=20000`;
+    fetch(`${apiBaseUrl}/calc-result${qs}`)
+      .then(res => {
+        if (!res.ok) return [];
+        return res.json().catch(() => []);
+      })
+      .then(data => {
+        const rows = Array.isArray(data) ? data : [];
+        // aggregate by wm_code + gauge
+        const map = new Map();
+        for (const r of rows) {
+          const code = (r.wm_code || '').trim();
+          const gauge = (r.gauge || '').trim();
+          const key = `${code}||${gauge}`;
+          const building = r.building_name || '';
+          const qty = Number(r.result) || 0;
+          if (!map.has(key)) {
+            map.set(key, {
+              wm_code: code,
+              gauge: gauge,
+              description: r.description || '',
+              spec: r.spec || r.add_spec || '',
+              reference_to: r.member_name || r.guid || r.gui || '',
+              uom: r.unit || r.uom || '',
+              total: 0,
+              byBuilding: {},
+            });
+          }
+          const item = map.get(key);
+          item.total = (item.total || 0) + qty;
+          item.byBuilding[building] = (item.byBuilding[building] || 0) + qty;
+        }
+
+        const out = Array.from(map.values());
+        // sort by wm_code
+        out.sort((a, b) => (a.wm_code || '').localeCompare(b.wm_code || ''));
+        setAggregatedRows(out);
+      })
+      .catch(() => setAggregatedRows([]));
+  }, [apiBaseUrl, selectedRevKey]);
 
   return (
     <div style={{ width: '100%', overflowX: 'auto', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #0001', padding: 16 }}>
@@ -74,12 +123,41 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
           </tr>
         </thead>
         <tbody>
-          {/* 실제 데이터 렌더링 필요 */}
-          <tr>
-            <td colSpan={baseHeaders.length + buildingNames.length} style={{ textAlign: 'center', color: '#bbb', padding: 32 }}>
-              (준비중) DB 연동 후 워크마스터/게이지코드별 집계표가 표시됩니다.
-            </td>
-          </tr>
+          {(!selectedRevKey) ? (
+            <tr>
+              <td colSpan={baseHeaders.length + buildingNames.length} style={{ textAlign: 'center', color: '#bbb', padding: 32 }}>
+                리비전을 선택하세요.
+              </td>
+            </tr>
+          ) : aggregatedRows.length === 0 ? (
+            <tr>
+              <td colSpan={baseHeaders.length + buildingNames.length} style={{ textAlign: 'center', color: '#bbb', padding: 32 }}>
+                선택된 리비전에 해당하는 데이터가 없습니다.
+              </td>
+            </tr>
+          ) : (
+            aggregatedRows.map((row, idx) => {
+              const fmt = (v) => {
+                if (v == null || v === '') return '';
+                return Number.isInteger(v) ? String(v) : (Number(v).toFixed(3));
+              };
+              return (
+                <tr key={`${row.wm_code}||${row.gauge}||${idx}`}>
+                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.wm_code}</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.gauge}</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.description}</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{''}</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.uom}</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.total)}</td>
+                  {buildingNames.map((b) => (
+                    <td key={b} style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.byBuilding[b] || 0)}</td>
+                  ))}
+                </tr>
+              );
+            })
+          )}
         </tbody>
       </table>
     </div>
