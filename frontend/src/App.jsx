@@ -25,6 +25,27 @@ const NAV_ITEMS = [
 ];
 const PROJECT_ROUTE_PREFIX = '/project';
 
+const PROJECT_UI_STATE_STORAGE_PREFIX = 'bnote:project-ui-state:';
+
+const isSupportedProjectPage = (value) => {
+  return [
+    'project-main',
+    'workmaster',
+    'matching',
+    'wm-precheck',
+    'select',
+    'wm-summary',
+    'calcDictionary',
+    'common',
+    'family',
+    'project-input-main',
+    'project-input-family',
+    'project-input-interior',
+    'project-report-qty-by-member',
+    'project',
+  ].includes(value);
+};
+
 function App() {
   const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
   const routeSuffix = pathname.startsWith(`${PROJECT_ROUTE_PREFIX}/`)
@@ -35,8 +56,25 @@ function App() {
   const isProjectEditorRoute = Boolean(projectRouteIdentifier);
   const isTeamEntryRoute = !isProjectEditorRoute;
 
+  const projectUiStateKey = isProjectEditorRoute && projectRouteIdentifier
+    ? `${PROJECT_UI_STATE_STORAGE_PREFIX}${encodeURIComponent(projectRouteIdentifier)}`
+    : null;
+
   const [selectedNode, setSelectedNode] = useState(null);
-  const [activePage, setActivePage] = useState(isProjectEditorRoute ? 'project-main' : 'project');
+  const [activePage, setActivePage] = useState(() => {
+    const fallback = isProjectEditorRoute ? 'project-main' : 'project';
+    if (!isProjectEditorRoute || !projectUiStateKey) return fallback;
+
+    try {
+      const raw = window.sessionStorage.getItem(projectUiStateKey);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      const page = typeof parsed?.activePage === 'string' ? parsed.activePage : '';
+      return isSupportedProjectPage(page) ? page : fallback;
+    } catch {
+      return fallback;
+    }
+  });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const [calcDictionaryEntries, setCalcDictionaryEntries] = useState([]);
@@ -74,6 +112,15 @@ function App() {
   const [projectDbRevision, setProjectDbRevision] = useState('');
   const [projectDbNeedsRefresh, setProjectDbNeedsRefresh] = useState(false);
   const [refreshBlinkOn, setRefreshBlinkOn] = useState(false);
+
+  useEffect(() => {
+    if (!isProjectEditorRoute || !projectUiStateKey) return;
+    try {
+      window.sessionStorage.setItem(projectUiStateKey, JSON.stringify({ activePage }));
+    } catch {
+      // ignore
+    }
+  }, [activePage, isProjectEditorRoute, projectUiStateKey]);
 
   useEffect(() => {
     if (!projectDbNeedsRefresh) {
@@ -129,8 +176,15 @@ function App() {
   }, [isProjectEditorRoute, projectRouteIdentifier, projectApiBase]);
 
   const reloadProjectPage = useCallback(() => {
+    if (isProjectEditorRoute && projectUiStateKey) {
+      try {
+        window.sessionStorage.setItem(projectUiStateKey, JSON.stringify({ activePage }));
+      } catch {
+        // ignore
+      }
+    }
     window.location.reload();
-  }, []);
+  }, [activePage, isProjectEditorRoute, projectUiStateKey]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;

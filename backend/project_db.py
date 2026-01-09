@@ -355,10 +355,44 @@ def ensure_extra_tables(db_path: Path) -> None:
         std_columns = {row[1] for row in cursor.fetchall()}
         if "derive_from" not in std_columns:
             cursor.execute("ALTER TABLE standard_items ADD COLUMN derive_from INTEGER")
-        cursor.execute("PRAGMA index_list('work_masters')")
-        indexes = {row[1] for row in cursor.fetchall()}
-        if "ix_work_masters_work_master_code" in indexes:
-            cursor.execute("DROP INDEX IF EXISTS ix_work_masters_work_master_code")
+
+        # --- Performance indexes (safe to apply repeatedly) ---
+        # WorkMaster equality join/lookup (used in calc_result join + duplication flows)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_work_masters_work_master_code ON work_masters (work_master_code)"
+        )
+
+        # Association table has no PK/index by default; add FK indexes for joins/deletes.
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_siwma_standard_item_id ON standard_item_work_master_association (standard_item_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_siwma_work_master_id ON standard_item_work_master_association (work_master_id)"
+        )
+
+        # Deletes / lookups by work_master_id happen frequently.
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_siwms_work_master_id ON standard_item_work_master_select (work_master_id)"
+        )
+
+        # Family-related lookups
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_calc_dictionary_family_list_id ON calc_dictionary (family_list_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_family_revit_type_family_list_id ON family_revit_type (family_list_id)"
+        )
+
+        # Calc result browsing & deletes (building_name/rev_key filters)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_calc_result_building_name ON calc_result (building_name)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_calc_result_rev_key ON calc_result (rev_key)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_calc_result_building_rev ON calc_result (building_name, rev_key)"
+        )
 
         # calc_dictionary migrations
         cursor.execute("PRAGMA table_info(calc_dictionary)")
