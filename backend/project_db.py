@@ -307,7 +307,7 @@ def promote_backup_to_project_db(backup_file_name: str) -> Dict[str, str]:
     # Move file first (atomic on same volume) then ensure extra tables + register.
     backup_path.rename(target_path)
     ensure_extra_tables(target_path)
-    _register_entry(target_path.name, display_name)
+    _register_entry(target_path.name, target_path.stem)
     return _entry_from_path(target_path.name, _metadata_for(target_path.name))
 
 
@@ -426,7 +426,7 @@ def create_project_db(display_name: str) -> Dict[str, str]:
     target_path = _next_available_path(display_name)
     shutil.copy(TEMPLATE_DB, target_path)
     ensure_extra_tables(target_path)
-    _register_entry(target_path.name, display_name)
+    _register_entry(target_path.name, target_path.stem)
     return _entry_from_path(target_path.name, _metadata_for(target_path.name))
 
 
@@ -442,7 +442,7 @@ def copy_project_db(
     target_path = _next_available_path(new_display)
     shutil.copy(source_path, target_path)
     ensure_extra_tables(target_path)
-    _register_entry(target_path.name, new_display)
+    _register_entry(target_path.name, target_path.stem)
     return _entry_from_path(target_path.name, _metadata_for(target_path.name))
 
 
@@ -453,13 +453,13 @@ def rename_project_db(source_file: str, new_display_name: str) -> Dict[str, str]
     dest_path = _next_available_path(new_display_name, allow_same=source_file)
     if dest_path.name == source_file:
         created_at = _metadata_for(source_file).get("created_at")
-        _register_entry(source_file, new_display_name, created_at)
+        _register_entry(source_file, Path(source_file).stem, created_at)
         return _entry_from_path(source_file, _metadata_for(source_file))
     metadata = _metadata_for(source_file)
     created_at = metadata.get("created_at") or datetime.utcnow().isoformat()
     source_path.rename(dest_path)
     _remove_entry(source_file)
-    _register_entry(dest_path.name, new_display_name, created_at)
+    _register_entry(dest_path.name, dest_path.stem, created_at)
     return _entry_from_path(dest_path.name, _metadata_for(dest_path.name))
 
 
