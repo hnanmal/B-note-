@@ -11,7 +11,7 @@ export default function ProjectMain({ apiBaseUrl }) {
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const trimmed = (abbr || '').trim();
-    document.title = trimmed ? `B-note+ - ${trimmed}` : 'B-note+';
+    document.title = trimmed ? `B-note+ [${trimmed}]` : 'B-note+';
   }, [abbr]);
 
   const loadAbbreviation = useCallback(async () => {

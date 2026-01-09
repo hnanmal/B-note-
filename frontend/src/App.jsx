@@ -80,7 +80,7 @@ function App() {
     }
 
     let cancelled = false;
-    document.title = projectTabAbbr ? `B-note+ - ${projectTabAbbr}` : 'B-note+';
+    document.title = projectTabAbbr ? `B-note+ [${projectTabAbbr}]` : 'B-note+';
 
     (async () => {
       try {
@@ -102,7 +102,7 @@ function App() {
   useEffect(() => {
     if (typeof document === 'undefined') return;
     if (!isProjectEditorRoute) return;
-    document.title = projectTabAbbr ? `B-note+ - ${projectTabAbbr}` : 'B-note+';
+    document.title = projectTabAbbr ? `B-note+ [${projectTabAbbr}]` : 'B-note+';
   }, [isProjectEditorRoute, projectTabAbbr]);
 
   const [exportingDynamoJson, setExportingDynamoJson] = useState(false);
