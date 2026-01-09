@@ -24,6 +24,9 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   const [workMasterSearch, setWorkMasterSearch] = useState('');
   const [workMasterMatchIndex, setWorkMasterMatchIndex] = useState(0);
   const workMasterRefs = useRef(new Map());
+  const pendingWorkMasterScrollRef = useRef(false);
+  const pendingWorkMasterScrollTargetRef = useRef(null);
+  const workMasterLoadStartedRef = useRef(false);
 
   const selectedGwmId = selectedGwmNode?.id ?? null;
   const effectiveStandardItemId = selectedGwmNode?.derive_from ?? selectedGwmId;
@@ -127,12 +130,43 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
   }, [workMasterMatchIndex, workMasterMatches]);
 
   useEffect(() => {
-    if (!selectedWorkMasterId) return;
-    const el = workMasterRefs.current.get(selectedWorkMasterId);
-    if (el && el.scrollIntoView) {
-      el.scrollIntoView({ behavior: 'auto', block: 'center' });
+    if (!selectedGwmId) {
+      pendingWorkMasterScrollRef.current = false;
+      pendingWorkMasterScrollTargetRef.current = null;
+      workMasterLoadStartedRef.current = false;
+      return;
     }
-  }, [selectedWorkMasterId, dbWorkMasters]);
+    pendingWorkMasterScrollRef.current = true;
+    pendingWorkMasterScrollTargetRef.current = null;
+    workMasterLoadStartedRef.current = false;
+  }, [selectedGwmId]);
+
+  useEffect(() => {
+    if (!pendingWorkMasterScrollRef.current) return;
+    if (!selectedGwmId) return;
+    if (dbWorkMastersLoading) return;
+    if (!workMasterLoadStartedRef.current) return;
+
+    let targetId = pendingWorkMasterScrollTargetRef.current ?? selectedWorkMasterId ?? null;
+
+    if (isDerivedSelection && !targetId) return;
+
+    if (!targetId) {
+      targetId = dbWorkMasters?.[0]?.id ?? null;
+    }
+    if (!targetId) {
+      pendingWorkMasterScrollRef.current = false;
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      const el = workMasterRefs.current.get(targetId);
+      if (el && el.scrollIntoView) {
+        el.scrollIntoView({ behavior: 'auto', block: 'center' });
+      }
+      pendingWorkMasterScrollRef.current = false;
+    });
+  }, [dbWorkMastersLoading, dbWorkMasters, selectedWorkMasterId, selectedGwmId]);
 
   const getSelectedNodeDisplayName = () => {
     if (!selectedGwmNode) return '—';
@@ -174,6 +208,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
 
     let cancelled = false;
     setDbWorkMastersLoading(true);
+    workMasterLoadStartedRef.current = true;
     setDbWorkMastersError(null);
     setSelectionError(null);
     setGaugeAdding({});
@@ -204,7 +239,9 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
           };
         });
         if (!isDerivedSelection) {
-          setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
+          const nextSelectedId = data?.selected_work_master_id ?? null;
+          pendingWorkMasterScrollTargetRef.current = nextSelectedId;
+          setSelectedWorkMasterId(nextSelectedId);
         }
         const sorted = sortWorkMasters(workMasters);
         setDbWorkMasters(sorted);
@@ -245,7 +282,9 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
               name: derivedName,
             };
           });
-          setSelectedWorkMasterId(data?.selected_work_master_id ?? null);
+          const nextSelectedId = data?.selected_work_master_id ?? null;
+          pendingWorkMasterScrollTargetRef.current = nextSelectedId;
+          setSelectedWorkMasterId(nextSelectedId);
           setSelectionError(null);
         })
         .catch((error) => {
