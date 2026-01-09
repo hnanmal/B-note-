@@ -948,6 +948,8 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
     return ids;
   }, [selectedStdItems]);
 
+  const INDENT_UNIT = 28; // px, used for tree indentation
+
   const assignedStandardTree = useMemo(() => {
     if (!normalizedAssignedStandardIds.size || !standardTree.length) {
       return [];
@@ -1638,14 +1640,14 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
       const isEditing = Boolean(metadata?.id && editingAssignmentId === metadata.id);
       const hasChildren = node.children && node.children.length > 0;
       const label = deriveLabel(node);
-      // Indent derived nodes one extra level
+      // Indent derived nodes one extra level, with a wider indent
       const isDerived = Boolean(node.derive_from);
       const indentLevel = level + (isDerived ? 1 : 0);
       return (
         <div
           key={`assigned-${node.id}-${level}`}
           style={{
-            marginLeft: indentLevel * 16,
+            paddingLeft: indentLevel * INDENT_UNIT,
             marginBottom: 10,
             paddingBottom: 4,
             borderBottom: '1px dashed rgba(148, 163, 184, 0.3)',
@@ -1839,7 +1841,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
               </div>
             </div>
           )}
-          {hasChildren && renderAssignedStandardNodes(node.children, level + 1)}
+          {hasChildren && renderAssignedStandardNodes(node.children, indentLevel + 1)}
         </div>
       );
     });
@@ -1862,7 +1864,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginLeft: level * 16,
+            paddingLeft: level * INDENT_UNIT,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -1988,7 +1990,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>({node.item_type})</span>
                 </div>
                 {description && (
-                  <div style={{ fontSize: 11, color: '#475467', marginLeft: level * 16 + 8 }}>
+                  <div style={{ fontSize: 11, color: '#475467', marginLeft: level * INDENT_UNIT + 8 }}>
                     {description}
                   </div>
                 )}
@@ -2022,7 +2024,7 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
           </div>
         </div>
         {hasChildren && (
-          <div style={{ paddingLeft: 12, borderLeft: level === 0 ? '1px solid #e5e7eb' : 'none' }}>
+          <div style={{ paddingLeft: INDENT_UNIT, borderLeft: level === 0 ? '1px solid #e5e7eb' : 'none' }}>
             {node.children.map((child) => renderFamilyNode(child, level + 1))}
           </div>
         )}
