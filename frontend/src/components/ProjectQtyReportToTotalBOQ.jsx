@@ -215,6 +215,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               const thStyle = { padding: '6px 4px', border: '1px solid #e5e7eb', fontWeight: 700 };
               if (i === 0) { thStyle.minWidth = 140; thStyle.maxWidth = 140; } // Work Master Code (approx 15 chars)
               if (i === 1) { thStyle.minWidth = 40; thStyle.maxWidth = 40; } // Gauge Code very narrow
+              if (i === 2) { thStyle.minWidth = 200; thStyle.maxWidth = 400; } // Description slightly wider (~+5 chars)
               return <th key={h} style={thStyle}>{h}</th>;
             })}
             {displayedBuildings.map((b) => (
@@ -245,18 +246,18 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                 // fragment for group header + rows
                 <React.Fragment key={`group-${groupIdx}-${groupName}`}>
                   <tr style={{ background: '#e6f9e6' }}>
-                    {/* empty cells for first two columns */}
-                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140 }}></td>
-                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40 }}></td>
-                    <td style={{ padding: '6px 8px', border: '1px solid #e6e6e6', fontWeight: 700 }}>
-                      {groupName || '(Uncategorized)'}
-                    </td>
+                      {/* empty cells for first two columns */}
+                      <td style={{ padding: '1px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140 }}></td>
+                      <td style={{ padding: '1px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40 }}></td>
+                      <td style={{ padding: '3px 6px', border: '1px solid #e6e6e6', fontWeight: 700, minWidth: 200 }}>
+                        {groupName || '(Uncategorized)'}
+                      </td>
                     {/* remaining base header cells (Description already used) */}
-                    {Array.from({ length: baseHeaders.length - 3 }).map((_, i) => (
-                      <td key={`gh-${groupIdx}-${i}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
+                      {Array.from({ length: baseHeaders.length - 3 }).map((_, i) => (
+                      <td key={`gh-${groupIdx}-${i}`} style={{ padding: '1px 6px', border: '1px solid #f3f4f6' }}></td>
                     ))}
                     {displayedBuildings.map((b) => (
-                      <td key={`gh-b-${groupIdx}-${b}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
+                      <td key={`gh-b-${groupIdx}-${b}`} style={{ padding: '2px 6px', border: '1px solid #f3f4f6' }}></td>
                     ))}
                   </tr>
                         {(() => {
@@ -289,24 +290,24 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
 
                             return (
                               <React.Fragment key={`group-${groupIdx}-mid-${midIdx}-${midName}`}>
-                                <tr style={{ background: '#dff7df' }}>
-                                  <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140 }}></td>
-                                  <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40 }}></td>
-                                  <td style={{ padding: '6px 8px', border: '1px solid #e6e6e6', fontWeight: 600 }}>
+                                <tr style={{ background: '#fff9e6' }}>
+                                  <td style={{ padding: '2px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140 }}></td>
+                                  <td style={{ padding: '2px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40 }}></td>
+                                  <td style={{ padding: '3px 6px', border: '1px solid #e6e6e6', fontWeight: 600, minWidth: 200 }}>
                                     {midName || '(Uncategorized Mid)'}
                                   </td>
                                   {Array.from({ length: baseHeaders.length - 3 }).map((_, i) => (
-                                    <td key={`mh-${groupIdx}-${midIdx}-${i}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
+                                    <td key={`mh-${groupIdx}-${midIdx}-${i}`} style={{ padding: '1px 6px', border: '1px solid #f3f4f6' }}></td>
                                   ))}
                                   {displayedBuildings.map((b) => (
-                                    <td key={`mh-b-${groupIdx}-${midIdx}-${b}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
+                                    <td key={`mh-b-${groupIdx}-${midIdx}-${b}`} style={{ padding: '1px 6px', border: '1px solid #f3f4f6' }}></td>
                                   ))}
                                 </tr>
                                 {filtered.map((row, idx) => (
                                   <tr key={`${row.wm_code}||${row.gauge}||${groupIdx}||${midIdx}||${idx}`}>
                                     <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.wm_code}</td>
                                     <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.gauge}</td>
-                                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.description}</td>
+                                    <td style={{ padding: '3px 6px', border: '1px solid #f3f4f6', minWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.description}</td>
                                     <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
                                     <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.add_spec || ''}</td>
                                     <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
