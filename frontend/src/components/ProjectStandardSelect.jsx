@@ -122,7 +122,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     const targetId = workMasterMatches[Math.min(workMasterMatchIndex, workMasterMatches.length - 1)];
     const el = workMasterRefs.current.get(targetId);
     if (el && el.scrollIntoView) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: 'auto', block: 'center' });
     }
   }, [workMasterMatchIndex, workMasterMatches]);
 
@@ -130,7 +130,7 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
     if (!selectedWorkMasterId) return;
     const el = workMasterRefs.current.get(selectedWorkMasterId);
     if (el && el.scrollIntoView) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: 'auto', block: 'center' });
     }
   }, [selectedWorkMasterId, dbWorkMasters]);
 
