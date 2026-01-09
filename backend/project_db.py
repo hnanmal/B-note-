@@ -12,6 +12,7 @@ PROJECT_DB_DIR.mkdir(parents=True, exist_ok=True)
 MANIFEST_PATH = PROJECT_DB_DIR / "project_db_manifest.json"
 TEMPLATE_DB = PROJECT_DIR / "b-note-dev.db"
 ADMIN_KEY = "HECBIM"
+BACKUP_DIR = PROJECT_DB_DIR / "backup"
 
 FILENAME_PATTERN = re.compile(r'^[^<>:"/\\|\?\*\x00-\x1F]+\.db$', re.IGNORECASE)
 EXTRA_TABLE_STATEMENTS = [
@@ -244,6 +245,70 @@ def list_project_dbs() -> List[Dict[str, str]]:
         items.append(_entry_from_path(file_path.name, metadata))
     items.sort(key=lambda item: item["created_at"], reverse=True)
     return items
+
+
+def _resolve_backup_path(file_name: str) -> Path:
+    _verify_filename(file_name)
+    candidate = BACKUP_DIR / file_name
+    if not candidate.exists():
+        raise FileNotFoundError("요청하신 백업 DB를 찾을 수 없습니다.")
+    resolved = candidate.resolve()
+    if resolved.parent != BACKUP_DIR.resolve():
+        raise ValueError("잘못된 경로입니다.")
+    if not resolved.is_file():
+        raise FileNotFoundError("요청하신 백업 DB를 찾을 수 없습니다.")
+    if not _looks_like_sqlite_db(resolved):
+        raise ValueError("백업 DB 파일이 손상되었거나 형식이 올바르지 않습니다.")
+    return resolved
+
+
+_BACKUP_NAME_PATTERN = re.compile(r"^(?P<name>.+?)_(?P<ts>\d{8}_\d{6})(?:_\d+)?$")
+
+
+def _display_name_from_backup_filename(file_name: str) -> str:
+    stem = Path(file_name).stem
+    match = _BACKUP_NAME_PATTERN.match(stem)
+    if match:
+        return match.group("name")
+    return stem
+
+
+def list_project_db_backups() -> List[Dict[str, str]]:
+    if not BACKUP_DIR.exists():
+        return []
+
+    items: List[Dict[str, str]] = []
+    for file_path in sorted(BACKUP_DIR.glob("*.db"), key=lambda p: p.name.lower()):
+        if not file_path.is_file():
+            continue
+        if not _looks_like_sqlite_db(file_path):
+            continue
+        created_at = datetime.utcfromtimestamp(file_path.stat().st_ctime).isoformat()
+        items.append(
+            {
+                "file_name": file_path.name,
+                "display_name": _display_name_from_backup_filename(file_path.name),
+                "created_at": created_at,
+                "size": file_path.stat().st_size,
+            }
+        )
+
+    items.sort(key=lambda item: item["created_at"], reverse=True)
+    return items
+
+
+def promote_backup_to_project_db(backup_file_name: str) -> Dict[str, str]:
+    """Move a backup DB from pjt_db/backup into pjt_db and register it in manifest."""
+
+    backup_path = _resolve_backup_path(backup_file_name)
+    display_name = _display_name_from_backup_filename(backup_file_name)
+
+    target_path = _next_available_path(display_name)
+    # Move file first (atomic on same volume) then ensure extra tables + register.
+    backup_path.rename(target_path)
+    ensure_extra_tables(target_path)
+    _register_entry(target_path.name, display_name)
+    return _entry_from_path(target_path.name, _metadata_for(target_path.name))
 
 
 def ensure_extra_tables(db_path: Path) -> None:

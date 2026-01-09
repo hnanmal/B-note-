@@ -523,6 +523,13 @@ class ProjectDbBackupResponse(BaseModel):
     backup_created_at: str
 
 
+class ProjectDbBackupItem(BaseModel):
+    file_name: str
+    display_name: str
+    created_at: str
+    size: int
+
+
 class CommonInputBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

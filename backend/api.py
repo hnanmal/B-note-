@@ -4666,6 +4666,29 @@ def list_project_databases():
     return project_db.list_project_dbs()
 
 
+@router.get(
+    "/project-db/backups/",
+    response_model=List[schemas.ProjectDbBackupItem],
+    tags=["Project DB"],
+)
+def list_project_database_backups():
+    return project_db.list_project_db_backups()
+
+
+@router.post(
+    "/project-db/backups/{backup_file_name}/promote",
+    response_model=schemas.ProjectDbItem,
+    tags=["Project DB"],
+)
+def promote_project_database_backup(backup_file_name: str):
+    try:
+        return project_db.promote_backup_to_project_db(backup_file_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @router.post(
     "/project-db/",
     response_model=schemas.ProjectDbItem,

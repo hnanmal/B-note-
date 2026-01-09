@@ -44,6 +44,9 @@ export default function ProjectPage() {
   const [renameValue, setRenameValue] = useState('');
   const [loadingList, setLoadingList] = useState(false);
   const [actionPending, setActionPending] = useState(false);
+  const [backupModalOpen, setBackupModalOpen] = useState(false);
+  const [backupItems, setBackupItems] = useState([]);
+  const [loadingBackups, setLoadingBackups] = useState(false);
 
   const fetchProjectDbs = useCallback(async () => {
     setLoadingList(true);
@@ -61,6 +64,19 @@ export default function ProjectPage() {
   useEffect(() => {
     fetchProjectDbs();
   }, [fetchProjectDbs]);
+
+  const fetchBackups = useCallback(async () => {
+    setLoadingBackups(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-db/backups/`);
+      const data = (await parseResponse(response)) || [];
+      setBackupItems(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || '백업 DB 목록을 불러오지 못했습니다.' });
+    } finally {
+      setLoadingBackups(false);
+    }
+  }, []);
 
   const setTemporaryError = (message) => setStatus({ type: 'error', message });
 
@@ -193,6 +209,35 @@ export default function ProjectPage() {
     }
   };
 
+  const openBackupModal = async () => {
+    setBackupModalOpen(true);
+    await fetchBackups();
+  };
+
+  const closeBackupModal = () => {
+    setBackupModalOpen(false);
+  };
+
+  const handlePromoteBackup = async (backupFileName, backupDisplayName) => {
+    if (!backupFileName) return;
+    setActionPending(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/project-db/backups/${encodeURIComponent(backupFileName)}/promote`,
+        { method: 'POST' }
+      );
+      const result = await parseResponse(response);
+      const createdName = result?.display_name || backupDisplayName || backupFileName;
+      setStatus({ type: 'success', message: `백업을 프로젝트로 생성했습니다: ${createdName}` });
+      await fetchProjectDbs();
+      await fetchBackups();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || '백업을 프로젝트로 만들지 못했습니다.' });
+    } finally {
+      setActionPending(false);
+    }
+  };
+
   const lastUpdated = useMemo(() => {
     if (!projectDbs.length) return 'N/A';
     const latest = projectDbs.reduce((prev, current) => {
@@ -251,6 +296,22 @@ export default function ProjectPage() {
           style={{ borderRadius: 8, border: 'none', padding: '10px 18px', background: actionPending ? '#a5b4fc' : '#1d4ed8', color: '#fff', fontWeight: 600, cursor: actionPending ? 'not-allowed' : 'pointer' }}
         >
           생성
+        </button>
+        <button
+          type="button"
+          onClick={openBackupModal}
+          disabled={actionPending}
+          style={{
+            borderRadius: 8,
+            border: '1px solid rgba(15,23,42,0.16)',
+            padding: '10px 14px',
+            background: '#fff',
+            color: '#0f172a',
+            fontWeight: 700,
+            cursor: actionPending ? 'not-allowed' : 'pointer',
+          }}
+        >
+          백업 폴더 보기
         </button>
         <div style={{ fontSize: 12, color: '#64748b' }}>
           {loadingList ? '프로젝트 DB 목록을 불러오는 중입니다…' : `총 ${totalCount}개 · 마지막 업데이트 ${lastUpdated} · 총 용량 ${totalSize}`}
@@ -340,6 +401,134 @@ export default function ProjectPage() {
           ))}
         </div>
       </section>
+
+      {backupModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            zIndex: 50,
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeBackupModal();
+          }}
+        >
+          <div
+            style={{
+              width: 'min(980px, 100%)',
+              background: '#fff',
+              borderRadius: 14,
+              boxShadow: '0 18px 60px rgba(15,23,42,0.25)',
+              padding: 18,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              maxHeight: '85vh',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>백업 DB 목록</div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>backend/pjt_db/backup 폴더</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={fetchBackups}
+                  disabled={loadingBackups || actionPending}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(15,23,42,0.16)',
+                    background: '#fff',
+                    fontWeight: 700,
+                    cursor: loadingBackups || actionPending ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  새로고침
+                </button>
+                <button
+                  type="button"
+                  onClick={closeBackupModal}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(15,23,42,0.16)',
+                    background: '#fff',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+
+            <div style={{ overflow: 'auto', border: '1px solid rgba(15,23,42,0.10)', borderRadius: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(15,23,42,0.08)' }}>이름</th>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(15,23,42,0.08)' }}>파일</th>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(15,23,42,0.08)' }}>생성일</th>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(15,23,42,0.08)' }}>크기</th>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(15,23,42,0.08)' }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingBackups ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: 14, color: '#64748b' }}>
+                        불러오는 중...
+                      </td>
+                    </tr>
+                  ) : backupItems.length ? (
+                    backupItems.map((item) => (
+                      <tr key={item.file_name} style={{ borderTop: '1px solid rgba(15,23,42,0.06)' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>{item.display_name}</td>
+                        <td style={{ padding: '10px 12px', color: '#334155', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>{item.file_name}</td>
+                        <td style={{ padding: '10px 12px', color: '#334155' }}>{formatDate(item.created_at)}</td>
+                        <td style={{ padding: '10px 12px', color: '#334155' }}>{formatBytes(item.size || 0)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            onClick={() => handlePromoteBackup(item.file_name, item.display_name)}
+                            disabled={actionPending}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: 10,
+                              border: 'none',
+                              background: '#2563eb',
+                              color: '#fff',
+                              fontWeight: 800,
+                              cursor: actionPending ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            프로젝트로 만들기
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} style={{ padding: 14, color: '#64748b' }}>
+                        백업 파일이 없습니다.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ fontSize: 12, color: '#475467' }}>삭제를 실행하려면 admin 키를 입력하세요 (KEY: {ADMIN_KEY})</div>
