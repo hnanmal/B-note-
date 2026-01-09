@@ -94,6 +94,7 @@ EXTRA_TABLE_STATEMENTS = [
         result_log TEXT,
         work_master_id INTEGER,
         work_master_code TEXT,
+        gauge TEXT,
         created_at TEXT NOT NULL
     )
     """,
@@ -322,6 +323,8 @@ def ensure_extra_tables(db_path: Path) -> None:
         calc_result_columns = {row[1] for row in cursor.fetchall()}
         if "rev_key" not in calc_result_columns:
             cursor.execute("ALTER TABLE calc_result ADD COLUMN rev_key TEXT")
+        if "gauge" not in calc_result_columns:
+            cursor.execute("ALTER TABLE calc_result ADD COLUMN gauge TEXT")
 
         cursor.execute("PRAGMA table_info(family_revit_type)")
         frt_columns = {row[1] for row in cursor.fetchall()}

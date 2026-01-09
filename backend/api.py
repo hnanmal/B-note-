@@ -1879,6 +1879,11 @@ def import_calc_result_json(
             work_master_code,
         )
 
+        # Try to extract gauge from the work_master payload or entry payload
+        gauge = _coerce_str(_payload_get(wm_payload, "gauge", "gauge_code", "gaugeCode", "G"))
+        if not gauge:
+            gauge = _coerce_str(_payload_get(entry, "gauge", "게이지", "gauge"))
+
         guid = _coerce_str(_payload_get(entry, "GUID", "guid"))
         gui = _coerce_str(_payload_get(entry, "GUI", "gui"))
         member_name = _coerce_str(
@@ -1939,13 +1944,13 @@ def import_calc_result_json(
                         category, standard_type_number, standard_type_name,
                         classification, detail_classification, unit,
                         formula, substituted_formula, result, result_log,
-                        work_master_id, work_master_code, created_at
+                        work_master_id, work_master_code, gauge, created_at
                     ) VALUES (
                         :key, :rev_key, :building_name, :guid, :gui, :member_name,
                         :category, :standard_type_number, :standard_type_name,
                         :classification, :detail_classification, :unit,
                         :formula, :substituted_formula, :result, :result_log,
-                        :work_master_id, :work_master_code, :created_at
+                        :work_master_id, :work_master_code, :gauge, :created_at
                     )
                     """
                 ),
@@ -1968,6 +1973,7 @@ def import_calc_result_json(
                     "result_log": result_log,
                     "work_master_id": resolved_wm_id,
                     "work_master_code": work_master_code,
+                    "gauge": gauge,
                     "created_at": now_iso,
                 },
             )
@@ -2575,6 +2581,7 @@ def manual_update_calc_results(
                 break
         work_master_id = wm_meta.get("work_master_id") if wm_meta else None
         work_master_code = wm_meta.get("work_master_code") if wm_meta else None
+        gauge_val = _coerce_str(wm_meta.get("gauge")) if wm_meta else None
         unit_val = _compose_unit_from_wm_meta(wm_meta)
 
         standard_item_type_value = (
@@ -2626,13 +2633,13 @@ def manual_update_calc_results(
                             category, standard_type_number, standard_type_name,
                             classification, detail_classification, unit,
                             formula, substituted_formula, result, result_log,
-                            work_master_id, work_master_code, created_at
+                            work_master_id, work_master_code, gauge, created_at
                         ) VALUES (
                             :key, :rev_key, :building_name, :guid, :gui, :member_name,
                             :category, :standard_type_number, :standard_type_name,
                             :classification, :detail_classification, :unit,
                             :formula, :substituted_formula, :result, :result_log,
-                            :work_master_id, :work_master_code, :created_at
+                            :work_master_id, :work_master_code, :gauge, :created_at
                         )
                         """
                     ),
@@ -2655,6 +2662,7 @@ def manual_update_calc_results(
                         "result_log": result_log,
                         "work_master_id": work_master_id,
                         "work_master_code": work_master_code,
+                        "gauge": gauge_val,
                         "created_at": now_iso,
                     },
                 )
