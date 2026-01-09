@@ -22,6 +22,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
   const [availableBuildings, setAvailableBuildings] = useState([]);
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [aggregatedRows, setAggregatedRows] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [midOrder, setMidOrder] = useState({});
   const [pjtAbbr, setPjtAbbr] = useState('');
 
@@ -64,8 +65,11 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
     if (!apiBaseUrl) return;
     if (!selectedRevKey) {
       setAggregatedRows([]);
+      setLoading(false);
       return;
     }
+
+    setLoading(true);
 
     const qs = `?rev_key=${encodeURIComponent(selectedRevKey)}&limit=20000`;
     fetch(`${apiBaseUrl}/calc-result${qs}`)
@@ -181,9 +185,15 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               grouped.get(g).push(item);
             }
             setAggregatedRows(Array.from(grouped.entries()));
+          })
+          .finally(() => {
+            setLoading(false);
           });
       })
-      .catch(() => setAggregatedRows([]));
+      .catch(() => {
+        setAggregatedRows([]);
+        setLoading(false);
+      });
   }, [apiBaseUrl, selectedRevKey]);
 
   const displayedBuildings = selectedBuilding ? [selectedBuilding] : buildingNames;
@@ -368,7 +378,13 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
           </tr>
         </thead>
         <tbody>
-          {(!selectedRevKey) ? (
+          {loading ? (
+            <tr>
+              <td colSpan={baseHeaders.length + displayedBuildings.length} style={{ textAlign: 'center', color: '#64748b', fontSize: 12, padding: 20 }}>
+                데이터를 불러오는 중입니다...
+              </td>
+            </tr>
+          ) : (!selectedRevKey) ? (
             <tr>
               <td colSpan={baseHeaders.length + displayedBuildings.length} style={{ textAlign: 'center', color: '#bbb', padding: 20 }}>
                 리비전을 선택하세요.

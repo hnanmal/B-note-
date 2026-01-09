@@ -743,7 +743,7 @@ function App() {
             height: 'calc(100% - 30px)',
             zIndex: 10,
             // CSS variables for nav button theming; JS will override these when appropriate
-            ['--nav-bg']: isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#b798bbff',
+            ['--nav-bg']: isProjectEditorRoute ? PROJECT_INACTIVE_BG : '#f1f1f1ff',
             ['--nav-active-bg']: isProjectEditorRoute ? PROJECT_ACTIVE_BG : '#f7c748',
             ['--nav-active-color']: isProjectEditorRoute ? PROJECT_ACTIVE_TEXT : '#2c1b00',
           }}
