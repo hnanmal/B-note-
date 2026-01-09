@@ -18,6 +18,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
   const [availableBuildings, setAvailableBuildings] = useState([]);
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [aggregatedRows, setAggregatedRows] = useState([]);
+  const [midOrder, setMidOrder] = useState({});
 
   useEffect(() => {
     if (!apiBaseUrl) return;
@@ -113,11 +114,22 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
           .then((r) => (r.ok ? r.json().catch(() => []) : []))
           .then((wms) => {
             const wmMap = new Map();
+            const largeMidMap = new Map();
             if (Array.isArray(wms)) {
               for (const wm of wms) {
                 const key = `${normalize(wm.work_master_code)}||${normalize(wm.gauge)}`;
                 wmMap.set(key, wm);
+                const large = normalize(wm.cat_large_desc || wm.cat_large_code || '');
+                const mid = normalize(wm.cat_mid_desc || wm.cat_mid_code || '');
+                if (!largeMidMap.has(large)) largeMidMap.set(large, new Set());
+                if (mid) largeMidMap.get(large).add(mid);
               }
+              // convert largeMidMap to plain object with ordered arrays
+              const midOrderObj = {};
+              for (const [large, mids] of largeMidMap.entries()) {
+                midOrderObj[large] = Array.from(mids);
+              }
+              setMidOrder(midOrderObj);
             }
 
             for (const item of out) {
@@ -128,6 +140,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                 wm = wmMap.get(`${normalize(item.wm_code)}||${normalize(item.gauge).toUpperCase()}`) || wmMap.get(`${normalize(item.wm_code).toUpperCase()}||${normalize(item.gauge).toUpperCase()}`);
               }
               item.cat_large_desc = (wm && (wm.cat_large_desc || wm.cat_large_code || '')) || item.cat_large_desc || '';
+              // also populate mid category from work_masters
+              item.cat_mid_desc = (wm && (wm.cat_mid_desc || wm.cat_mid_code || '')) || item.cat_mid_desc || '';
               // Use work_masters.cat_small_desc as Description when available
               if (wm && (wm.cat_small_desc || wm.cat_small_code)) {
                 item.description = wm.cat_small_desc || wm.cat_small_code || item.description || '';
@@ -246,26 +260,66 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                     ))}
                   </tr>
                         {(() => {
-                          const filtered = items.filter(it => {
-                            if (!selectedBuilding) return true;
-                            return Number((it.byBuilding && it.byBuilding[selectedBuilding]) || 0) > 0;
+                          // Group items by mid-category inside this large group
+                          const midMap = new Map();
+                          for (const it of items) {
+                            const mid = (it.cat_mid_desc || '').trim();
+                            if (!midMap.has(mid)) midMap.set(mid, []);
+                            midMap.get(mid).push(it);
+                          }
+
+                          // build ordered mid entries: prefer DB order from midOrder, then append any remaining mids sorted
+                          const midsForLarge = (midOrder && midOrder[groupName]) || [];
+                          const allMids = Array.from(midMap.keys());
+                          const remaining = allMids.filter(m => !midsForLarge.includes(m)).sort((a,b)=> (a||'').localeCompare(b||''));
+                          const orderedMidNames = [
+                            ...midsForLarge.filter(m => midMap.has(m)),
+                            ...remaining,
+                          ];
+
+                          const midEntries = orderedMidNames.map((m) => [m, midMap.get(m)]);
+
+                          return midEntries.map(([midName, midItems], midIdx) => {
+                            // filter rows by selected building if needed
+                            const filtered = midItems.filter(it => {
+                              if (!selectedBuilding) return true;
+                              return Number((it.byBuilding && it.byBuilding[selectedBuilding]) || 0) > 0;
+                            });
+                            if (!filtered.length) return null;
+
+                            return (
+                              <React.Fragment key={`group-${groupIdx}-mid-${midIdx}-${midName}`}>
+                                <tr style={{ background: '#dff7df' }}>
+                                  <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140 }}></td>
+                                  <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40 }}></td>
+                                  <td style={{ padding: '6px 8px', border: '1px solid #e6e6e6', fontWeight: 600 }}>
+                                    {midName || '(Uncategorized Mid)'}
+                                  </td>
+                                  {Array.from({ length: baseHeaders.length - 3 }).map((_, i) => (
+                                    <td key={`mh-${groupIdx}-${midIdx}-${i}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
+                                  ))}
+                                  {displayedBuildings.map((b) => (
+                                    <td key={`mh-b-${groupIdx}-${midIdx}-${b}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
+                                  ))}
+                                </tr>
+                                {filtered.map((row, idx) => (
+                                  <tr key={`${row.wm_code}||${row.gauge}||${groupIdx}||${midIdx}||${idx}`}>
+                                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.wm_code}</td>
+                                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.gauge}</td>
+                                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.description}</td>
+                                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
+                                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.add_spec || ''}</td>
+                                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
+                                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.uom}</td>
+                                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.total)}</td>
+                                    {displayedBuildings.map((b) => (
+                                      <td key={`val-${groupIdx}-${midIdx}-${idx}-${b}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.byBuilding[b] || 0)}</td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </React.Fragment>
+                            );
                           });
-                          if (!filtered.length) return null;
-                          return filtered.map((row, idx) => (
-                    <tr key={`${row.wm_code}||${row.gauge}||${groupIdx}||${idx}`}>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.wm_code}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.gauge}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.description}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.add_spec || ''}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.uom}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.total)}</td>
-                      {displayedBuildings.map((b) => (
-                        <td key={`val-${groupIdx}-${idx}-${b}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.byBuilding[b] || 0)}</td>
-                      ))}
-                    </tr>
-                          ));
                         })()}
                 </React.Fragment>
               );
