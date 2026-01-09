@@ -2040,7 +2040,7 @@ def list_calc_results(
                 cr.gui AS gui,
                 cr.member_name AS member_name,
                 COALESCE(wm.work_master_code, cr.work_master_code) AS wm_code,
-                wm.gauge AS gauge,
+                COALESCE(cr.gauge, wm.gauge) AS gauge,
                 wm.add_spec AS add_spec,
                 wm.cat_large_desc AS cat_large_desc,
                 wm.cat_mid_desc AS cat_mid_desc,
