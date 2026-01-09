@@ -354,7 +354,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
       <div style={{ flex: '1 1 auto', overflow: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 11 }}>
         <thead>
-          <tr style={{ background: '#f7c748', color: '#2c1b00' }}>
+          <tr style={{ background: '#E5E7EB', color: '#2c1b00' }}>
             {baseHeaders.map((h, i) => {
               const thStyle = { padding: '6px 4px', border: '1px solid #e5e7eb', fontWeight: 700 };
               if (i === 0) { thStyle.minWidth = 140; thStyle.maxWidth = 140; } // Work Master Code (approx 15 chars)
