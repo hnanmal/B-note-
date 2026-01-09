@@ -649,7 +649,63 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             <span style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8' }}>{headline}</span>
             {categoryLabel && <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{categoryLabel}</span>}
           </div>
+          <div
+            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                handleAddGauge(workMaster.id);
+              }}
+              disabled={gaugeButtonDisabled}
+              title={gaugeButtonTitle}
+              style={{
+                padding: '4px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                borderRadius: 6,
+                border: '1px solid #cbd5f5',
+                background: gaugeButtonDisabled ? '#f1f5f9' : '#fff',
+                color: gaugeButtonDisabled ? '#94a3b8' : '#0f172a',
+                cursor: gaugeButtonDisabled ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isGaugeAdding ? '추가 중...' : '게이지 추가'}
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                handleRemoveGauge(workMaster.id);
+              }}
+              disabled={!gaugeValue || selectionLoading || isGaugeRemoving}
+              style={{
+                padding: '4px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                borderRadius: 6,
+                border: '1px solid #f87171',
+                background: !gaugeValue || selectionLoading || isGaugeRemoving ? '#fee2e2' : '#fff',
+                color: !gaugeValue || selectionLoading || isGaugeRemoving ? '#fca5a5' : '#dc2626',
+                cursor: !gaugeValue || selectionLoading || isGaugeRemoving ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isGaugeRemoving ? '삭제 중...' : '게이지 삭제'}
+            </button>
+          </div>
         </div>
+        {(gaugeError || gaugeRemoveError) && (
+          <div style={{ fontSize: 11, color: '#b91c1c', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {gaugeError && <span>{gaugeError}</span>}
+            {gaugeRemoveError && <span>{gaugeRemoveError}</span>}
+          </div>
+        )}
         {(attrSummary || uomLabel) && (
           <div style={{ fontSize: 12, color: '#374151', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {attrSummary && <span>{attrSummary}</span>}
@@ -733,55 +789,6 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             >
               {isSpecSaving ? '저장 중...' : '저장'}
             </button>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleAddGauge(workMaster.id);
-              }}
-              disabled={gaugeButtonDisabled}
-              title={gaugeButtonTitle}
-              style={{
-                padding: '4px 12px',
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 6,
-                border: '1px solid #cbd5f5',
-                background: gaugeButtonDisabled ? '#f1f5f9' : '#fff',
-                color: gaugeButtonDisabled ? '#94a3b8' : '#0f172a',
-                cursor: gaugeButtonDisabled ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {isGaugeAdding ? '추가 중...' : '게이지 추가'}
-            </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleRemoveGauge(workMaster.id);
-              }}
-              disabled={!gaugeValue || selectionLoading || isGaugeRemoving}
-              style={{
-                padding: '4px 12px',
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 6,
-                border: '1px solid #f87171',
-                background: !gaugeValue || selectionLoading || isGaugeRemoving ? '#fee2e2' : '#fff',
-                color: !gaugeValue || selectionLoading || isGaugeRemoving ? '#fca5a5' : '#dc2626',
-                cursor: !gaugeValue || selectionLoading || isGaugeRemoving ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {isGaugeRemoving ? '삭제 중...' : '게이지 삭제'}
-            </button>
-            {gaugeError && (
-              <div style={{ fontSize: 11, color: '#b91c1c' }}>{gaugeError}</div>
-            )}
-            {gaugeRemoveError && (
-              <div style={{ fontSize: 11, color: '#b91c1c' }}>{gaugeRemoveError}</div>
-            )}
           </div>
           {specError && (
             <div style={{ fontSize: 11, color: '#b91c1c' }}>{specError}</div>
