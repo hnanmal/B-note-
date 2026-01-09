@@ -150,6 +150,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
       .catch(() => setAggregatedRows([]));
   }, [apiBaseUrl, selectedRevKey]);
 
+  const displayedBuildings = selectedBuilding ? [selectedBuilding] : buildingNames;
+
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #0001', padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
@@ -189,7 +191,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
             {baseHeaders.map((h) => (
               <th key={h} style={{ padding: '8px 6px', border: '1px solid #e5e7eb', fontWeight: 700 }}>{h}</th>
             ))}
-            {buildingNames.map((b) => (
+            {displayedBuildings.map((b) => (
               <th key={b} style={{ padding: '8px 6px', border: '1px solid #e5e7eb', fontWeight: 700 }}>{b}</th>
             ))}
           </tr>
@@ -197,13 +199,13 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
         <tbody>
           {(!selectedRevKey) ? (
             <tr>
-              <td colSpan={baseHeaders.length + buildingNames.length} style={{ textAlign: 'center', color: '#bbb', padding: 32 }}>
+              <td colSpan={baseHeaders.length + displayedBuildings.length} style={{ textAlign: 'center', color: '#bbb', padding: 32 }}>
                 리비전을 선택하세요.
               </td>
             </tr>
           ) : aggregatedRows.length === 0 ? (
             <tr>
-              <td colSpan={baseHeaders.length + buildingNames.length} style={{ textAlign: 'center', color: '#bbb', padding: 32 }}>
+              <td colSpan={baseHeaders.length + displayedBuildings.length} style={{ textAlign: 'center', color: '#bbb', padding: 32 }}>
                 선택된 리비전에 해당하는 데이터가 없습니다.
               </td>
             </tr>
@@ -227,7 +229,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                     {Array.from({ length: baseHeaders.length - 3 }).map((_, i) => (
                       <td key={`gh-${groupIdx}-${i}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
                     ))}
-                    {buildingNames.map((b) => (
+                    {displayedBuildings.map((b) => (
                       <td key={`gh-b-${groupIdx}-${b}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
                     ))}
                   </tr>
@@ -247,7 +249,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                       <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
                       <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.uom}</td>
                       <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.total)}</td>
-                      {buildingNames.map((b) => (
+                      {displayedBuildings.map((b) => (
                         <td key={`val-${groupIdx}-${idx}-${b}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.byBuilding[b] || 0)}</td>
                       ))}
                     </tr>
