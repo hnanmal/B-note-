@@ -586,7 +586,21 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
                 '산출로그',
                 '단위',
               ].map((h) => (
-                <th key={h} style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{h}</th>
+                <th
+                  key={h}
+                  style={{
+                    textAlign: 'left',
+                    padding: '6px 8px',
+                    borderBottom: '1px solid #e5e7eb',
+                    whiteSpace: 'nowrap',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 3,
+                    background: '#f3f4f6',
+                  }}
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
