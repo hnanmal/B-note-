@@ -2071,6 +2071,11 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
             <span style={{ fontSize: 13, fontWeight: 600, color: '#475467' }}>Standard GWM Tree</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {isProjectContext && (
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#475467', whiteSpace: 'nowrap' }}>
+                  현재상태 :
+                </span>
+              )}
+              {isProjectContext && (
                 <button
                   type="button"
                   onClick={() => setHideDerivedInStdTree((prev) => !prev)}
