@@ -304,19 +304,29 @@ function WorkMasterManager({ apiBaseUrl = API_BASE_URL, selectedFamilyNode = nul
 
             {message && <p><strong>상태:</strong> {message}</p>}
 
-            <h3>WorkMaster 목록</h3>
-            <div style={{ marginBottom: '10px' }}>
-                <form onSubmit={handleSearch}>
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    flexWrap: 'nowrap',
+                    overflowX: 'auto',
+                    marginBottom: 10,
+                }}
+            >
+                <h3 style={{ margin: 0, whiteSpace: 'nowrap' }}>WorkMaster 목록</h3>
+                <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
                     <input
                         type="text"
                         placeholder="전체 컬럼에서 검색..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ marginRight: '10px', padding: '5px' }}/>
-                    <button type="submit">검색</button>
+                        style={{ padding: '5px', minWidth: 220 }}
+                    />
+                    <button type="submit" style={{ whiteSpace: 'nowrap' }}>검색</button>
                 </form>
+                <button type="button" onClick={handleRefresh} style={{ whiteSpace: 'nowrap' }}>새로고침</button>
             </div>
-            <button onClick={handleRefresh}>새로고침</button>
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
                 <h3 style={{ margin: 0 }}>신규 WM 추가</h3>
