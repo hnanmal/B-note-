@@ -219,16 +219,20 @@ export default function ProjectPage() {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 16, padding: 20, background: '#fff', borderRadius: 14, boxShadow: '0 4px 20px rgba(31,41,55,0.08)' }}>
       <header>
-        <img
-          src={appLogoMainTab}
-          alt="B-note+"
-          style={{ width: 220, maxWidth: '100%', height: 'auto', marginBottom: 10, display: 'block' }}
-        />
-        <div style={{ fontSize: 14, color: '#556', marginBottom: 4 }}>Project Main · 실시간 DB 관리</div>
-        <h1 style={{ margin: 0, fontSize: 30, color: '#1f2937' }}>프로젝트 DB 운영</h1>
-        <p style={{ margin: '8px 0 0', color: '#475467', lineHeight: 1.6 }}>
-          backend/pjt_db 폴더에 있는 DB 파일을 API로 실시간 관리합니다. 생성 · 복사 · 이름변경 · 삭제 모두 여기에서 실행하세요.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <img
+            src={appLogoMainTab}
+            alt="B-note+"
+            style={{ width: 220, maxWidth: '100%', height: 'auto', display: 'block' }}
+          />
+          <div style={{ minWidth: 240, flex: '1 1 320px' }}>
+            <div style={{ fontSize: 14, color: '#556', marginBottom: 4 }}>Project Main · 실시간 DB 관리</div>
+            <h1 style={{ margin: 0, fontSize: 30, color: '#1f2937' }}>프로젝트 DB 운영</h1>
+            <p style={{ margin: '8px 0 0', color: '#475467', lineHeight: 1.6 }}>
+              backend/pjt_db 폴더에 있는 DB 파일을 API로 실시간 관리합니다. 생성 · 복사 · 이름변경 · 삭제 모두 여기에서 실행하세요.
+            </p>
+          </div>
+        </div>
       </header>
 
       <section style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
