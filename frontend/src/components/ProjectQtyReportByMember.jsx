@@ -336,13 +336,15 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
       </div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select value={selectedBuilding} onChange={(e) => { setSelectedBuilding(e.target.value); setSelectedRevKey(''); }}>
+        <select value={selectedBuilding} onChange={(e) => { setSelectedBuilding(e.target.value); setSelectedRevKey(''); }}
+          style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}>
           <option value="">건물(전체)</option>
           {buildings.map((b) => (
             <option key={b} value={b}>{b}</option>
           ))}
         </select>
-        <select value={selectedRevKey} onChange={(e) => setSelectedRevKey(e.target.value)}>
+        <select value={selectedRevKey} onChange={(e) => setSelectedRevKey(e.target.value)}
+          style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}>
           <option value="">rev_key(전체)</option>
           {revKeys.map((k) => (
             <option key={k} value={k}>{k}</option>
@@ -353,7 +355,7 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
           type="button"
           onClick={runManualCalcUpdate}
           disabled={!selectedRevKey || loading}
-          style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+          style={{ height: 32, fontSize: 14, padding: '0 16px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
           title="선택된 rev_key에 대해 14.Manual_Input 수동 산출을 DB에 저장"
         >
           Manual Calc Update
@@ -364,7 +366,7 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
             type="button"
             onClick={() => { setDeleteArmed(true); setDeleteConfirmText(''); }}
             disabled={!selectedBuilding || !selectedRevKey || loading}
-            style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ef4444', background: '#fff', cursor: 'pointer' }}
+            style={{ height: 32, fontSize: 14, padding: '0 16px', borderRadius: 6, border: '1px solid #ef4444', background: '#fff', cursor: 'pointer' }}
             title="선택된 Building + rev_key 데이터 삭제(확인 단계 포함)"
           >
             Delete (Building+rev)
@@ -376,14 +378,14 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
               placeholder={selectedRevKey ? `"${selectedRevKey}"` : 'rev_key'}
-              style={{ height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid #d1d5db', minWidth: 180 }}
+              style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', minWidth: 180 }}
               disabled={loading}
             />
             <button
               type="button"
               onClick={deleteSelectedRevision}
               disabled={!selectedBuilding || !selectedRevKey || loading || normalizeKey(deleteConfirmText) !== normalizeKey(selectedRevKey)}
-              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ef4444', background: '#fff', cursor: 'pointer' }}
+              style={{ height: 32, fontSize: 14, padding: '0 16px', borderRadius: 6, border: '1px solid #ef4444', background: '#fff', cursor: 'pointer' }}
               title="rev_key가 일치하면 삭제됩니다"
             >
               Confirm Delete
@@ -392,7 +394,7 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
               type="button"
               onClick={() => { setDeleteArmed(false); setDeleteConfirmText(''); }}
               disabled={loading}
-              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+              style={{ height: 32, fontSize: 14, padding: '0 16px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -402,7 +404,7 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
         <button
           type="button"
           onClick={clearFilters}
-          style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+          style={{ height: 32, fontSize: 14, padding: '0 16px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
         >
           Clear Filters
         </button>
@@ -410,12 +412,12 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           placeholder="Search"
-          style={{ height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid #d1d5db', minWidth: 220 }}
+          style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', minWidth: 220 }}
         />
         <button
           type="button"
           onClick={() => setSearchText('')}
-          style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+          style={{ height: 32, fontSize: 14, padding: '0 16px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
         >
           Clear Search
         </button>
@@ -426,31 +428,36 @@ export default function ProjectQtyReportByMember({ apiBaseUrl }) {
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <select value={filters.category} onChange={(e) => setFilters((p) => ({ ...p, category: e.target.value }))}>
+        <select value={filters.category} onChange={(e) => setFilters((p) => ({ ...p, category: e.target.value }))}
+          style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}>
           <option value="">카테고리(전체)</option>
           {options.category.map((v) => (
             <option key={v} value={v}>{v}</option>
           ))}
         </select>
-        <select value={filters.standardTypeNumber} onChange={(e) => setFilters((p) => ({ ...p, standardTypeNumber: e.target.value }))}>
+        <select value={filters.standardTypeNumber} onChange={(e) => setFilters((p) => ({ ...p, standardTypeNumber: e.target.value }))}
+          style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}>
           <option value="">표준타입 번호(전체)</option>
           {options.standardTypeNumber.map((v) => (
             <option key={v} value={v}>{v}</option>
           ))}
         </select>
-        <select value={filters.standardTypeName} onChange={(e) => setFilters((p) => ({ ...p, standardTypeName: e.target.value }))}>
+        <select value={filters.standardTypeName} onChange={(e) => setFilters((p) => ({ ...p, standardTypeName: e.target.value }))}
+          style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}>
           <option value="">표준타입 이름(전체)</option>
           {options.standardTypeName.map((v) => (
             <option key={v} value={v}>{v}</option>
           ))}
         </select>
-        <select value={filters.classification} onChange={(e) => setFilters((p) => ({ ...p, classification: e.target.value }))}>
+        <select value={filters.classification} onChange={(e) => setFilters((p) => ({ ...p, classification: e.target.value }))}
+          style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}>
           <option value="">분류(전체)</option>
           {options.classification.map((v) => (
             <option key={v} value={v}>{v}</option>
           ))}
         </select>
-        <select value={filters.description} onChange={(e) => setFilters((p) => ({ ...p, description: e.target.value }))}>
+        <select value={filters.description} onChange={(e) => setFilters((p) => ({ ...p, description: e.target.value }))}
+          style={{ height: 32, fontSize: 14, padding: '0 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}>
           <option value="">상세분류(전체)</option>
           {options.description.map((v) => (
             <option key={v} value={v}>{v}</option>
