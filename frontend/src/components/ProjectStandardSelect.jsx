@@ -645,9 +645,11 @@ export default function ProjectStandardSelect({ apiBaseUrl }) {
             disabled={selectionLoading}
             style={{ width: 18, height: 18 }}
           />
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{headline}</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{headline}</span>
+            {categoryLabel && <span style={{ fontSize: 12, color: '#475467' }}>{categoryLabel}</span>}
+          </div>
         </div>
-        {categoryLabel && <div style={{ fontSize: 12, color: '#475467' }}>{categoryLabel}</div>}
         {(attrSummary || uomLabel) && (
           <div style={{ fontSize: 12, color: '#374151', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {attrSummary && <span>{attrSummary}</span>}
