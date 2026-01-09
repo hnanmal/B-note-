@@ -372,10 +372,12 @@ function WorkMasterManager({ apiBaseUrl = API_BASE_URL, selectedFamilyNode = nul
                         <tr>
                             <th style={tableHeaderStyle}>Work Master Code</th>
                             <th style={tableHeaderStyle}>Discipline</th>
+                            <th style={tableHeaderStyle}>Gauge Code</th>
                             <th style={tableHeaderStyle}>Large Category</th>
                             <th style={tableHeaderStyle}>Mid Category</th>
                             <th style={tableHeaderStyle}>Small Category</th>
                             <th style={tableHeaderStyle}>Unit</th>
+                            <th style={tableHeaderStyle}>New/Old</th>
                             <th style={tableHeaderStyle}>Attr1 Spec</th>
                             <th style={tableHeaderStyle}>Attr2 Spec</th>
                             <th style={tableHeaderStyle}>Attr3 Spec</th>
@@ -389,10 +391,12 @@ function WorkMasterManager({ apiBaseUrl = API_BASE_URL, selectedFamilyNode = nul
                             <tr key={wm.id}>
                                 <td style={tableCellStyle}>{wm.work_master_code}</td>
                                 <td style={tableCellStyle}>{wm.discipline}</td>
+                                <td style={tableCellStyle}>{wm.gauge}</td>
                                 <td style={tableCellStyle}>{wm.cat_large_desc}</td>
                                 <td style={tableCellStyle}>{wm.cat_mid_desc}</td>
                                 <td style={tableCellStyle}>{wm.cat_small_desc}</td>
                                 <td style={tableCellStyle}>{wm.uom1}</td>
+                                <td style={tableCellStyle}>{wm.new_old_code}</td>
                                 <td style={tableCellStyle}>{wm.attr1_spec}</td>
                                 <td style={tableCellStyle}>{wm.attr2_spec}</td>
                                 <td style={tableCellStyle}>{wm.attr3_spec}</td>
