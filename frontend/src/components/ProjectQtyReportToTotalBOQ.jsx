@@ -15,6 +15,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
   const [buildingNames, setBuildingNames] = useState([]);
   const [revKeys, setRevKeys] = useState([]);
   const [selectedRevKey, setSelectedRevKey] = useState('');
+  const [availableBuildings, setAvailableBuildings] = useState([]);
+  const [selectedBuilding, setSelectedBuilding] = useState('');
   const [aggregatedRows, setAggregatedRows] = useState([]);
 
   useEffect(() => {
@@ -58,7 +60,19 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
         return res.json().catch(() => []);
       })
       .then(data => {
-        const rows = Array.isArray(data) ? data : [];
+          const rows = Array.isArray(data) ? data : [];
+          // collect available buildings for this selected rev
+          try {
+            const bset = new Set();
+            for (const r of rows) {
+              if (r && r.building_name) bset.add(r.building_name);
+            }
+            setAvailableBuildings(Array.from(bset));
+          } catch (e) {
+            setAvailableBuildings([]);
+          }
+          // reset building filter when rev changes
+          setSelectedBuilding('');
         // aggregate by wm_code + gauge
         const map = new Map();
         for (const r of rows) {
@@ -154,6 +168,19 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
             ))}
           </select>
         </div>
+        <div>
+          <select
+            value={selectedBuilding}
+            onChange={e => setSelectedBuilding(e.target.value)}
+            disabled={!selectedRevKey || !availableBuildings.length}
+            style={{ height: 32, fontSize: 15, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 180 }}
+          >
+            <option value="">All buildings</option>
+            {availableBuildings.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+        </div>
       </div>
       <div style={{ flex: '1 1 auto', overflow: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 14 }}>
@@ -204,7 +231,13 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                       <td key={`gh-b-${groupIdx}-${b}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
                     ))}
                   </tr>
-                  {items.map((row, idx) => (
+                        {(() => {
+                          const filtered = items.filter(it => {
+                            if (!selectedBuilding) return true;
+                            return Number((it.byBuilding && it.byBuilding[selectedBuilding]) || 0) > 0;
+                          });
+                          if (!filtered.length) return null;
+                          return filtered.map((row, idx) => (
                     <tr key={`${row.wm_code}||${row.gauge}||${groupIdx}||${idx}`}>
                       <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.wm_code}</td>
                       <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.gauge}</td>
@@ -218,7 +251,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                         <td key={`val-${groupIdx}-${idx}-${b}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.byBuilding[b] || 0)}</td>
                       ))}
                     </tr>
-                  ))}
+                          ));
+                        })()}
                 </React.Fragment>
               );
             })
