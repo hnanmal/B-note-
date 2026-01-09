@@ -11,6 +11,7 @@ import ProjectInputMain from './components/ProjectInputMain';
 import ProjectFamilyAssign from './components/ProjectFamilyAssign';
 import ProjectInteriorMatrix from './components/ProjectInteriorMatrix';
 import ProjectQtyReportByMember from './components/ProjectQtyReportByMember';
+import ProjectQtyReportToTotalBOQ from './components/ProjectQtyReportToTotalBOQ';
 import ProjectStandardSelect from './components/ProjectStandardSelect';
 import ProjectWmSummary from './components/ProjectWmSummary';
 import ProjectWmPrecheck from './components/ProjectWmPrecheck';
@@ -395,6 +396,7 @@ function App() {
   };
   const projectReportPages = {
     'project-report-qty-by-member': "Q'ty Report by Member",
+    'project-report-qty-to-total-boq': "Q'ty Report to Total BOQ",
   };
   const fetchCalcDictionaryIndex = useCallback(async () => {
     setCalcDictionaryLoading(true);
@@ -944,6 +946,25 @@ function App() {
                           }}
                         >
                           Q'ty Report by Member
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActivePage('project-report-qty-to-total-boq')}
+                          className={`nav-btn${activePage === 'project-report-qty-to-total-boq' ? ' active' : ''}`}
+                          style={{
+                            width: '100%',
+                            minWidth: 0,
+                            maxWidth: '100%',
+                            padding: '6px 0',
+                            fontWeight: 600,
+                            fontSize: 13,
+                            border: 'none',
+                            background: activePage === 'project-report-qty-to-total-boq' ? '#f7c748' : '#f1f1f1',
+                            color: activePage === 'project-report-qty-to-total-boq' ? '#2c1b00' : '#1d4ed8',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Q'ty Report to Total BOQ
                         </button>
                       </div>
                     </>
@@ -1522,7 +1543,12 @@ function App() {
           )
         ) : projectReportPages[activePage] ? (
           <div className="panel project-report" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
-            <ProjectQtyReportByMember apiBaseUrl={projectApiBase} />
+            {activePage === 'project-report-qty-by-member' && (
+              <ProjectQtyReportByMember apiBaseUrl={projectApiBase} />
+            )}
+            {activePage === 'project-report-qty-to-total-boq' && (
+              <ProjectQtyReportToTotalBOQ />
+            )}
           </div>
         ) : activePage === 'project-main' ? (
           <div className="panel project-main" style={{ flex: '1 1 auto', height: 'calc(100% - 64px)', position: 'relative', zIndex: 1, minWidth: 0, overflow: 'hidden', padding: 16 }}>
