@@ -422,6 +422,12 @@ class ProjectMetadata(BaseModel):
     pjt_description: Optional[str] = None
 
 
+class ProjectDbRevision(BaseModel):
+    revision: str
+    mtime_ns: int
+    size: int
+
+
 class GwmFamilyAssignmentPayload(BaseModel):
     standard_item_ids: List[int] = Field(default_factory=list)
 

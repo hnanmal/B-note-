@@ -71,6 +71,67 @@ function App() {
 
   const [projectTabAbbr, setProjectTabAbbr] = useState('');
 
+  const [projectDbRevision, setProjectDbRevision] = useState('');
+  const [projectDbNeedsRefresh, setProjectDbNeedsRefresh] = useState(false);
+  const [refreshBlinkOn, setRefreshBlinkOn] = useState(false);
+
+  useEffect(() => {
+    if (!projectDbNeedsRefresh) {
+      setRefreshBlinkOn(false);
+      return;
+    }
+    const id = window.setInterval(() => {
+      setRefreshBlinkOn((prev) => !prev);
+    }, 650);
+    return () => window.clearInterval(id);
+  }, [projectDbNeedsRefresh]);
+
+  useEffect(() => {
+    if (!isProjectEditorRoute || !projectRouteIdentifier || !projectApiBase) {
+      setProjectDbRevision('');
+      setProjectDbNeedsRefresh(false);
+      return;
+    }
+
+    let cancelled = false;
+    let timerId = null;
+    const controller = new AbortController();
+
+    const tick = async () => {
+      try {
+        const response = await fetch(`${projectApiBase}/db-revision`, { signal: controller.signal });
+        if (!response.ok) return;
+        const payload = await response.json().catch(() => null);
+        const revision = String(payload?.revision ?? '');
+        if (!revision) return;
+        if (cancelled) return;
+
+        setProjectDbRevision((prev) => {
+          if (!prev) return revision;
+          if (prev !== revision) {
+            setProjectDbNeedsRefresh(true);
+          }
+          return prev;
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    tick();
+    timerId = window.setInterval(tick, 7000);
+
+    return () => {
+      cancelled = true;
+      if (timerId) window.clearInterval(timerId);
+      controller.abort();
+    };
+  }, [isProjectEditorRoute, projectRouteIdentifier, projectApiBase]);
+
+  const reloadProjectPage = useCallback(() => {
+    window.location.reload();
+  }, []);
+
   useEffect(() => {
     if (typeof document === 'undefined') return;
     if (!isProjectEditorRoute) {
@@ -465,6 +526,26 @@ function App() {
           <span>{headerTitle}</span>
           {isProjectEditorRoute && projectRouteIdentifier ? (
             <>
+              <button
+                type="button"
+                onClick={reloadProjectPage}
+                style={{
+                  height: 20,
+                  padding: '0 7px',
+                  borderRadius: 8,
+                  border: '0.5px solid #0f172a',
+                  background: projectDbNeedsRefresh && refreshBlinkOn ? '#0f172a' : '#ffffff',
+                  color: projectDbNeedsRefresh && refreshBlinkOn ? '#ffffff' : '#0f172a',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  lineHeight: 1,
+                  opacity: projectDbNeedsRefresh ? (refreshBlinkOn ? 1 : 0.55) : 1,
+                }}
+                title={projectDbNeedsRefresh ? 'DB가 변경되었습니다. 새로고침하여 최신 내용으로 갱신하세요.' : '페이지 새로고침'}
+              >
+                새로고침
+              </button>
               <button
                 type="button"
                 onClick={downloadDbExcel}

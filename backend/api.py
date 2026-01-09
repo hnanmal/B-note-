@@ -10,6 +10,7 @@ import datetime
 import sqlite3
 import ast
 import operator
+import os
 
 from . import crud, project_db, schemas, models
 from .database import SessionLocal
@@ -3984,6 +3985,26 @@ def update_project_metadata(
         raise HTTPException(status_code=404, detail=str(exc))
     updates = payload.model_dump(exclude_unset=True)
     return project_db.update_project_metadata(db_path, updates)
+
+
+@router.get(
+    "/project/{project_identifier}/db-revision",
+    response_model=schemas.ProjectDbRevision,
+    tags=["Project Data"],
+)
+def read_project_db_revision(
+    project_identifier: str,
+):
+    try:
+        db_path = project_db.resolve_project_db_path(project_identifier)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    stat = os.stat(db_path)
+    mtime_ns = int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000)))
+    size = int(stat.st_size)
+    revision = f"{mtime_ns}:{size}"
+    return {"revision": revision, "mtime_ns": mtime_ns, "size": size}
 
 
 @router.delete(
