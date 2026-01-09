@@ -162,7 +162,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
           <select
             value={selectedRevKey}
             onChange={e => setSelectedRevKey(e.target.value)}
-            style={{ height: 32, fontSize: 15, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 140 }}
+            style={{ height: 28, fontSize: 13, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 140 }}
           >
             <option value="">rev 선택</option>
             {revKeys.map((rev) => (
@@ -175,7 +175,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
             value={selectedBuilding}
             onChange={e => setSelectedBuilding(e.target.value)}
             disabled={!selectedRevKey || !availableBuildings.length}
-            style={{ height: 32, fontSize: 15, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 180 }}
+            style={{ height: 28, fontSize: 13, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 180 }}
           >
             <option value="">All buildings</option>
             {availableBuildings.map((b) => (
@@ -185,27 +185,27 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
         </div>
       </div>
       <div style={{ flex: '1 1 auto', overflow: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 14 }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 10 }}>
         <thead>
           <tr style={{ background: '#f7c748', color: '#2c1b00' }}>
             {baseHeaders.map((h) => (
-              <th key={h} style={{ padding: '8px 6px', border: '1px solid #e5e7eb', fontWeight: 700 }}>{h}</th>
+              <th key={h} style={{ padding: '6px 4px', border: '1px solid #e5e7eb', fontWeight: 700 }}>{h}</th>
             ))}
             {displayedBuildings.map((b) => (
-              <th key={b} style={{ padding: '8px 6px', border: '1px solid #e5e7eb', fontWeight: 700 }}>{b}</th>
+              <th key={b} style={{ padding: '6px 4px', border: '1px solid #e5e7eb', fontWeight: 700 }}>{b}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {(!selectedRevKey) ? (
             <tr>
-              <td colSpan={baseHeaders.length + displayedBuildings.length} style={{ textAlign: 'center', color: '#bbb', padding: 32 }}>
+              <td colSpan={baseHeaders.length + displayedBuildings.length} style={{ textAlign: 'center', color: '#bbb', padding: 20 }}>
                 리비전을 선택하세요.
               </td>
             </tr>
           ) : aggregatedRows.length === 0 ? (
             <tr>
-              <td colSpan={baseHeaders.length + displayedBuildings.length} style={{ textAlign: 'center', color: '#bbb', padding: 32 }}>
+              <td colSpan={baseHeaders.length + displayedBuildings.length} style={{ textAlign: 'center', color: '#bbb', padding: 20 }}>
                 선택된 리비전에 해당하는 데이터가 없습니다.
               </td>
             </tr>
@@ -218,19 +218,19 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
               return (
                 // fragment for group header + rows
                 <React.Fragment key={`group-${groupIdx}-${groupName}`}>
-                    <tr style={{ background: '#e6f9e6' }}>
-                      {/* empty cells for first two columns */}
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
-                      <td style={{ padding: '8px 10px', border: '1px solid #e6e6e6', fontWeight: 700 }}>
-                        {groupName || '(Uncategorized)'}
-                      </td>
+                  <tr style={{ background: '#e6f9e6' }}>
+                    {/* empty cells for first two columns */}
+                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
+                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
+                    <td style={{ padding: '6px 8px', border: '1px solid #e6e6e6', fontWeight: 700 }}>
+                      {groupName || '(Uncategorized)'}
+                    </td>
                     {/* remaining base header cells (Description already used) */}
                     {Array.from({ length: baseHeaders.length - 3 }).map((_, i) => (
-                      <td key={`gh-${groupIdx}-${i}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
+                      <td key={`gh-${groupIdx}-${i}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
                     ))}
                     {displayedBuildings.map((b) => (
-                      <td key={`gh-b-${groupIdx}-${b}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}></td>
+                      <td key={`gh-b-${groupIdx}-${b}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
                     ))}
                   </tr>
                         {(() => {
@@ -241,16 +241,16 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                           if (!filtered.length) return null;
                           return filtered.map((row, idx) => (
                     <tr key={`${row.wm_code}||${row.gauge}||${groupIdx}||${idx}`}>
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.wm_code}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.gauge}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.description}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{''}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6' }}>{row.uom}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.total)}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.wm_code}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.gauge}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.description}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{''}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.reference_to}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.uom}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.total)}</td>
                       {displayedBuildings.map((b) => (
-                        <td key={`val-${groupIdx}-${idx}-${b}`} style={{ padding: '6px 8px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.byBuilding[b] || 0)}</td>
+                        <td key={`val-${groupIdx}-${idx}-${b}`} style={{ padding: '4px 6px', border: '1px solid #f3f4f6', textAlign: 'right' }}>{fmt(row.byBuilding[b] || 0)}</td>
                       ))}
                     </tr>
                           ));
