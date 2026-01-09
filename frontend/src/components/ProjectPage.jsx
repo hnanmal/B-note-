@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { API_BASE_URL } from '../apiConfig';
+import appLogoMainTab from '../assets/app_logo_maintab.png';
 const ADMIN_KEY = 'HECBIM';
 
 const formatBytes = (bytes = 0) => {
@@ -218,6 +219,11 @@ export default function ProjectPage() {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 16, padding: 20, background: '#fff', borderRadius: 14, boxShadow: '0 4px 20px rgba(31,41,55,0.08)' }}>
       <header>
+        <img
+          src={appLogoMainTab}
+          alt="B-note+"
+          style={{ width: 220, maxWidth: '100%', height: 'auto', marginBottom: 10, display: 'block' }}
+        />
         <div style={{ fontSize: 14, color: '#556', marginBottom: 4 }}>Project Main · 실시간 DB 관리</div>
         <h1 style={{ margin: 0, fontSize: 30, color: '#1f2937' }}>프로젝트 DB 운영</h1>
         <p style={{ margin: '8px 0 0', color: '#475467', lineHeight: 1.6 }}>
