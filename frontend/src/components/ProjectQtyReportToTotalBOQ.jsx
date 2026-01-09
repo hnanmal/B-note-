@@ -96,7 +96,7 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
   }, [apiBaseUrl, selectedRevKey]);
 
   return (
-    <div style={{ width: '100%', overflowX: 'auto', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #0001', padding: 16 }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #0001', padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 18, color: '#d97706' }}>
           Q'ty Report to Total BOQ
@@ -114,7 +114,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
           </select>
         </div>
       </div>
-      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 14 }}>
+      <div style={{ flex: '1 1 auto', overflow: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 14 }}>
         <thead>
           <tr style={{ background: '#f7c748', color: '#2c1b00' }}>
             {baseHeaders.map((h) => (
@@ -162,7 +163,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
             })
           )}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }
