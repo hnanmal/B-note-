@@ -188,9 +188,12 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
         <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1200, fontSize: 10 }}>
         <thead>
           <tr style={{ background: '#f7c748', color: '#2c1b00' }}>
-            {baseHeaders.map((h) => (
-              <th key={h} style={{ padding: '6px 4px', border: '1px solid #e5e7eb', fontWeight: 700 }}>{h}</th>
-            ))}
+            {baseHeaders.map((h, i) => {
+              const thStyle = { padding: '6px 4px', border: '1px solid #e5e7eb', fontWeight: 700 };
+              if (i === 0) { thStyle.minWidth = 140; thStyle.maxWidth = 140; } // Work Master Code (approx 15 chars)
+              if (i === 1) { thStyle.minWidth = 40; thStyle.maxWidth = 40; } // Gauge Code very narrow
+              return <th key={h} style={thStyle}>{h}</th>;
+            })}
             {displayedBuildings.map((b) => (
               <th key={b} style={{ padding: '6px 4px', border: '1px solid #e5e7eb', fontWeight: 700 }}>{b}</th>
             ))}
@@ -220,8 +223,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                 <React.Fragment key={`group-${groupIdx}-${groupName}`}>
                   <tr style={{ background: '#e6f9e6' }}>
                     {/* empty cells for first two columns */}
-                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
-                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}></td>
+                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140 }}></td>
+                    <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40 }}></td>
                     <td style={{ padding: '6px 8px', border: '1px solid #e6e6e6', fontWeight: 700 }}>
                       {groupName || '(Uncategorized)'}
                     </td>
@@ -241,8 +244,8 @@ export default function ProjectQtyReportToTotalBOQ({ apiBaseUrl }) {
                           if (!filtered.length) return null;
                           return filtered.map((row, idx) => (
                     <tr key={`${row.wm_code}||${row.gauge}||${groupIdx}||${idx}`}>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.wm_code}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.gauge}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 140, maxWidth:140, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.wm_code}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6', minWidth: 40, maxWidth:40, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.gauge}</td>
                       <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.description}</td>
                       <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{row.spec}</td>
                       <td style={{ padding: '4px 6px', border: '1px solid #f3f4f6' }}>{''}</td>
