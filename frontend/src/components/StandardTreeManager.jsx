@@ -642,14 +642,15 @@ export default function StandardTreeManager({
                                             background: isDerived ? '#ede9fe' : undefined,
                                             padding: isDerived ? '2px 6px' : undefined,
                                             borderRadius: isDerived ? 6 : undefined,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 4,
                                         }}
                                     >
-                                        {derivedLabel} <small style={{ color: '#666', fontSize: 10 }}>({node.type})</small>
                                         {isDerived && (
                                             <span
                                                 style={{
                                                     fontSize: 10,
-                                                    marginLeft: 4,
                                                     padding: '1px 4px',
                                                     borderRadius: 4,
                                                     background: '#e0e7ff',
@@ -659,6 +660,7 @@ export default function StandardTreeManager({
                                                 파생
                                             </span>
                                         )}
+                                        {derivedLabel} <small style={{ color: '#666', fontSize: 10 }}>({node.type})</small>
                                         {isUnselectedHighlight && (
                                             <span
                                                 style={{
