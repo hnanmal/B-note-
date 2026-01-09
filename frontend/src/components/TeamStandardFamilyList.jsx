@@ -1638,11 +1638,14 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
       const isEditing = Boolean(metadata?.id && editingAssignmentId === metadata.id);
       const hasChildren = node.children && node.children.length > 0;
       const label = deriveLabel(node);
+      // Indent derived nodes one extra level
+      const isDerived = Boolean(node.derive_from);
+      const indentLevel = level + (isDerived ? 1 : 0);
       return (
         <div
           key={`assigned-${node.id}-${level}`}
           style={{
-            marginLeft: level * 16,
+            marginLeft: indentLevel * 16,
             marginBottom: 10,
             paddingBottom: 4,
             borderBottom: '1px dashed rgba(148, 163, 184, 0.3)',
