@@ -633,7 +633,7 @@ export default function StandardTreeManager({
                                     />
                                 )}
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    {level === 2 && (
+                                    {level === 2 && !node.derive_from && (
                                         <span style={{ fontWeight: 600, fontSize: 12 }}>▸</span>
                                     )}
                                     <span

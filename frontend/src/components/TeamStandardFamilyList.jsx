@@ -1654,6 +1654,10 @@ export default function TeamStandardFamilyList({ apiBaseUrl = API_BASE_URL }) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {/* Arrow marker: ▻ for derived, default for others */}
+            <span style={{ fontSize: 14, color: '#64748b', minWidth: 16, display: 'inline-block' }}>
+              {isDerived ? '▻' : '▸'}
+            </span>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{label}</span>
             <span style={{ fontSize: 11, color: '#475467' }}>({node.type || '표준'})</span>
             <div style={{ flex: 1, fontSize: 11, color: '#1f2937' }}>
