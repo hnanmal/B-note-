@@ -37,13 +37,13 @@ const parseResponse = async (response) => {
 
 export default function ProjectPage() {
   const [projectDbs, setProjectDbs] = useState([]);
-  const [newName, setNewName] = useState('');
   const [adminKey, setAdminKey] = useState('');
   const [status, setStatus] = useState(null);
   const [renameTarget, setRenameTarget] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [loadingList, setLoadingList] = useState(false);
   const [actionPending, setActionPending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [backupModalOpen, setBackupModalOpen] = useState(false);
   const [backupItems, setBackupItems] = useState([]);
   const [loadingBackups, setLoadingBackups] = useState(false);
@@ -79,30 +79,6 @@ export default function ProjectPage() {
   }, []);
 
   const setTemporaryError = (message) => setStatus({ type: 'error', message });
-
-  const handleCreate = async () => {
-    const trimmed = newName.trim();
-    if (!trimmed) {
-      setTemporaryError('DB 이름을 입력해주세요.');
-      return;
-    }
-    setActionPending(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/project-db/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ display_name: trimmed }),
-      });
-      await parseResponse(response);
-      setNewName('');
-      setStatus({ type: 'success', message: `’${trimmed}’ 프로젝트 DB가 생성되었습니다.` });
-      await fetchProjectDbs();
-    } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setActionPending(false);
-    }
-  };
 
   const handleCopy = async (fileName, displayName) => {
     setActionPending(true);
@@ -250,6 +226,16 @@ export default function ProjectPage() {
   }, [projectDbs]);
 
   const totalCount = projectDbs.length;
+  const filteredProjectDbs = useMemo(() => {
+    const q = (searchTerm || '').trim().toLowerCase();
+    if (!q) return projectDbs;
+    return projectDbs.filter((db) => {
+      const display = (db.display_name || '').toLowerCase();
+      const file = (db.file_name || '').toLowerCase();
+      return display.includes(q) || file.includes(q);
+    });
+  }, [projectDbs, searchTerm]);
+  const filteredCount = filteredProjectDbs.length;
   const totalSize = useMemo(() => {
     if (!projectDbs.length) return '0 KB';
     return formatBytes(projectDbs.reduce((sum, db) => sum + (db.size || 0), 0));
@@ -282,22 +268,15 @@ export default function ProjectPage() {
       </header>
 
       <section style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ flex: '1 1 240px', minWidth: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#444' }}>새 프로젝트 DB 생성</label>
+        <div style={{ flex: '1 1 280px', minWidth: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#444' }}>DB 검색</label>
           <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="예: BIM 표준 2026"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="이름 또는 파일명으로 검색"
             style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(15,23,42,0.2)', fontSize: 14 }}
           />
         </div>
-        <button
-          onClick={handleCreate}
-          disabled={actionPending}
-          style={{ borderRadius: 8, border: 'none', padding: '10px 18px', background: actionPending ? '#a5b4fc' : '#1d4ed8', color: '#fff', fontWeight: 600, cursor: actionPending ? 'not-allowed' : 'pointer' }}
-        >
-          생성
-        </button>
         <button
           type="button"
           onClick={openBackupModal}
@@ -315,14 +294,16 @@ export default function ProjectPage() {
           백업 폴더 보기
         </button>
         <div style={{ fontSize: 12, color: '#64748b' }}>
-          {loadingList ? '프로젝트 DB 목록을 불러오는 중입니다…' : `총 ${totalCount}개 · 마지막 업데이트 ${lastUpdated} · 총 용량 ${totalSize}`}
+          {loadingList
+            ? '프로젝트 DB 목록을 불러오는 중입니다…'
+            : `표시 ${filteredCount} / 총 ${totalCount}개 · 마지막 업데이트 ${lastUpdated} · 총 용량 ${totalSize}`}
         </div>
       </section>
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>프로젝트 DB 목록</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12 }}>
-          {projectDbs.map((db) => (
+          {filteredProjectDbs.map((db) => (
             <article key={db.file_name} style={{ borderRadius: 10, border: '1px solid rgba(15,23,42,0.12)', padding: 12, display: 'flex', flexDirection: 'column', gap: 6, background: '#f8fafc' }}>
               <button
                 type="button"
